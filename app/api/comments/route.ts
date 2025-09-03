@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 import { randomUUID } from 'node:crypto'
 import { db, dbSchema } from '@/lib/db/client'
 import { and, eq } from 'drizzle-orm'
@@ -35,15 +37,30 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as {
       entityType: 'task' | 'subtask'
       entityId: string
-      userId: string
-      userName: string
-      avatar?: string | null
       content: string
     }
 
-    if (!body?.entityType || !body?.entityId || !body?.userId || !body?.userName || !body?.content?.trim()) {
+    if (!body?.entityType || !body?.entityId || !body?.content?.trim()) {
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 })
     }
+
+    // Authenticate user via JWT cookie
+    const cookieStore = await cookies()
+    const token = cookieStore.get(AUTH_COOKIE)?.value
+    if (!token) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    let userIdFromToken: string
+    try {
+      const payload = await verifyAuthToken(token)
+      userIdFromToken = String(payload.sub)
+    } catch {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Load user to attach display fields
+    const userRow = (
+      await db.select().from(dbSchema.users).where(eq(dbSchema.users.id, userIdFromToken))
+    )[0]
+    if (!userRow) return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 })
 
     const now = new Date().toISOString()
     const id = randomUUID()
@@ -52,9 +69,9 @@ export async function POST(req: NextRequest) {
       id,
       entityType: body.entityType,
       entityId: body.entityId,
-      userId: body.userId,
-      userName: body.userName,
-      avatar: body.avatar || null,
+      userId: userRow.id,
+      userName: userRow.name,
+      avatar: userRow.avatar || null,
       content: body.content.trim(),
       createdAt: now,
       updatedAt: now,

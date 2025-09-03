@@ -72,6 +72,10 @@ export function TaskDashboard() {
   const [activities, setActivities] = useState<UIActivity[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const dueSoon = tasks
+    .filter((t) => !!t.dueDate && new Date(t.dueDate!) >= new Date() && new Date(t.dueDate!) <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) && !t.isOverdue)
+    .sort((a, b) => new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime())
+    .slice(0, 3)
 
   useEffect(() => {
     let abort = false
@@ -225,7 +229,7 @@ export function TaskDashboard() {
               <Button variant="ghost" className="w-full justify-start h-10 px-3">
                 <div className="flex items-center gap-2">
                   <Avatar className="h-6 w-6">
-                    <AvatarImage src={user?.avatar || "/placeholder.svg"} />
+                    <AvatarImage src={user?.avatar || "/placeholder-user.jpg"} />
                     <AvatarFallback className="text-xs">
                       {user?.name
                         ?.split(" ")
@@ -397,7 +401,7 @@ export function TaskDashboard() {
                     <div className="flex -space-x-2">
                       {task.assignees.map((assignee, index) => (
                         <Avatar key={index} className="h-6 w-6 border-2 border-white">
-                          <AvatarImage src={assignee.avatar || "/placeholder.svg"} />
+                          <AvatarImage src={assignee.avatar || "/placeholder-user.jpg"} />
                           <AvatarFallback className="text-xs">{assignee.name[0]}</AvatarFallback>
                         </Avatar>
                       ))}
@@ -445,30 +449,26 @@ export function TaskDashboard() {
 
           {!rightPanelCollapsed && (
             <div className="space-y-6">
-              {/* Due Soon */}
+              {/* Due Soon (derived from live tasks) */}
               <div>
                 <h3 className="font-semibold text-slate-900 mb-3">Due Soon</h3>
                 <div className="space-y-2">
-                  <button
-                    onClick={() => handleTaskClick(2)}
-                    className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 w-full text-left transition-colors"
-                  >
-                    <Circle className="h-4 w-4 text-red-500" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">API integration testing</p>
-                      <p className="text-xs text-red-600">Overdue</p>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => handleTaskClick(1)}
-                    className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 w-full text-left transition-colors"
-                  >
-                    <Circle className="h-4 w-4 text-slate-400" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">Design system components</p>
-                      <p className="text-xs text-slate-500">Tomorrow</p>
-                    </div>
-                  </button>
+                  {dueSoon.length === 0 && (
+                    <p className="text-xs text-slate-500">No tasks due in the next 3 days.</p>
+                  )}
+                  {dueSoon.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => handleTaskClick(t.id)}
+                      className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 w-full text-left transition-colors"
+                    >
+                      <Circle className={`h-4 w-4 ${t.isOverdue ? 'text-red-500' : 'text-slate-400'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">{t.title}</p>
+                        <p className="text-xs text-slate-500">Due {t.dueDate}</p>
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </div>
 
