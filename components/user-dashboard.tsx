@@ -45,279 +45,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/contexts/auth-context"
 
-// Projects will be loaded from the API at runtime
-const mockUserProjects: Project[] = [
-  {
-    id: "660e8400-e29b-41d4-a716-446655440001",
-    name: "Website Redesign",
-    description: "Complete overhaul of the company website with modern design and improved UX",
-    status: "in-progress",
-    priority: "high",
-    dueDate: "2024-02-15",
-    createdAt: "2024-01-01",
-    progress: 68,
-    tasksCompleted: 1,
-    totalTasks: 2,
-    ownerId: "550e8400-e29b-41d4-a716-446655440001",
-    owner: {
-      id: "550e8400-e29b-41d4-a716-446655440001",
-      name: "Sarah Chen",
-      avatar: "/diverse-woman-portrait.png",
-      initials: "SC",
-    },
-    team: [
-      {
-        id: "550e8400-e29b-41d4-a716-446655440005",
-        name: "Alice Johnson",
-        avatar: "/diverse-woman-portrait.png",
-        initials: "AJ",
-      },
-      { id: "550e8400-e29b-41d4-a716-446655440006", name: "Bob Smith", avatar: "/thoughtful-man.png", initials: "BS" },
-    ],
-    tags: ["Design", "Frontend", "UX"],
-    color: "indigo",
-    tasks: [
-      {
-        id: "770e8400-e29b-41d4-a716-446655440001",
-        projectId: "660e8400-e29b-41d4-a716-446655440001",
-        title: "Design System Updates",
-        description: "Update color palette and typography",
-        status: "done",
-        priority: "high",
-        dueDate: "2024-01-15",
-        createdAt: "2024-01-01",
-        progress: 100,
-        assignees: [
-          {
-            id: "550e8400-e29b-41d4-a716-446655440006",
-            name: "Bob Smith",
-            avatar: "/thoughtful-man.png",
-            initials: "BS",
-          },
-        ],
-        createdById: "550e8400-e29b-41d4-a716-446655440001",
-        createdBy: {
-          id: "550e8400-e29b-41d4-a716-446655440001",
-          name: "Sarah Chen",
-          avatar: "/diverse-woman-portrait.png",
-          initials: "SC",
-        },
-        approvalStatus: "approved",
-        subtasks: [],
-        subtasksCompleted: 4,
-        totalSubtasks: 4,
-        tags: ["Design", "UI"],
-        comments: [
-          {
-            id: "1",
-            userId: "550e8400-e29b-41d4-a716-446655440006",
-            user: "Bob Smith",
-            avatar: "/thoughtful-man.png",
-            content: "Completed all button variants",
-            createdAt: "2024-01-14",
-          },
-        ],
-        attachments: [],
-      },
-      {
-        id: "770e8400-e29b-41d4-a716-446655440002",
-        projectId: "660e8400-e29b-41d4-a716-446655440001",
-        title: "Homepage Redesign",
-        description: "Complete redesign of the homepage layout",
-        status: "in-progress",
-        priority: "high",
-        dueDate: "2024-01-18",
-        createdAt: "2024-01-02",
-        progress: 60,
-        assignees: [
-          {
-            id: "550e8400-e29b-41d4-a716-446655440006",
-            name: "Bob Smith",
-            avatar: "/thoughtful-man.png",
-            initials: "BS",
-          },
-        ],
-        createdById: "550e8400-e29b-41d4-a716-446655440001",
-        createdBy: {
-          id: "550e8400-e29b-41d4-a716-446655440001",
-          name: "Sarah Chen",
-          avatar: "/diverse-woman-portrait.png",
-          initials: "SC",
-        },
-        approvalStatus: "approved",
-        subtasks: [],
-        subtasksCompleted: 3,
-        totalSubtasks: 5,
-        tags: ["Design", "Frontend"],
-        comments: [
-          {
-            id: "2",
-            userId: "550e8400-e29b-41d4-a716-446655440005",
-            user: "Alice Johnson",
-            avatar: "/diverse-woman-portrait.png",
-            content: "Working on mobile responsive design",
-            createdAt: "2024-01-16",
-          },
-        ],
-        attachments: [],
-      },
-    ],
-  },
-  {
-    id: "660e8400-e29b-41d4-a716-446655440002",
-    name: "Mobile App Development",
-    description: "Native iOS and Android app for customer engagement",
-    status: "planning",
-    priority: "medium",
-    dueDate: "2024-03-30",
-    createdAt: "2024-01-05",
-    progress: 25,
-    tasksCompleted: 0,
-    totalTasks: 1,
-    ownerId: "550e8400-e29b-41d4-a716-446655440002",
-    owner: {
-      id: "550e8400-e29b-41d4-a716-446655440002",
-      name: "Marcus Johnson",
-      avatar: "/thoughtful-man.png",
-      initials: "MJ",
-    },
-    team: [
-      {
-        id: "550e8400-e29b-41d4-a716-446655440006",
-        name: "Bob Smith",
-        avatar: "/thoughtful-man.png",
-        initials: "BS",
-      },
-    ],
-    tags: ["Mobile", "iOS", "Android"],
-    color: "emerald",
-    tasks: [
-      {
-        id: "770e8400-e29b-41d4-a716-446655440003",
-        projectId: "660e8400-e29b-41d4-a716-446655440002",
-        title: "Mobile UI Components",
-        description: "Create reusable UI components for mobile app",
-        status: "in-progress",
-        priority: "medium",
-        dueDate: "2024-01-25",
-        createdAt: "2024-01-10",
-        progress: 30,
-        assignees: [
-          {
-            id: "550e8400-e29b-41d4-a716-446655440006",
-            name: "Bob Smith",
-            avatar: "/thoughtful-man.png",
-            initials: "BS",
-          },
-        ],
-        createdById: "550e8400-e29b-41d4-a716-446655440002",
-        createdBy: {
-          id: "550e8400-e29b-41d4-a716-446655440002",
-          name: "Marcus Johnson",
-          avatar: "/thoughtful-man.png",
-          initials: "MJ",
-        },
-        approvalStatus: "approved",
-        subtasks: [],
-        subtasksCompleted: 1,
-        totalSubtasks: 6,
-        tags: ["Mobile", "UI"],
-        comments: [
-          {
-            id: "3",
-            userId: "550e8400-e29b-41d4-a716-446655440006",
-            user: "Bob Smith",
-            avatar: "/thoughtful-man.png",
-            content: "Started with button components",
-            createdAt: "2024-01-15",
-          },
-        ],
-        attachments: [],
-      },
-    ],
-  },
-]
-
-const myCreatedTasks = [
-  {
-    id: "770e8400-e29b-41d4-a716-446655440004",
-    projectId: "660e8400-e29b-41d4-a716-446655440001",
-    projectName: "Website Redesign",
-    title: "Implement dark mode toggle",
-    status: "pending" as const,
-    createdAt: "2024-01-14",
-    description: "Add dark mode support across all components",
-    tags: ["Frontend", "Feature"],
-    approvalStatus: "pending" as const,
-  },
-  {
-    id: "770e8400-e29b-41d4-a716-446655440005",
-    projectId: "660e8400-e29b-41d4-a716-446655440001",
-    projectName: "Website Redesign",
-    title: "Fix responsive layout issues",
-    status: "approved" as const,
-    createdAt: "2024-01-12",
-    description: "Resolve mobile layout problems on dashboard",
-    tags: ["Frontend", "Bug Fix"],
-    approvalStatus: "approved" as const,
-    approvedAt: "2024-01-13",
-  },
-]
-
-const activities = [
-  { action: "completed", task: "Design System Updates", project: "Website Redesign", time: "2 hours ago" },
-  { action: "commented on", task: "Homepage Redesign", project: "Website Redesign", time: "4 hours ago" },
-  { action: "created", task: "Implement dark mode toggle", project: "Website Redesign", time: "1 day ago" },
-]
-
-const userCalendarEvents = [
-  {
-    id: "1",
-    title: "Design Review Meeting",
-    type: "meeting",
-    date: "2024-01-18",
-    time: "10:00 AM",
-    duration: "1 hour",
-    attendees: ["Sarah Chen", "Alice Johnson"],
-    location: "Conference Room A",
-    project: "Website Redesign",
-    color: "indigo",
-  },
-  {
-    id: "2",
-    title: "Homepage Redesign",
-    type: "task",
-    date: "2024-01-18",
-    time: "Due",
-    priority: "high",
-    project: "Website Redesign",
-    progress: 60,
-    color: "indigo",
-  },
-  {
-    id: "3",
-    title: "Mobile UI Components",
-    type: "task",
-    date: "2024-01-25",
-    time: "Due",
-    priority: "medium",
-    project: "Mobile App Development",
-    progress: 30,
-    color: "emerald",
-  },
-  {
-    id: "4",
-    title: "Sprint Planning",
-    type: "meeting",
-    date: "2024-01-22",
-    time: "2:00 PM",
-    duration: "2 hours",
-    attendees: ["Marcus Johnson", "Elena Rodriguez"],
-    location: "Virtual",
-    project: "Mobile App Development",
-    color: "emerald",
-  },
-]
+// All data is fetched from APIs at runtime; removed all mock arrays
 
 export function UserDashboard() {
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false)
@@ -326,8 +54,10 @@ export function UserDashboard() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [projects, setProjects] = useState<Project[]>([])
   const [loadingProjects, setLoadingProjects] = useState(false)
+  const [errorProjects, setErrorProjects] = useState<string | null>(null)
   const [myTasks, setMyTasks] = useState<Task[]>([])
   const [loadingTasks, setLoadingTasks] = useState(false)
+  const [errorTasks, setErrorTasks] = useState<string | null>(null)
   const [createTaskOpen, setCreateTaskOpen] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
@@ -343,9 +73,13 @@ export function UserDashboard() {
         const json = await res.json()
         if (!ignore && res.ok && json.success) {
           setProjects(json.data as Project[])
+          setErrorProjects(null)
+        } else if (!ignore) {
+          setErrorProjects(json?.error || 'Failed to load projects')
         }
       } catch (e) {
         console.error('Failed to load projects', e)
+        if (!ignore) setErrorProjects('Failed to load projects')
       } finally {
         if (!ignore) setLoadingProjects(false)
       }
@@ -365,9 +99,13 @@ export function UserDashboard() {
         const json = await res.json()
         if (!ignore && res.ok && json.success) {
           setMyTasks(json.data as Task[])
+          setErrorTasks(null)
+        } else if (!ignore) {
+          setErrorTasks(json?.error || 'Failed to load tasks')
         }
       } catch (e) {
         console.error('Failed to load tasks', e)
+        if (!ignore) setErrorTasks('Failed to load tasks')
       } finally {
         if (!ignore) setLoadingTasks(false)
       }
@@ -435,19 +173,41 @@ export function UserDashboard() {
   const getUpcomingEvents = () => {
     const today = new Date()
     const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
-
-    return userCalendarEvents
-      .filter((event) => {
-        const eventDate = new Date(event.date)
-        return eventDate >= today && eventDate <= nextWeek
+    return myTasks
+      .filter((t) => {
+        const d = new Date(t.dueDate)
+        return d >= today && d <= nextWeek
       })
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
       .slice(0, 4)
+      .map((t) => ({
+        id: t.id,
+        title: t.title,
+        type: 'task' as const,
+        date: t.dueDate,
+        time: 'Due',
+        priority: t.priority,
+        project: projects.find((p) => p.id === t.projectId)?.name || 'Project',
+        progress: t.progress,
+        color: projects.find((p) => p.id === t.projectId)?.color || 'indigo',
+      }))
   }
 
   const getTodaysEvents = () => {
     const today = new Date().toISOString().split("T")[0]
-    return userCalendarEvents.filter((event) => event.date === today)
+    return myTasks
+      .filter((t) => t.dueDate === today)
+      .map((t) => ({
+        id: t.id,
+        title: t.title,
+        type: 'task' as const,
+        date: t.dueDate,
+        time: 'Due',
+        priority: t.priority,
+        project: projects.find((p) => p.id === t.projectId)?.name || 'Project',
+        progress: t.progress,
+        color: projects.find((p) => p.id === t.projectId)?.color || 'indigo',
+      }))
   }
 
   return (
@@ -521,7 +281,7 @@ export function UserDashboard() {
               <Star className="h-4 w-4 text-slate-600" />
               <span className="text-sm font-medium text-slate-900">Created by Me</span>
               <Badge variant="outline" className="ml-auto text-xs">
-                {myCreatedTasks.length}
+                {myTasks.filter((t) => t.createdById === (user?.id || '')).length}
               </Badge>
             </button>
             <button
@@ -592,7 +352,7 @@ export function UserDashboard() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={user?.avatar || "/thoughtful-man.png"} />
+                      <AvatarImage src={user?.avatar || "/placeholder-user.jpg"} />
                       <AvatarFallback>{user?.name?.charAt(0) || "U"}</AvatarFallback>
                     </Avatar>
                   </Button>
@@ -627,6 +387,16 @@ export function UserDashboard() {
 
         {/* Center Pane */}
         <div className="flex-1 p-6 overflow-auto">
+          {(loadingProjects || loadingTasks) && (
+            <div className="mb-4 rounded-md bg-slate-50 border border-slate-200 p-3 text-sm text-slate-700">
+              Loading your projects and tasks...
+            </div>
+          )}
+          {(errorProjects || errorTasks) && (
+            <div className="mb-4 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+              {errorProjects || errorTasks}
+            </div>
+          )}
           <div className="mb-8">
             <Card className="mb-6">
               <CardHeader className="pb-4">
@@ -799,6 +569,11 @@ export function UserDashboard() {
           </div>
 
           <div className="space-y-6 mb-8">
+            {!loadingProjects && !loadingTasks && projects.length === 0 && myTasks.length === 0 && (
+              <Card>
+                <CardContent className="py-10 text-center text-slate-500">No data yet. Create your first task to get started.</CardContent>
+              </Card>
+            )}
             {projects.map((project) => {
               const myTasksInProject = myTasks.filter((task) =>
                 task.projectId === project.id && task.assignees?.some((a) => a.id === (user?.id || "")),
