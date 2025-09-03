@@ -382,6 +382,7 @@ export function AdminDashboard() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+          </div>
         </div>
 
         {/* Dashboard Metrics */}
@@ -520,7 +521,6 @@ export function AdminDashboard() {
                 </CardContent>
               </Card>
             </div>
-          </div>
 
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-slate-900 mb-2">Project Overview</h2>
@@ -732,9 +732,7 @@ export function AdminDashboard() {
             )}
           </div>
         </div>
-      </div>
-
-      {/* Right Panel - Team Stats */}
+      
       <div
         className={`bg-white border-l border-slate-200 transition-all duration-300 ${rightPanelCollapsed ? "w-12" : "w-[320px]"}`}
       >
