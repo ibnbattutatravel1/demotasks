@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
@@ -9,104 +9,16 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { CalendarDays, Plus, MoreHorizontal, ArrowLeft, FolderOpen } from "lucide-react"
 import type { Project } from "@/lib/types"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu"
+import { useToast } from "@/hooks/use-toast"
 
-const mockProjects: Project[] = [
-  {
-    id: "1",
-    name: "Website Redesign",
-    description: "Complete overhaul of the company website",
-    status: "active",
-    priority: "high",
-    createdAt: "2024-01-01",
-    updatedAt: "2024-01-14",
-    createdBy: "admin",
-    assignees: ["Sarah Chen", "Marcus Johnson"],
-    dueDate: "2024-02-15",
-    progress: 68,
-    tags: ["Design", "Frontend"],
-  },
-  {
-    id: "2",
-    name: "Mobile App Development",
-    description: "Native iOS and Android app development",
-    status: "active",
-    priority: "medium",
-    createdAt: "2024-01-05",
-    updatedAt: "2024-01-14",
-    createdBy: "admin",
-    assignees: ["Elena Rodriguez", "David Kim"],
-    dueDate: "2024-03-30",
-    progress: 45,
-    tags: ["Mobile", "Development"],
-  },
-]
-
-const mockTasks = [
-  {
-    id: "1",
-    projectId: "1",
-    title: "Design System Updates",
-    description: "Update color palette and typography",
-    status: "todo",
-    priority: "high",
-    assignees: ["Sarah Chen"],
-    dueDate: "2024-01-15",
-    tags: ["Design", "UI"],
-    approvalStatus: "approved",
-    createdAt: "2024-01-10",
-    updatedAt: "2024-01-14",
-    createdBy: "Sarah Chen",
-    progress: 25,
-  },
-  {
-    id: "2",
-    projectId: "1",
-    title: "API Integration",
-    description: "Connect frontend with backend services",
-    status: "in-progress",
-    priority: "high",
-    assignees: ["Marcus Johnson"],
-    dueDate: "2024-01-18",
-    tags: ["Development", "Backend"],
-    approvalStatus: "approved",
-    createdAt: "2024-01-08",
-    updatedAt: "2024-01-14",
-    createdBy: "Marcus Johnson",
-    progress: 60,
-  },
-  {
-    id: "3",
-    projectId: "2",
-    title: "User Testing",
-    description: "Conduct usability testing sessions",
-    status: "review",
-    priority: "medium",
-    assignees: ["Elena Rodriguez"],
-    dueDate: "2024-01-20",
-    tags: ["Research", "UX"],
-    approvalStatus: "pending",
-    createdAt: "2024-01-12",
-    updatedAt: "2024-01-14",
-    createdBy: "Elena Rodriguez",
-    progress: 80,
-  },
-  {
-    id: "4",
-    projectId: "2",
-    title: "Documentation",
-    description: "Update project documentation",
-    status: "done",
-    priority: "low",
-    assignees: ["David Kim"],
-    dueDate: "2024-01-12",
-    tags: ["Documentation"],
-    approvalStatus: "approved",
-    createdAt: "2024-01-05",
-    updatedAt: "2024-01-12",
-    createdBy: "David Kim",
-    progress: 100,
-  },
-]
 
 const columns = [
   { id: "todo", title: "To Do", color: "bg-slate-100" },
@@ -118,9 +30,33 @@ const columns = [
 export default function KanbanPage() {
   const { user } = useAuth()
   const router = useRouter()
-  const [tasks, setTasks] = useState(mockTasks)
-  const [projects] = useState(mockProjects)
-  const [expandedProjects, setExpandedProjects] = useState(new Set(["1", "2"]))
+  const [tasks, setTasks] = useState<any[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
+  const { toast } = useToast()
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setIsLoading(true)
+        // fetch projects
+        const [projRes, taskRes] = await Promise.all([
+          fetch('/api/projects'),
+          fetch(user?.role === 'admin' ? '/api/tasks' : `/api/tasks?assigneeId=${encodeURIComponent(user?.id || '')}`),
+        ])
+        const projJson = await projRes.json()
+        if (projRes.ok && projJson.success) setProjects(projJson.data as Project[])
+        const taskJson = await taskRes.json()
+        if (taskRes.ok && taskJson.success) setTasks(taskJson.data as any[])
+      } catch (e) {
+        console.error('Failed to load kanban data', e)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    load()
+  }, [user?.id, user?.role])
 
   const handleAddTask = () => {
     router.push("/tasks/new")
@@ -140,8 +76,7 @@ export default function KanbanPage() {
     setExpandedProjects(newExpanded)
   }
 
-  const filteredTasks =
-    user?.role === "admin" ? tasks : tasks.filter((task) => task.assignees.includes(user?.name || ""))
+  const filteredTasks = tasks
 
   const getTasksByStatus = (status: string) => {
     return filteredTasks.filter((task) => task.status === status)
@@ -150,6 +85,70 @@ export default function KanbanPage() {
   const getProjectForTask = (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId)
     return projects.find((p) => p.id === task?.projectId)
+  }
+
+  const patchTask = async (id: string, payload: Partial<{ status: string; priority: string }>) => {
+    const res = await fetch(`/api/tasks/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const json = await res.json()
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to update task')
+    return json.data
+  }
+
+  const postActivity = async (taskId: string, message: string) => {
+    try {
+      if (!user) return
+      await fetch('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entityType: 'task',
+          entityId: taskId,
+          userId: user.id,
+          userName: user.name || 'User',
+          avatar: user.avatar || null,
+          content: message,
+        }),
+      })
+    } catch {}
+  }
+
+  const updateTaskLocal = (id: string, changes: any) => {
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...changes } : t)))
+  }
+
+  const handleChangeStatus = async (taskId: string, status: 'todo' | 'in-progress' | 'review' | 'done') => {
+    const prev = tasks.find((t) => t.id === taskId)
+    if (!prev) return
+    updateTaskLocal(taskId, { status })
+    try {
+      const updated = await patchTask(taskId, { status })
+      // sync server-computed fields (e.g., progress)
+      setTasks((prevList) => prevList.map((t) => (t.id === taskId ? { ...t, ...updated } : t)))
+      toast({ title: 'Status updated', description: `${prev.title} → ${status}` })
+      postActivity(taskId, `changed status to "${status}"`)
+    } catch (e: any) {
+      updateTaskLocal(taskId, { status: prev.status })
+      toast({ title: 'Update failed', description: e.message, variant: 'destructive' as any })
+    }
+  }
+
+  const handleChangePriority = async (taskId: string, priority: 'low' | 'medium' | 'high') => {
+    const prev = tasks.find((t) => t.id === taskId)
+    if (!prev) return
+    updateTaskLocal(taskId, { priority })
+    try {
+      const updated = await patchTask(taskId, { priority })
+      setTasks((prevList) => prevList.map((t) => (t.id === taskId ? { ...t, ...updated } : t)))
+      toast({ title: 'Priority updated', description: `${prev.title} → ${priority}` })
+      postActivity(taskId, `updated priority to "${priority}"`)
+    } catch (e: any) {
+      updateTaskLocal(taskId, { priority: prev.priority })
+      toast({ title: 'Update failed', description: e.message, variant: 'destructive' as any })
+    }
   }
 
   const getPriorityColor = (priority: string) => {
@@ -250,7 +249,9 @@ export default function KanbanPage() {
 
               {/* Column Content */}
               <div className="bg-white rounded-b-2xl p-4 min-h-[600px] space-y-4 border-l border-r border-b border-gray-200">
-                {getTasksByStatus(column.id).map((task) => {
+                {isLoading ? (
+                  <div className="text-sm text-gray-500">Loading...</div>
+                ) : getTasksByStatus(column.id).map((task) => {
                   const project = getProjectForTask(task.id)
                   return (
                     <Card
@@ -270,9 +271,25 @@ export default function KanbanPage() {
                               {task.title}
                             </CardTitle>
                           </div>
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button aria-label="Task actions" variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-44">
+                              <DropdownMenuLabel>Change status</DropdownMenuLabel>
+                              <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'todo')}>To Do</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'in-progress')}>In Progress</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'review')}>Review</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'done')}>Done</DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel>Priority</DropdownMenuLabel>
+                              <DropdownMenuItem onClick={() => handleChangePriority(task.id, 'low')}>Low</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleChangePriority(task.id, 'medium')}>Medium</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleChangePriority(task.id, 'high')}>High</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                         <p className="text-xs text-gray-600 mt-1">{task.description}</p>
                       </CardHeader>
@@ -286,7 +303,7 @@ export default function KanbanPage() {
 
                         {/* Tags */}
                         <div className="flex flex-wrap gap-1">
-                          {task.tags.map((tag) => (
+                          {task.tags.map((tag: string) => (
                             <Badge key={tag} variant="outline" className="text-xs bg-gray-50">
                               {tag}
                             </Badge>
@@ -304,22 +321,19 @@ export default function KanbanPage() {
                         {/* Assignees */}
                         <div className="flex items-center gap-2">
                           <div className="flex -space-x-1">
-                            {task.assignees.map((assignee, index) => (
+                            {task.assignees.map((assignee: any, index: number) => (
                               <Avatar key={index} className="w-6 h-6 border-2 border-white">
                                 <AvatarImage
-                                  src={`/abstract-geometric-shapes.png?key=ndkjd&key=r9v2b&height=24&width=24&query=${assignee}`}
-                                  alt={assignee}
+                                  src={assignee?.avatar || `/abstract-geometric-shapes.png?height=24&width=24&query=${encodeURIComponent(assignee?.name || assignee?.id || 'user')}`}
+                                  alt={assignee?.name || 'User'}
                                 />
                                 <AvatarFallback className="text-xs bg-indigo-100 text-indigo-700">
-                                  {assignee
-                                    .split(" ")
-                                    .map((n) => n[0])
-                                    .join("")}
+                                  {(assignee?.initials || assignee?.name?.split(" ")?.map((n: string) => n[0]).join("") || "U").toString()}
                                 </AvatarFallback>
                               </Avatar>
                             ))}
                           </div>
-                          <span className="text-xs text-gray-700">{task.assignees.join(", ")}</span>
+                          <span className="text-xs text-gray-700">{task.assignees.map((a: any) => a?.name || a?.id).join(", ")}</span>
                         </div>
                       </CardContent>
                     </Card>

@@ -98,14 +98,60 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       // replace assignees
       await db.delete(dbSchema.taskAssignees).where(eq(dbSchema.taskAssignees.taskId, id))
       if (body.assigneeIds.length) {
-        await db.insert(dbSchema.taskAssignees).values(body.assigneeIds.map((userId) => ({ taskId: id, userId })))
+        try {
+          // Ensure all users exist
+          await Promise.all(
+            body.assigneeIds.map((userId) =>
+              db
+                .insert(dbSchema.users)
+                .values({
+                  id: userId,
+                  name: `User ${userId}`,
+                  email: `${userId}@example.com`,
+                  initials: (userId[0] || 'U').toUpperCase(),
+                  role: 'user',
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                })
+                .onConflictDoUpdate({
+                  target: dbSchema.users.id,
+                  set: { updatedAt: new Date().toISOString() },
+                })
+            )
+          )
+          
+          // Insert new assignees
+          await db.insert(dbSchema.taskAssignees).values(
+            body.assigneeIds.map((userId) => ({
+              id: randomUUID(),
+              taskId: id,
+              userId,
+              assignedAt: new Date().toISOString(),
+            }))
+          )
+        } catch (error) {
+          console.error('Error updating assignees:', error)
+          throw error
+        }
       }
     }
 
     if (body.tags) {
-      await db.delete(dbSchema.taskTags).where(eq(dbSchema.taskTags.taskId, id))
-      if (body.tags.length) {
-        await db.insert(dbSchema.taskTags).values(body.tags.map((tag) => ({ taskId: id, tag })))
+      try {
+        await db.delete(dbSchema.taskTags).where(eq(dbSchema.taskTags.taskId, id))
+        if (body.tags.length) {
+          await db.insert(dbSchema.taskTags).values(
+            body.tags.map((tag) => ({
+              id: randomUUID(),
+              taskId: id,
+              tag,
+              createdAt: new Date().toISOString(),
+            }))
+          )
+        }
+      } catch (error) {
+        console.error('Error updating tags:', error)
+        throw error
       }
     }
 

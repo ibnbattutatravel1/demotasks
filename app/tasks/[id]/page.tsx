@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,7 +10,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import type { Task, Project, Subtask } from "@/lib/types"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
+import { Check, ChevronsUpDown } from "lucide-react"
+import { cn } from "@/lib/utils"
+import type { Task, Project, Subtask, User } from "@/lib/types"
 import {
   ArrowLeft,
   Calendar,
@@ -99,11 +103,33 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
   const [attachments, setAttachments] = useState<any[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [editingTask, setEditingTask] = useState(false)
+  const [editingAssignees, setEditingAssignees] = useState(false)
+  const [editingTags, setEditingTags] = useState(false)
+  const [availableUsers, setAvailableUsers] = useState<User[]>([])
   const [editTaskTitle, setEditTaskTitle] = useState("")
   const [editTaskDescription, setEditTaskDescription] = useState("")
   const [editTaskDueDate, setEditTaskDueDate] = useState("")
   const [editTaskPriority, setEditTaskPriority] = useState<"low" | "medium" | "high">("medium")
+  const [editTaskAssignees, setEditTaskAssignees] = useState<string[]>([])
+  const [editTaskTags, setEditTaskTags] = useState<string[]>([])
+  const [newTag, setNewTag] = useState("")
   const { toast } = useToast()
+  // Task-level comments
+  const [taskComments, setTaskComments] = useState<Array<{ id: string; userId: string; userName: string; avatar?: string | null; content: string; createdAt: string }>>([])
+  const [newTaskComment, setNewTaskComment] = useState("")
+
+  // Load available users for assignment
+  const loadUsers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/users')
+      const json = await res.json()
+      if (res.ok && json.success) {
+        setAvailableUsers(json.data)
+      }
+    } catch (e) {
+      console.error('Failed to load users', e)
+    }
+  }, [])
 
   // Load task and project
   useEffect(() => {
@@ -122,6 +148,8 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
           setEditTaskDescription(t.description)
           setEditTaskDueDate(t.dueDate || "")
           setEditTaskPriority(t.priority)
+          setEditTaskAssignees(t.assignees?.map(a => a.id) || [])
+          setEditTaskTags(t.tags || [])
           // Load project context lazily from projects list
           try {
             const pres = await fetch('/api/projects')
@@ -131,6 +159,16 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
               setProject(proj)
             }
           } catch {}
+          // Load task comments
+          try {
+            const cres = await fetch(`/api/comments?entityType=task&entityId=${encodeURIComponent(params.id)}`)
+            const cjson = await cres.json()
+            if (cres.ok && cjson.success) {
+              setTaskComments(cjson.data || [])
+            }
+          } catch (e) {
+            console.error('Failed to load comments', e)
+          }
         }
       } catch (e) {
         console.error('Failed to load task', e)
@@ -139,8 +177,64 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
       }
     }
     load()
+    loadUsers()
     return () => { ignore = true }
-  }, [params.id])
+  }, [params.id, loadUsers])
+
+  const refreshTaskComments = async () => {
+    try {
+      const cres = await fetch(`/api/comments?entityType=task&entityId=${encodeURIComponent(params.id)}`)
+      const cjson = await cres.json()
+      if (cres.ok && cjson.success) setTaskComments(cjson.data || [])
+    } catch (e) {
+      console.error('Failed to refresh comments', e)
+    }
+  }
+
+  const handleAddTaskComment = async () => {
+    if (!task || !user) return
+    const content = newTaskComment.trim()
+    if (!content) return
+    const optimistic = {
+      id: `temp-${Date.now()}`,
+      userId: user.id,
+      userName: user.name || 'You',
+      avatar: user.avatar || null,
+      content,
+      createdAt: new Date().toISOString(),
+    }
+    setTaskComments((prev) => [...prev, optimistic])
+    setNewTaskComment("")
+    try {
+      const res = await fetch('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entityType: 'task', entityId: task.id, userId: user.id, userName: user.name || 'User', avatar: user.avatar || null, content }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to add comment')
+      await refreshTaskComments()
+    } catch (e: any) {
+      toast({ title: 'Failed to add comment', description: e.message, variant: 'destructive' })
+      // rollback
+      setTaskComments((prev) => prev.filter((c) => c.id !== optimistic.id))
+      setNewTaskComment(content)
+    }
+  }
+
+  const handleDeleteTaskComment = async (commentId: string) => {
+    const prev = taskComments
+    setTaskComments((list) => list.filter((c) => c.id !== commentId))
+    try {
+      const res = await fetch(`/api/comments/${commentId}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to delete comment')
+      toast({ title: 'Comment deleted' })
+    } catch (e: any) {
+      toast({ title: 'Delete failed', description: e.message, variant: 'destructive' })
+      setTaskComments(prev)
+    }
+  }
 
   const refreshTask = async () => {
     try {
@@ -354,29 +448,50 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
     if (!task) return
     if (editTaskTitle.trim()) {
       try {
+        const updates = {
+          title: editTaskTitle.trim(),
+          description: editTaskDescription.trim(),
+          dueDate: editTaskDueDate || null,
+          priority: editTaskPriority,
+          assigneeIds: editTaskAssignees,
+          tags: editTaskTags
+        }
+        
         const res = await fetch(`/api/tasks/${task.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: editTaskTitle.trim(), description: editTaskDescription.trim(), dueDate: editTaskDueDate || null, priority: editTaskPriority }),
+          body: JSON.stringify(updates),
         })
+        
         if (res.ok) {
           setEditingTask(false)
+          setEditingAssignees(false)
+          setEditingTags(false)
           toast({ title: 'Task updated', description: 'Task has been successfully updated.' })
           await refreshTask()
         }
       } catch (e) {
         console.error('Update task failed', e)
+        toast({
+          title: 'Update failed',
+          description: 'Failed to update task. Please try again.',
+          variant: 'destructive',
+        })
       }
     }
   }
 
   const handleCancelTaskEdit = () => {
     setEditingTask(false)
+    setEditingAssignees(false)
+    setEditingTags(false)
     if (task) {
       setEditTaskTitle(task.title)
       setEditTaskDescription(task.description)
       setEditTaskDueDate(task.dueDate || "")
       setEditTaskPriority(task.priority)
+      setEditTaskAssignees(task.assignees?.map(a => a.id) || [])
+      setEditTaskTags(task.tags || [])
     }
   }
 
@@ -575,6 +690,62 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
                 ) : (
                   <p className="text-slate-700 leading-relaxed">{task?.description}</p>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Comments */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-slate-600" />
+                  Comments
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  {taskComments.length === 0 && (
+                    <p className="text-sm text-slate-500">No comments yet.</p>
+                  )}
+                  {taskComments.map((c) => (
+                    <div key={c.id} className="flex gap-3">
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={c.avatar || "/placeholder-user.jpg"} />
+                        <AvatarFallback className="text-xs">{(c.userName || 'U')[0]}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-medium text-slate-900">{c.userName}</span>
+                          <span className="text-xs text-slate-500">{formatTimeAgo(c.createdAt)}</span>
+                        </div>
+                        <p className="text-sm text-slate-700 whitespace-pre-wrap">{c.content}</p>
+                      </div>
+                      {(user?.role === 'admin' || user?.id === c.userId) && (
+                        <Button variant="ghost" size="sm" onClick={() => handleDeleteTaskComment(c.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <Avatar className="h-6 w-6">
+                    <AvatarFallback className="text-xs">{(user?.initials || 'U')}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 space-y-2">
+                    <Textarea
+                      placeholder="Write a comment..."
+                      value={newTaskComment}
+                      onChange={(e) => setNewTaskComment(e.target.value)}
+                      className="min-h-[60px]"
+                    />
+                    <div className="flex justify-end">
+                      <Button size="sm" onClick={handleAddTaskComment} disabled={!newTaskComment.trim()}>
+                        Add Comment
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -831,18 +1002,113 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
                     <p className="text-sm text-slate-600">{task?.createdBy?.name || '—'}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Users className="h-4 w-4 text-slate-500" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">Assignees</p>
-                    <div className="flex -space-x-2 mt-1">
-                      {(task?.assignees || []).map((assignee, index) => (
-                        <Avatar key={index} className="h-6 w-6 border-2 border-white">
-                          <AvatarImage src={assignee.avatar || "/placeholder.svg"} />
-                          <AvatarFallback className="text-xs">{assignee.initials}</AvatarFallback>
-                        </Avatar>
-                      ))}
+                <div className="flex items-start gap-3">
+                  <Users className="h-4 w-4 text-slate-500 mt-1" />
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-slate-900">Assignees</p>
+                      {editingTask && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 px-2 text-xs"
+                          onClick={() => setEditingAssignees(!editingAssignees)}
+                        >
+                          {editingAssignees ? 'Done' : 'Edit'}
+                        </Button>
+                      )}
                     </div>
+                    
+                    {editingAssignees ? (
+                      <div className="mt-1 space-y-2">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className="w-full justify-between"
+                            >
+                              Add assignee...
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[300px] p-0">
+                            <Command>
+                              <CommandInput placeholder="Search users..." />
+                              <CommandEmpty>No users found.</CommandEmpty>
+                              <CommandGroup className="max-h-[200px] overflow-y-auto">
+                                {availableUsers.map((user) => (
+                                  <CommandItem
+                                    key={user.id}
+                                    onSelect={() => {
+                                      setEditTaskAssignees(prev => 
+                                        prev.includes(user.id)
+                                          ? prev.filter(id => id !== user.id)
+                                          : [...prev, user.id]
+                                      )
+                                    }}
+                                  >
+                                    <div className="flex items-center gap-2 w-full">
+                                      <Check
+                                        className={cn(
+                                          "h-4 w-4",
+                                          editTaskAssignees.includes(user.id) ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <Avatar className="h-6 w-6">
+                                        <AvatarImage src={user.avatar || "/placeholder.svg"} />
+                                        <AvatarFallback className="text-xs">
+                                          {user.initials}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <span className="flex-1">{user.name}</span>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                        
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {editTaskAssignees.map(userId => {
+                            const user = availableUsers.find(u => u.id === userId)
+                            if (!user) return null
+                            return (
+                              <div key={user.id} className="flex items-center gap-1 bg-slate-100 rounded-full pl-2 pr-1 py-1">
+                                <Avatar className="h-5 w-5">
+                                  <AvatarImage src={user.avatar || "/placeholder.svg"} />
+                                  <AvatarFallback className="text-xs">
+                                    {user.initials}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-xs">{user.name}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-5 w-5 rounded-full"
+                                  onClick={() => setEditTaskAssignees(prev => prev.filter(id => id !== user.id))}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex -space-x-2 mt-1">
+                        {(task?.assignees?.length ? task.assignees : []).map((assignee, index) => (
+                          <Avatar key={index} className="h-6 w-6 border-2 border-white">
+                            <AvatarImage src={assignee.avatar || "/placeholder.svg"} />
+                            <AvatarFallback className="text-xs">{assignee.initials}</AvatarFallback>
+                          </Avatar>
+                        ))}
+                        {!task?.assignees?.length && (
+                          <span className="text-sm text-slate-400">No assignees</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -851,16 +1117,83 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
             {/* Tags */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Tags</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Tags</CardTitle>
+                  {editingTask && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 px-2 text-xs"
+                      onClick={() => setEditingTags(!editingTags)}
+                    >
+                      {editingTags ? 'Done' : 'Edit'}
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {(task?.tags || []).map((tag, index) => (
-                    <Badge key={index} variant="secondary">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
+                {editingTags ? (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Add a tag..."
+                        value={newTag}
+                        onChange={(e) => setNewTag(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newTag.trim()) {
+                            if (!editTaskTags.includes(newTag.trim())) {
+                              setEditTaskTags([...editTaskTags, newTag.trim()])
+                            }
+                            setNewTag('')
+                            e.preventDefault()
+                          }
+                        }}
+                      />
+                      <Button 
+                        size="sm" 
+                        onClick={() => {
+                          if (newTag.trim() && !editTaskTags.includes(newTag.trim())) {
+                            setEditTaskTags([...editTaskTags, newTag.trim()])
+                            setNewTag('')
+                          }
+                        }}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 min-h-[32px]">
+                      {editTaskTags.map((tag, index) => (
+                        <Badge 
+                          key={index} 
+                          variant="secondary"
+                          className="pr-1 pl-2 py-1"
+                        >
+                          {tag}
+                          <button
+                            onClick={() => setEditTaskTags(editTaskTags.filter((_, i) => i !== index))}
+                            className="ml-1 rounded-full hover:bg-slate-300 p-0.5"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                      {!editTaskTags.length && (
+                        <p className="text-sm text-slate-400">No tags yet. Add some above.</p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {(task?.tags || []).map((tag, index) => (
+                      <Badge key={index} variant="secondary">
+                        {tag}
+                      </Badge>
+                    ))}
+                    {!task?.tags?.length && (
+                      <p className="text-sm text-slate-400">No tags</p>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
 

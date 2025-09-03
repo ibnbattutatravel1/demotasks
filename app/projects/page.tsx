@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
@@ -25,6 +23,7 @@ import {
   ChevronDown,
   ChevronRight,
   ArrowLeft,
+  Plus,
   Edit,
   Copy,
   Trash2,
@@ -38,26 +37,31 @@ export default function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [priorityFilter, setPriorityFilter] = useState<string>("all")
   const [projects, setProjects] = useState<Project[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [tasksByProject, setTasksByProject] = useState<Record<string, Task[]>>({})
   const [loadingProjectTasks, setLoadingProjectTasks] = useState<Record<string, boolean>>({})
   const router = useRouter()
   const { user } = useAuth()
 
-  useEffect(() => {
-    let ignore = false
-    const load = async () => {
-      try {
-        const res = await fetch('/api/projects')
-        const json = await res.json()
-        if (!ignore && res.ok && json.success) {
-          setProjects(json.data as Project[])
-        }
-      } catch (e) {
-        console.error('Failed to load projects', e)
+  const loadProjects = async () => {
+    try {
+      setIsLoading(true)
+      const res = await fetch('/api/projects')
+      const json = await res.json()
+      if (res.ok && json.success) {
+        setProjects(json.data as Project[])
+      } else {
+        console.error('Failed to load projects:', json.error)
       }
+    } catch (e) {
+      console.error('Failed to load projects', e)
+    } finally {
+      setIsLoading(false)
     }
-    load()
-    return () => { ignore = true }
+  }
+
+  useEffect(() => {
+    loadProjects()
   }, [])
 
   const filteredProjects = projects.filter((project) => {
@@ -80,7 +84,19 @@ export default function ProjectsPage() {
       const res = await fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}`)
       const json = await res.json()
       if (res.ok && json.success) {
-        setTasksByProject((prev) => ({ ...prev, [projectId]: json.data as Task[] }))
+        setTasksByProject((prev) => ({
+          ...prev,
+          [projectId]: json.data.map((t: any) => ({
+            ...t,
+            status: t.status || 'todo',
+            priority: t.priority || 'medium',
+            assignees: t.assignees || [],
+            tags: t.tags || [],
+            subtasks: t.subtasks || []
+          }))
+        }))
+      } else {
+        console.error('Failed to load tasks:', json.error)
       }
     } catch (e) {
       console.error('Failed to load tasks for project', projectId, e)
@@ -90,13 +106,18 @@ export default function ProjectsPage() {
   }
 
   const toggleProject = (projectId: string) => {
-    const newExpanded = new Set(expandedProjects)
-    if (newExpanded.has(projectId)) {
-      newExpanded.delete(projectId)
-    } else {
-      newExpanded.add(projectId)
-    }
-    setExpandedProjects(newExpanded)
+    setExpandedProjects((prev) => {
+      const next = new Set(prev)
+      if (next.has(projectId)) {
+        next.delete(projectId)
+      } else {
+        next.add(projectId)
+        if (!tasksByProject[projectId]) {
+          void loadTasksForProject(projectId)
+        }
+      }
+      return next
+    })
   }
 
   const getStatusColor = (status: string) => {
@@ -123,43 +144,62 @@ export default function ProjectsPage() {
     router.push(`/projects/${projectId}/edit`)
   }
 
-  const handleDuplicateProject = (e: React.MouseEvent, projectId: string) => {
+  const handleDuplicateProject = async (e: React.MouseEvent, projectId: string) => {
     e.stopPropagation()
     const project = projects.find((p) => p.id === projectId)
-    if (project) {
-      console.log("[v0] Duplicating project:", project.name)
-      const newProject: Project = {
-        ...project,
-        id: `${Date.now()}`,
-        name: `${project.name} (Copy)`,
-        createdAt: new Date().toISOString().split("T")[0],
-        updatedAt: new Date().toISOString().split("T")[0],
-        progress: 0,
+    if (!project) return
+
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...project,
+          name: `${project.name} (Copy)`,
+          id: undefined // Let the server generate a new ID
+        })
+      })
+
+      if (res.ok) {
+        await loadProjects()
+      } else {
+        const error = await res.json()
+        console.error('Failed to duplicate project:', error)
+        alert('Failed to duplicate project. Please try again.')
       }
-      const updatedProjects = [...projects, newProject]
-      setProjects(updatedProjects)
-      localStorage.setItem("projects", JSON.stringify(updatedProjects))
-      alert(`Project "${project.name}" has been duplicated successfully!`)
+    } catch (error) {
+      console.error('Error duplicating project:', error)
+      alert('An error occurred while duplicating the project.')
     }
   }
 
-  const handleDeleteProject = (e: React.MouseEvent, projectId: string) => {
+  const handleDeleteProject = async (e: React.MouseEvent, projectId: string) => {
     e.stopPropagation()
     const project = projects.find((p) => p.id === projectId)
+    if (!project) return
 
-    if (user?.role !== "admin") {
-      alert("Only administrators can delete projects.")
+    if (!confirm(`Are you sure you want to delete "${project.name}"? This action cannot be undone.`)) {
       return
     }
 
-    if (project && confirm(`Are you sure you want to delete "${project.name}"? This action cannot be undone.`)) {
-      console.log("[v0] Deleting project:", project.name)
-      const updatedProjects = projects.filter((p) => p.id !== projectId)
-      setProjects(updatedProjects)
-      localStorage.setItem("projects", JSON.stringify(updatedProjects))
-      alert(`Project "${project.name}" has been deleted successfully!`)
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: 'DELETE'
+      })
+
+      if (res.ok) {
+        await loadProjects()
+      } else {
+        const error = await res.json()
+        console.error('Failed to delete project:', error)
+        alert('Failed to delete project. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error deleting project:', error)
+      alert('An error occurred while deleting the project.')
     }
   }
+  
 
   const getFilterLabel = () => {
     const activeFilters = []
@@ -538,83 +578,102 @@ export default function ProjectsPage() {
                 {filteredProjects.map((project) => {
                   const projectTasks = getTasksForProject(project.id)
                   const completedTasks = projectTasks.filter((t) => t.status === "done").length
-
                   return (
-                    <div
-                      key={project.id}
-                      className="p-4 hover:bg-slate-50 transition-colors cursor-pointer"
-                      onClick={() => handleProjectClick(project.id)}
-                    >
+                    <div key={project.id} className="p-4 hover:bg-slate-50">
                       <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-4">
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-slate-900">{project.name}</h3>
-                              <p className="text-sm text-slate-600 mt-1">{project.description}</p>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <div className="text-center">
-                                <p className="text-sm font-medium text-slate-900">{project.progress}%</p>
-                                <p className="text-xs text-slate-500">Progress</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="text-sm font-medium text-slate-900">
-                                  {completedTasks}/{projectTasks.length}
-                                </p>
-                                <p className="text-xs text-slate-500">Tasks</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="text-sm font-medium text-slate-900">{project.createdBy}</p>
-                                <p className="text-xs text-slate-500">Lead</p>
-                              </div>
-                              <div className="flex -space-x-2">
-                                {project.assignees.slice(0, 3).map((member, index) => (
-                                  <Avatar key={index} className="h-6 w-6 border-2 border-white">
-                                    <AvatarImage
-                                      src={`/abstract-geometric-shapes.png?height=24&width=24&query=${member}`}
-                                    />
-                                    <AvatarFallback className="text-xs">
-                                      {member
-                                        .split(" ")
-                                        .map((n) => n[0])
-                                        .join("")}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                ))}
-                              </div>
+                        <div className="flex items-center gap-4">
+                          <button
+                            className="h-6 w-6 flex items-center justify-center rounded hover:bg-slate-100"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleProject(project.id)
+                              if (!expandedProjects.has(project.id)) {
+                                void loadTasksForProject(project.id)
+                              }
+                            }}
+                          >
+                            {expandedProjects.has(project.id) ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </button>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-slate-900">{project.name}</span>
                               <Badge variant="outline" className={getStatusColor(project.status)}>
                                 {project.status}
                               </Badge>
                             </div>
+                            <p className="text-sm text-slate-600 line-clamp-1">{project.description}</p>
                           </div>
                         </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={(e) => handleEditProject(e, project.id)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit Project
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => handleDuplicateProject(e, project.id)}>
-                              <Copy className="h-4 w-4 mr-2" />
-                              Duplicate Project
-                            </DropdownMenuItem>
-                            {user?.role === "admin" && (
-                              <DropdownMenuItem
-                                onClick={(e) => handleDeleteProject(e, project.id)}
-                                className="text-red-600 focus:text-red-600"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete Project
+                        <div className="flex items-center gap-6">
+                          <div className="text-sm text-slate-600">
+                            <span className="font-medium">
+                              {completedTasks}/{projectTasks.length}
+                            </span>
+                            <span className="ml-1">tasks</span>
+                          </div>
+                          <div className="w-48">
+                            <Progress value={project.progress} className="h-2" />
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem onClick={(e) => handleEditProject(e, project.id)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit Project
                               </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                              <DropdownMenuItem onClick={(e) => handleDuplicateProject(e, project.id)}>
+                                <Copy className="h-4 w-4 mr-2" />
+                                Duplicate Project
+                              </DropdownMenuItem>
+                              {user?.role === "admin" && (
+                                <DropdownMenuItem
+                                  onClick={(e) => handleDeleteProject(e, project.id)}
+                                  className="text-red-600 focus:text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete Project
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
+                      {expandedProjects.has(project.id) && (
+                        <div className="mt-3 pl-10">
+                          {loadingProjectTasks[project.id] ? (
+                            <div className="text-sm text-slate-500">Loading tasks...</div>
+                          ) : projectTasks.length === 0 ? (
+                            <div className="text-sm text-slate-500">No tasks</div>
+                          ) : (
+                            <div className="space-y-2">
+                              {projectTasks.map((task) => (
+                                <div
+                                  key={task.id}
+                                  className="flex items-center justify-between p-2 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    router.push(`/tasks/${task.id}`)
+                                  }}
+                                >
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-slate-900">{task.title}</p>
+                                    <p className="text-xs text-slate-600 line-clamp-1">{task.description}</p>
+                                  </div>
+                                  <Badge variant="outline" className="text-xs">{task.status}</Badge>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 })}

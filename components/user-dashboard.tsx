@@ -33,6 +33,7 @@ import {
   LogOut,
   Settings,
   MapPin,
+  Bell,
 } from "lucide-react"
 import {
   DropdownMenu,

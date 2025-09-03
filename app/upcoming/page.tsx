@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -10,134 +10,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { useAuth } from "@/contexts/auth-context"
 import { Search, ArrowLeft, Calendar, Clock, AlertTriangle, ChevronRight, FolderOpen } from "lucide-react"
-import type { Project, Task, Subtask } from "@/lib/types"
-
-const mockProjects: Project[] = [
-  {
-    id: "1",
-    name: "Website Redesign",
-    description: "Complete website overhaul",
-    status: "active",
-    priority: "high",
-    createdAt: "2024-01-01",
-    updatedAt: "2024-01-14",
-    createdBy: "admin",
-    assignees: ["Alice Johnson", "Bob Smith"],
-    dueDate: "2024-02-15",
-    progress: 68,
-    tags: ["Design", "Frontend"],
-  },
-  {
-    id: "2",
-    name: "Mobile App Development",
-    description: "iOS and Android app development",
-    status: "active",
-    priority: "medium",
-    createdAt: "2024-01-05",
-    updatedAt: "2024-01-14",
-    createdBy: "admin",
-    assignees: ["Charlie Brown", "Diana Wilson"],
-    dueDate: "2024-03-30",
-    progress: 45,
-    tags: ["Mobile", "Development"],
-  },
-]
-
-const upcomingTasks: Task[] = [
-  {
-    id: "1",
-    projectId: "1",
-    title: "Design system components",
-    description: "Complete the remaining components for the design system",
-    status: "in-progress",
-    priority: "high",
-    assignees: ["Alice Johnson", "Bob Smith"],
-    dueDate: "2024-01-15",
-    tags: ["Design", "High Priority"],
-    approvalStatus: "approved",
-    createdAt: "2024-01-10",
-    updatedAt: "2024-01-14",
-    createdBy: "Alice Johnson",
-    progress: 75,
-  },
-  {
-    id: "2",
-    projectId: "2",
-    title: "Mobile app UI improvements",
-    description: "Enhance the mobile user interface based on user feedback",
-    status: "todo",
-    priority: "medium",
-    assignees: ["Charlie Brown"],
-    dueDate: "2024-01-18",
-    tags: ["Mobile", "UI"],
-    approvalStatus: "approved",
-    createdAt: "2024-01-08",
-    updatedAt: "2024-01-14",
-    createdBy: "Charlie Brown",
-    progress: 30,
-  },
-  {
-    id: "3",
-    projectId: "1",
-    title: "API integration testing",
-    description: "Complete testing of all API endpoints",
-    status: "review",
-    priority: "high",
-    assignees: ["Diana Wilson"],
-    dueDate: "2024-01-12",
-    tags: ["Backend", "Testing"],
-    approvalStatus: "pending",
-    createdAt: "2024-01-05",
-    updatedAt: "2024-01-14",
-    createdBy: "Diana Wilson",
-    progress: 45,
-  },
-]
-
-const mockSubtasks: Subtask[] = [
-  {
-    id: "1",
-    taskId: "1",
-    title: "Button component",
-    description: "Create button variants",
-    status: "done",
-    priority: "medium",
-    assignees: ["Alice Johnson"],
-    dueDate: "2024-01-14",
-    createdAt: "2024-01-10",
-    updatedAt: "2024-01-14",
-    createdBy: "Alice Johnson",
-    progress: 100,
-  },
-  {
-    id: "2",
-    taskId: "1",
-    title: "Input component",
-    description: "Create input variants",
-    status: "in-progress",
-    priority: "medium",
-    assignees: ["Bob Smith"],
-    dueDate: "2024-01-15",
-    createdAt: "2024-01-10",
-    updatedAt: "2024-01-14",
-    createdBy: "Bob Smith",
-    progress: 60,
-  },
-  {
-    id: "3",
-    taskId: "2",
-    title: "Navigation redesign",
-    description: "Improve mobile navigation",
-    status: "todo",
-    priority: "high",
-    assignees: ["Charlie Brown"],
-    dueDate: "2024-01-18",
-    createdAt: "2024-01-08",
-    updatedAt: "2024-01-14",
-    createdBy: "Charlie Brown",
-    progress: 0,
-  },
-]
+import type { Project } from "@/lib/types"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu"
+import { useToast } from "@/hooks/use-toast"
 
 export default function UpcomingPage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -145,6 +27,31 @@ export default function UpcomingPage() {
   const [timeFilter, setTimeFilter] = useState("all")
   const router = useRouter()
   const { user } = useAuth()
+  const [projects, setProjects] = useState<Project[]>([])
+  const [tasks, setTasks] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setIsLoading(true)
+        const [projRes, taskRes] = await Promise.all([
+          fetch('/api/projects'),
+          fetch(user?.role === 'admin' ? '/api/tasks' : `/api/tasks?assigneeId=${encodeURIComponent(user?.id || '')}`),
+        ])
+        const projJson = await projRes.json()
+        if (projRes.ok && projJson.success) setProjects(projJson.data as Project[])
+        const taskJson = await taskRes.json()
+        if (taskRes.ok && taskJson.success) setTasks(taskJson.data as any[])
+      } catch (e) {
+        console.error('Failed to load upcoming data', e)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    load()
+  }, [user?.id, user?.role])
 
   const handleBackToDashboard = () => {
     router.push("/")
@@ -155,12 +62,76 @@ export default function UpcomingPage() {
   }
 
   const getProjectForTask = (taskId: string) => {
-    const task = upcomingTasks.find((t) => t.id === taskId)
-    return mockProjects.find((p) => p.id === task?.projectId)
+    const task = tasks.find((t) => t.id === taskId)
+    return projects.find((p) => p.id === task?.projectId)
   }
 
   const getSubtasksForTask = (taskId: string) => {
-    return mockSubtasks.filter((subtask) => subtask.taskId === taskId)
+    const task = tasks.find((t) => t.id === taskId)
+    return (task?.subtasks || []) as any[]
+  }
+
+  const patchTask = async (id: string, payload: Partial<{ status: 'todo' | 'in-progress' | 'review' | 'done'; priority: 'low' | 'medium' | 'high' }>) => {
+    const res = await fetch(`/api/tasks/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const json = await res.json()
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to update task')
+    return json.data
+  }
+
+  const postActivity = async (taskId: string, message: string) => {
+    try {
+      if (!user) return
+      await fetch('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entityType: 'task',
+          entityId: taskId,
+          userId: user.id,
+          userName: user.name || 'User',
+          avatar: user.avatar || null,
+          content: message,
+        }),
+      })
+    } catch {}
+  }
+
+  const updateTaskLocal = (id: string, changes: any) => {
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...changes } : t)))
+  }
+
+  const handleChangeStatus = async (taskId: string, status: 'todo' | 'in-progress' | 'review' | 'done') => {
+    const prev = tasks.find((t) => t.id === taskId)
+    if (!prev) return
+    updateTaskLocal(taskId, { status })
+    try {
+      const updated = await patchTask(taskId, { status })
+      setTasks((prevList) => prevList.map((t) => (t.id === taskId ? { ...t, ...updated } : t)))
+      toast({ title: 'Status updated', description: `${prev.title} → ${status}` })
+      postActivity(taskId, `changed status to "${status}"`)
+    } catch (e: any) {
+      updateTaskLocal(taskId, { status: prev.status })
+      toast({ title: 'Update failed', description: e.message, variant: 'destructive' as any })
+    }
+  }
+
+  const handleChangePriority = async (taskId: string, priority: 'low' | 'medium' | 'high') => {
+    const prev = tasks.find((t) => t.id === taskId)
+    if (!prev) return
+    updateTaskLocal(taskId, { priority })
+    try {
+      const updated = await patchTask(taskId, { priority })
+      setTasks((prevList) => prevList.map((t) => (t.id === taskId ? { ...t, ...updated } : t)))
+      toast({ title: 'Priority updated', description: `${prev.title} → ${priority}` })
+      postActivity(taskId, `updated priority to "${priority}"`)
+    } catch (e: any) {
+      updateTaskLocal(taskId, { priority: prev.priority })
+      toast({ title: 'Update failed', description: e.message, variant: 'destructive' as any })
+    }
   }
 
   const getDaysUntilDue = (dueDate: string) => {
@@ -174,7 +145,7 @@ export default function UpcomingPage() {
     return getDaysUntilDue(dueDate) < 0
   }
 
-  const filteredTasks = upcomingTasks.filter((task) => {
+  const filteredTasks = tasks.filter((task) => {
     const matchesSearch =
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -224,12 +195,12 @@ export default function UpcomingPage() {
     }
   }
 
-  const overdueTasks = upcomingTasks.filter((task) => isOverdue(task.dueDate)).length
-  const urgentTasks = upcomingTasks.filter((task) => {
+  const overdueTasks = tasks.filter((task) => isOverdue(task.dueDate)).length
+  const urgentTasks = tasks.filter((task) => {
     const days = getDaysUntilDue(task.dueDate)
     return days <= 3 && days >= 0
   }).length
-  const thisWeekTasks = upcomingTasks.filter((task) => {
+  const thisWeekTasks = tasks.filter((task) => {
     const days = getDaysUntilDue(task.dueDate)
     return days <= 7 && days >= 0
   }).length
@@ -248,7 +219,7 @@ export default function UpcomingPage() {
               <Calendar className="h-5 w-5 text-indigo-600" />
               <h1 className="text-xl font-semibold text-slate-900">Upcoming Tasks</h1>
               <Badge variant="outline" className="text-xs">
-                {upcomingTasks.length} tasks
+                {tasks.length} tasks
               </Badge>
             </div>
           </div>
@@ -264,7 +235,7 @@ export default function UpcomingPage() {
               />
             </div>
             <Avatar className="h-8 w-8">
-              <AvatarImage src={user?.role === "admin" ? "/diverse-woman-portrait.png" : "/thoughtful-man.png"} />
+              <AvatarImage src={user?.avatar || "/placeholder-user.jpg"} />
               <AvatarFallback>{user?.name?.[0] || "U"}</AvatarFallback>
             </Avatar>
           </div>
@@ -349,7 +320,12 @@ export default function UpcomingPage() {
       {/* Content */}
       <div className="p-6">
         <div className="max-w-6xl mx-auto">
-          {filteredTasks.length === 0 ? (
+          {isLoading ? (
+            <Card className="p-8 text-center">
+              <Calendar className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-slate-900 mb-2">Loading...</h3>
+            </Card>
+          ) : filteredTasks.length === 0 ? (
             <Card className="p-8 text-center">
               <Calendar className="h-12 w-12 text-slate-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-slate-900 mb-2">No upcoming tasks found</h3>
@@ -365,7 +341,7 @@ export default function UpcomingPage() {
                   const dueDateInfo = getDueDateDisplay(task.dueDate)
                   const project = getProjectForTask(task.id)
                   const subtasks = getSubtasksForTask(task.id)
-                  const completedSubtasks = subtasks.filter((s) => s.status === "done").length
+                  const completedSubtasks = subtasks.filter((s: any) => !!s.completed).length
                   const taskIsOverdue = isOverdue(task.dueDate)
 
                   return (
@@ -417,29 +393,46 @@ export default function UpcomingPage() {
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
                                 <div className="flex -space-x-2">
-                                  {task.assignees.map((assignee, index) => (
+                                  {task.assignees.map((assignee: any, index: number) => (
                                     <Avatar key={index} className="h-6 w-6 border-2 border-white">
-                                      <AvatarImage
-                                        src={`/abstract-geometric-shapes.png?height=24&width=24&query=${assignee}`}
+                                      <AvatarImage src={assignee?.avatar || 
+                                        `/abstract-geometric-shapes.png?height=24&width=24&query=${encodeURIComponent(assignee?.name || assignee?.id || 'user')}`}
                                       />
                                       <AvatarFallback className="text-xs">
-                                        {assignee
-                                          .split(" ")
-                                          .map((n) => n[0])
-                                          .join("")}
+                                        {(assignee?.initials || assignee?.name?.split(" ")?.map((n: string) => n[0]).join("") || "U").toString()}
                                       </AvatarFallback>
                                     </Avatar>
                                   ))}
                                 </div>
                                 <div className="flex gap-1">
-                                  {task.tags.map((tag, index) => (
+                                  {task.tags.map((tag: string, index: number) => (
                                     <Badge key={index} variant="outline" className="text-xs">
                                       {tag}
                                     </Badge>
                                   ))}
                                 </div>
                               </div>
-                              <ChevronRight className="h-4 w-4 text-slate-400" />
+                              <div className="flex items-center gap-1">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button aria-label="Task actions" variant="ghost" size="icon" className="h-7 w-7 p-0">
+                                      <ChevronRight className="h-4 w-4 text-slate-400" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-44">
+                                    <DropdownMenuLabel>Change status</DropdownMenuLabel>
+                                    <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'todo')}>To Do</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'in-progress')}>In Progress</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'review')}>Review</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'done')}>Done</DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuLabel>Priority</DropdownMenuLabel>
+                                    <DropdownMenuItem onClick={() => handleChangePriority(task.id, 'low')}>Low</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleChangePriority(task.id, 'medium')}>Medium</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleChangePriority(task.id, 'high')}>High</DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
                             </div>
                           </div>
                         </div>
