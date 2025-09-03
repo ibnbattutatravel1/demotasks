@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
@@ -41,58 +41,86 @@ import {
   LogOut,
 } from "lucide-react"
 
-const tasks = [
-  {
-    id: 1,
-    title: "Design system components",
-    progress: 75,
-    dueDate: "2024-01-15",
-    isOverdue: false,
-    assignees: [
-      { name: "Alice", avatar: "/diverse-woman-portrait.png" },
-      { name: "Bob", avatar: "/thoughtful-man.png" },
-    ],
-    tags: ["Design", "High Priority"],
-    subtasks: { completed: 3, total: 4 },
-  },
-  {
-    id: 2,
-    title: "API integration testing",
-    progress: 45,
-    dueDate: "2024-01-12",
-    isOverdue: true,
-    assignees: [{ name: "Charlie", avatar: "/developer-working.png" }],
-    tags: ["Backend", "Testing"],
-    subtasks: { completed: 2, total: 5 },
-  },
-  {
-    id: 3,
-    title: "Sprint Planning Q1 2024",
-    progress: 100,
-    dueDate: "2024-01-10",
-    isOverdue: false,
-    assignees: [
-      { name: "Diana", avatar: "/diverse-team-manager.png" },
-      { name: "Eve", avatar: "/professional-woman.png" },
-    ],
-    tags: ["Planning", "Sprint"],
-    subtasks: { completed: 8, total: 8 },
-    isSprint: true,
-  },
-]
+// Live state sourced from backend
+type UITask = {
+  id: string
+  title: string
+  progress: number
+  dueDate?: string
+  isOverdue: boolean
+  assignees: { name: string; avatar?: string }[]
+  tags: string[]
+  subtasks: { completed: number; total: number }
+  isSprint?: boolean
+}
 
-const activities = [
-  { user: "Alice", action: "completed", task: "Design system components", time: "2 hours ago" },
-  { user: "Bob", action: "commented on", task: "API integration testing", time: "4 hours ago" },
-  { user: "Charlie", action: "created", task: "Database migration script", time: "6 hours ago" },
-]
+type UIActivity = { user: string; action: string; task: string; time: string }
+
+const formatTimeAgo = (iso?: string) => {
+  if (!iso) return ""
+  const d = new Date(iso)
+  const diffMs = Date.now() - d.getTime()
+  const diffH = Math.max(1, Math.floor(diffMs / (1000 * 60 * 60)))
+  return `${diffH}h ago`
+}
 
 export function TaskDashboard() {
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false)
   const router = useRouter()
   const { user, logout } = useAuth()
+  const [tasks, setTasks] = useState<UITask[]>([])
+  const [activities, setActivities] = useState<UIActivity[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleTaskClick = (taskId: number) => {
+  useEffect(() => {
+    let abort = false
+    const load = async () => {
+      if (!user?.id) return
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await fetch(`/api/tasks?assigneeId=${encodeURIComponent(user.id)}`)
+        const json = await res.json()
+        if (!res.ok || !json?.success) throw new Error(json?.error || "Failed to fetch tasks")
+        if (abort) return
+        const data = (json.data || []) as any[]
+        const ui: UITask[] = data.map((t) => ({
+          id: t.id,
+          title: t.title,
+          progress: t.progress ?? 0,
+          dueDate: t.dueDate,
+          isOverdue: !!(t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "done"),
+          assignees: (t.assignees || []).map((a: any) => ({ name: a.name, avatar: a.avatar || "/placeholder-user.jpg" })),
+          tags: t.tags || [],
+          subtasks: { completed: t.subtasksCompleted || 0, total: t.totalSubtasks || 0 },
+        }))
+        setTasks(ui)
+
+        // Derive a simple recent activity feed from tasks
+        const act: UIActivity[] = data
+          .sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)))
+          .slice(0, 5)
+          .map((t) => ({
+            user: (t.assignees?.[0]?.name as string) || "",
+            action: t.status === "done" ? "completed" : "updated",
+            task: t.title,
+            time: formatTimeAgo(t.updatedAt || t.createdAt),
+          }))
+        setActivities(act)
+      } catch (e: any) {
+        if (!abort) setError(e?.message || "Failed to load tasks")
+      } finally {
+        if (!abort) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      abort = true
+    }
+  }, [user?.id])
+
+  const handleTaskClick = (taskId: string) => {
     console.log("[v0] Task clicked:", taskId)
     router.push(`/tasks/${taskId}`)
   }
@@ -139,7 +167,7 @@ export function TaskDashboard() {
             >
               <Clock className="h-4 w-4" />
               <span className="text-sm font-medium">Today</span>
-              <Badge className="ml-auto text-xs bg-indigo-500">5</Badge>
+              <Badge className="ml-auto text-xs bg-indigo-500">{tasks.length}</Badge>
             </button>
             <button
               onClick={() => handleNavigation("/upcoming")}
@@ -292,6 +320,12 @@ export function TaskDashboard() {
             </div>
           </div>
 
+          {loading && (
+            <div className="text-sm text-slate-500">Loading tasks…</div>
+          )}
+          {error && !loading && (
+            <div className="text-sm text-red-600">{error}</div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {tasks.map((task) => (
               <Card

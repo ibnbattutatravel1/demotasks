@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -45,230 +45,89 @@ import {
 import { useAuth } from "@/contexts/auth-context"
 import { CreateProjectDialog } from "@/components/create-project-dialog"
 
-const mockProjects: Project[] = [
-  {
-    id: "660e8400-e29b-41d4-a716-446655440001",
-    name: "Website Redesign",
-    description: "Complete overhaul of the company website with modern design and improved UX",
-    status: "in-progress",
-    priority: "high",
-    dueDate: "2024-02-15",
-    createdAt: "2024-01-01",
-    progress: 68,
-    tasksCompleted: 2,
-    totalTasks: 4,
-    ownerId: "550e8400-e29b-41d4-a716-446655440001",
-    owner: {
-      id: "550e8400-e29b-41d4-a716-446655440001",
-      name: "Sarah Chen",
-      avatar: "/diverse-woman-portrait.png",
-      initials: "SC",
-    },
-    team: [
-      {
-        id: "550e8400-e29b-41d4-a716-446655440005",
-        name: "Alice Johnson",
-        avatar: "/diverse-woman-portrait.png",
-        initials: "AJ",
-      },
-      { id: "550e8400-e29b-41d4-a716-446655440006", name: "Bob Smith", avatar: "/thoughtful-man.png", initials: "BS" },
-    ],
-    tags: ["Design", "Frontend", "UX"],
-    color: "indigo",
-    tasks: [
-      {
-        id: "770e8400-e29b-41d4-a716-446655440001",
-        projectId: "660e8400-e29b-41d4-a716-446655440001",
-        title: "Design System Updates",
-        description: "Update color palette and typography",
-        status: "done",
-        priority: "high",
-        dueDate: "2024-01-15",
-        createdAt: "2024-01-01",
-        progress: 100,
-        assignees: [
-          {
-            id: "550e8400-e29b-41d4-a716-446655440005",
-            name: "Alice Johnson",
-            avatar: "/diverse-woman-portrait.png",
-            initials: "AJ",
-          },
-        ],
-        createdById: "550e8400-e29b-41d4-a716-446655440001",
-        createdBy: {
-          id: "550e8400-e29b-41d4-a716-446655440001",
-          name: "Sarah Chen",
-          avatar: "/diverse-woman-portrait.png",
-          initials: "SC",
-        },
-        approvalStatus: "approved",
-        subtasks: [],
-        subtasksCompleted: 4,
-        totalSubtasks: 4,
-        tags: ["Design", "UI"],
-        comments: [],
-        attachments: [],
-      },
-      {
-        id: "770e8400-e29b-41d4-a716-446655440002",
-        projectId: "660e8400-e29b-41d4-a716-446655440001",
-        title: "Homepage Redesign",
-        description: "Complete redesign of the homepage layout",
-        status: "in-progress",
-        priority: "high",
-        dueDate: "2024-01-18",
-        createdAt: "2024-01-02",
-        progress: 60,
-        assignees: [
-          {
-            id: "550e8400-e29b-41d4-a716-446655440005",
-            name: "Alice Johnson",
-            avatar: "/diverse-woman-portrait.png",
-            initials: "AJ",
-          },
-          {
-            id: "550e8400-e29b-41d4-a716-446655440006",
-            name: "Bob Smith",
-            avatar: "/thoughtful-man.png",
-            initials: "BS",
-          },
-        ],
-        createdById: "550e8400-e29b-41d4-a716-446655440001",
-        createdBy: {
-          id: "550e8400-e29b-41d4-a716-446655440001",
-          name: "Sarah Chen",
-          avatar: "/diverse-woman-portrait.png",
-          initials: "SC",
-        },
-        approvalStatus: "approved",
-        subtasks: [],
-        subtasksCompleted: 3,
-        totalSubtasks: 5,
-        tags: ["Design", "Frontend"],
-        comments: [],
-        attachments: [],
-      },
-      {
-        id: "770e8400-e29b-41d4-a716-446655440003",
-        projectId: "660e8400-e29b-41d4-a716-446655440001",
-        title: "Mobile Responsive Updates",
-        description: "Ensure all pages work perfectly on mobile devices",
-        status: "todo",
-        priority: "medium",
-        dueDate: "2024-01-25",
-        createdAt: "2024-01-10",
-        progress: 0,
-        assignees: [
-          {
-            id: "550e8400-e29b-41d4-a716-446655440006",
-            name: "Bob Smith",
-            avatar: "/thoughtful-man.png",
-            initials: "BS",
-          },
-        ],
-        createdById: "550e8400-e29b-41d4-a716-446655440005",
-        createdBy: {
-          id: "550e8400-e29b-41d4-a716-446655440005",
-          name: "Alice Johnson",
-          avatar: "/diverse-woman-portrait.png",
-          initials: "AJ",
-        },
-        approvalStatus: "pending",
-        subtasks: [],
-        subtasksCompleted: 0,
-        totalSubtasks: 3,
-        tags: ["Frontend", "Mobile"],
-        comments: [],
-        attachments: [],
-      },
-    ],
-  },
-  {
-    id: "660e8400-e29b-41d4-a716-446655440002",
-    name: "Mobile App Development",
-    description: "Native iOS and Android app for customer engagement",
-    status: "planning",
-    priority: "medium",
-    dueDate: "2024-03-30",
-    createdAt: "2024-01-05",
-    progress: 25,
-    tasksCompleted: 1,
-    totalTasks: 6,
-    ownerId: "550e8400-e29b-41d4-a716-446655440002",
-    owner: {
-      id: "550e8400-e29b-41d4-a716-446655440002",
-      name: "Marcus Johnson",
-      avatar: "/thoughtful-man.png",
-      initials: "MJ",
-    },
-    team: [
-      {
-        id: "550e8400-e29b-41d4-a716-446655440003",
-        name: "Elena Rodriguez",
-        avatar: "/professional-woman.png",
-        initials: "ER",
-      },
-      {
-        id: "550e8400-e29b-41d4-a716-446655440004",
-        name: "David Kim",
-        avatar: "/developer-working.png",
-        initials: "DK",
-      },
-    ],
-    tags: ["Mobile", "iOS", "Android"],
-    color: "emerald",
-    tasks: [
-      {
-        id: "770e8400-e29b-41d4-a716-446655440004",
-        projectId: "660e8400-e29b-41d4-a716-446655440002",
-        title: "User Authentication System",
-        description: "Implement secure login and registration for mobile app",
-        status: "review",
-        priority: "high",
-        dueDate: "2024-01-20",
-        createdAt: "2024-01-08",
-        progress: 85,
-        assignees: [
-          {
-            id: "550e8400-e29b-41d4-a716-446655440003",
-            name: "Elena Rodriguez",
-            avatar: "/professional-woman.png",
-            initials: "ER",
-          },
-        ],
-        createdById: "550e8400-e29b-41d4-a716-446655440002",
-        createdBy: {
-          id: "550e8400-e29b-41d4-a716-446655440002",
-          name: "Marcus Johnson",
-          avatar: "/thoughtful-man.png",
-          initials: "MJ",
-        },
-        approvalStatus: "pending",
-        subtasks: [],
-        subtasksCompleted: 4,
-        totalSubtasks: 5,
-        tags: ["Mobile", "Auth", "Security"],
-        comments: [],
-        attachments: [],
-      },
-    ],
-  },
-]
-
-const teamStats = [
-  { name: "John Doe", tasksCreated: 12, tasksCompleted: 8, avatar: "/thoughtful-man.png" },
-  { name: "Jane Smith", tasksCreated: 8, tasksCompleted: 7, avatar: "/diverse-woman-portrait.png" },
-  { name: "Mike Johnson", tasksCreated: 15, tasksCompleted: 10, avatar: "/developer-working.png" },
-]
+type TeamStat = { name: string; tasksCreated: number; tasksCompleted: number; avatar?: string }
 
 export function AdminDashboard() {
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false)
-  const [projects, setProjects] = useState(mockProjects)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [teamStats, setTeamStats] = useState<TeamStat[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [activeFilter, setActiveFilter] = useState("all")
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({})
   const router = useRouter()
   const { toast } = useToast()
   const { user, logout } = useAuth()
+
+  // Load projects and compose tasks per project
+  useEffect(() => {
+    let abort = false
+    const load = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const projRes = await fetch("/api/projects")
+        const projJson = await projRes.json()
+        if (!projRes.ok || !projJson?.success) throw new Error(projJson?.error || "Failed to fetch projects")
+        const projs: Project[] = projJson.data || []
+
+        // Fetch tasks per project in parallel
+        const taskLists = await Promise.all(
+          projs.map(async (p: Project) => {
+            const tRes = await fetch(`/api/tasks?projectId=${encodeURIComponent(p.id)}`)
+            const tJson = await tRes.json()
+            const tasks = tRes.ok && tJson?.success ? (tJson.data as any[]) : []
+            return { projectId: p.id, tasks }
+          })
+        )
+
+        // Compose projects with tasks and counts
+        const withTasks: Project[] = projs.map((p) => {
+          const tlist = taskLists.find((t) => t.projectId === p.id)?.tasks || []
+          const tasksCompleted = tlist.filter((t: any) => t.status === "done").length
+          const totalTasks = tlist.length
+          return {
+            ...p,
+            tasks: tlist,
+            tasksCompleted,
+            totalTasks,
+          } as Project
+        })
+        if (!abort) setProjects(withTasks)
+
+        // Build team stats across all tasks
+        const allTasks = taskLists.flatMap((t) => t.tasks as any[])
+        const byUser = new Map<string, TeamStat>()
+        for (const t of allTasks) {
+          // createdBy
+          if (t.createdBy?.name) {
+            const key = `created:${t.createdBy.name}`
+            const prev = byUser.get(key) || { name: t.createdBy.name, tasksCreated: 0, tasksCompleted: 0, avatar: t.createdBy.avatar }
+            prev.tasksCreated += 1
+            if (t.status === "done") prev.tasksCompleted += 1
+            byUser.set(key, prev)
+          }
+          // assignees
+          for (const a of t.assignees || []) {
+            const key = `assignee:${a.name}`
+            const prev = byUser.get(key) || { name: a.name, tasksCreated: 0, tasksCompleted: 0, avatar: a.avatar }
+            if (t.status === "done") prev.tasksCompleted += 1
+            byUser.set(key, prev)
+          }
+        }
+        const aggregated = Array.from(new Map<string, TeamStat>(
+          Array.from(byUser.values()).map((s) => [s.name, s])
+        ).values())
+        if (!abort) setTeamStats(aggregated)
+      } catch (e: any) {
+        if (!abort) setError(e?.message || "Failed to load admin data")
+      } finally {
+        if (!abort) setLoading(false)
+      }
+    }
+    load()
+    return () => { abort = true }
+  }, [])
 
   const handleProjectClick = (projectId: string) => {
     router.push(`/projects/${projectId}`)
@@ -493,7 +352,7 @@ export function AdminDashboard() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={user?.avatar || "/diverse-woman-portrait.png"} />
+                      <AvatarImage src={user?.avatar || "/placeholder-user.jpg"} />
                       <AvatarFallback>{user?.name?.charAt(0) || "A"}</AvatarFallback>
                     </Avatar>
                   </Button>
@@ -523,35 +382,31 @@ export function AdminDashboard() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-          </div>
         </div>
 
-        {/* Center Pane */}
-        <div className="flex-1 p-6 overflow-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Admin Dashboard</h1>
-            <p className="text-slate-600 mb-6">Complete overview of all projects, tasks, and team performance</p>
-
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-600">Total Projects</p>
-                      <p className="text-2xl font-bold text-slate-900">{projects.length}</p>
-                    </div>
-                    <FolderOpen className="h-8 w-8 text-indigo-500" />
+        {/* Dashboard Metrics */}
+        <div className="p-6 space-y-6">
+          {loading && <div className="text-sm text-slate-500">Loading data…</div>}
+          {error && !loading && <div className="text-sm text-red-600">{error}</div>}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">Total Projects</p>
+                    <p className="text-2xl font-bold text-slate-900">{projects.length}</p>
                   </div>
-                  <div className="mt-2 flex items-center text-xs text-slate-500">
-                    <span className="text-green-600">
-                      {projects.filter((p) => p.status === "in-progress").length} active
-                    </span>
-                    <span className="mx-1">•</span>
-                    <span>{projects.filter((p) => p.status === "planning").length} planning</span>
-                  </div>
-                </CardContent>
-              </Card>
+                  <FolderOpen className="h-8 w-8 text-indigo-500" />
+                </div>
+                <div className="mt-2 flex items-center text-xs text-slate-500">
+                  <span className="text-green-600">
+                    {projects.filter((p) => p.status === "in-progress").length} active
+                  </span>
+                  <span className="mx-1">•</span>
+                  <span>{projects.filter((p) => p.status === "planning").length} planning</span>
+                </div>
+              </CardContent>
+            </Card>
 
               <Card>
                 <CardContent className="p-6">
@@ -598,17 +453,19 @@ export function AdminDashboard() {
                   </div>
                   <div className="mt-2 flex items-center text-xs text-slate-500">
                     <span className="text-green-600">
-                      {Math.round(
-                        (teamStats.reduce((acc, member) => acc + member.tasksCompleted, 0) /
-                          teamStats.reduce((acc, member) => acc + member.tasksCreated, 0)) *
-                          100,
-                      )}
+                      {(() => {
+                        const created = teamStats.reduce((acc, m) => acc + m.tasksCreated, 0)
+                        const completed = teamStats.reduce((acc, m) => acc + m.tasksCompleted, 0)
+                        if (!created) return 0
+                        return Math.round((completed / created) * 100)
+                      })()}
                       % completion rate
                     </span>
                   </div>
                 </CardContent>
               </Card>
             </div>
+          </div>
 
             {/* Quick Actions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -816,7 +673,7 @@ export function AdminDashboard() {
                               <div className="flex -space-x-2 mr-2">
                                 {task.assignees.map((assignee, index) => (
                                   <Avatar key={index} className="h-6 w-6 border-2 border-white">
-                                    <AvatarImage src={assignee.avatar || "/placeholder.svg"} />
+                                    <AvatarImage src={assignee.avatar || "/placeholder-user.jpg"} />
                                     <AvatarFallback className="text-xs">{assignee.initials}</AvatarFallback>
                                   </Avatar>
                                 ))}
@@ -899,7 +756,7 @@ export function AdminDashboard() {
                   {teamStats.map((member, index) => (
                     <div key={index} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={member.avatar || "/placeholder.svg"} />
+                        <AvatarImage src={member.avatar || "/placeholder-user.jpg"} />
                         <AvatarFallback className="text-xs">{member.name[0]}</AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">

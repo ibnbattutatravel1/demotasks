@@ -17,7 +17,6 @@ interface AuthContextType {
   user: User | null
   login: (email: string, password: string) => Promise<void>
   logout: () => void
-  switchRole: (role: UserRole) => void
   isLoading: boolean
 }
 
@@ -28,42 +27,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const savedUser = localStorage.getItem("taskara-user")
-    if (savedUser) {
-      setUser(JSON.parse(savedUser))
+    const hydrate = async () => {
+      try {
+        const res = await fetch("/api/auth/me", { cache: "no-store" })
+        if (res.ok) {
+          const json = await res.json()
+          if (json?.success && json.data) setUser(json.data)
+        }
+      } catch (_) {
+        // noop
+      } finally {
+        setIsLoading(false)
+      }
     }
-    setIsLoading(false)
+    hydrate()
   }, [])
 
   const login = async (email: string, password: string) => {
     setIsLoading(true)
-    // Mock login logic
-    const mockUser: User = {
-      id: email === "admin@taskara.com" ? "1" : "2",
-      name: email === "admin@taskara.com" ? "Admin User" : "Regular User",
-      email,
-      role: email === "admin@taskara.com" ? "admin" : "user",
-      avatar: email === "admin@taskara.com" ? "/diverse-woman-portrait.png" : "/thoughtful-man.png",
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.success) throw new Error(json?.error || "Login failed")
+      setUser(json.data)
+    } finally {
+      setIsLoading(false)
     }
-    setUser(mockUser)
-    localStorage.setItem("taskara-user", JSON.stringify(mockUser))
-    setIsLoading(false)
   }
 
-  const logout = () => {
+  const logout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" })
     setUser(null)
-    localStorage.removeItem("taskara-user")
   }
 
-  const switchRole = (role: UserRole) => {
-    if (user) {
-      const updatedUser = { ...user, role }
-      setUser(updatedUser)
-      localStorage.setItem("taskara-user", JSON.stringify(updatedUser))
-    }
-  }
-
-  return <AuthContext.Provider value={{ user, login, logout, switchRole, isLoading }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ user, login, logout, isLoading }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {
