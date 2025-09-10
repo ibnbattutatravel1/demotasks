@@ -77,6 +77,66 @@ export async function POST(req: NextRequest) {
       updatedAt: now,
     })
 
+    // Notifications: notify stakeholders for tasks/subtasks, excluding the author
+    try {
+      if (body.entityType === 'task') {
+        const task = (await db.select().from(dbSchema.tasks).where(eq(dbSchema.tasks.id, body.entityId)))[0]
+        if (task) {
+          const assignees = await db
+            .select({ userId: dbSchema.taskAssignees.userId })
+            .from(dbSchema.taskAssignees)
+            .where(eq(dbSchema.taskAssignees.taskId, task.id))
+          const recipients = new Set<string>([task.createdById, ...assignees.map(a => a.userId)])
+          recipients.delete(userRow.id) // exclude author
+          if (recipients.size) {
+            const title = task.title
+            const message = `${userRow.name} commented on a task.`
+            await Promise.all(Array.from(recipients).map(uid =>
+              db.insert(dbSchema.notifications).values({
+                id: randomUUID(),
+                type: 'task_commented',
+                title,
+                message,
+                read: 0 as any,
+                userId: uid,
+                relatedId: task.id,
+                relatedType: 'task',
+              })
+            ))
+          }
+        }
+      } else if (body.entityType === 'subtask') {
+        const subt = (await db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.id, body.entityId)))[0]
+        if (subt) {
+          const task = (await db.select().from(dbSchema.tasks).where(eq(dbSchema.tasks.id, subt.taskId)))[0]
+          const assignees = await db
+            .select({ userId: dbSchema.taskAssignees.userId })
+            .from(dbSchema.taskAssignees)
+            .where(eq(dbSchema.taskAssignees.taskId, subt.taskId))
+          const recipients = new Set<string>([task?.createdById, subt.assigneeId, ...assignees.map(a => a.userId)].filter(Boolean) as string[])
+          recipients.delete(userRow.id)
+          if (recipients.size) {
+            const title = task?.title || 'Subtask'
+            const message = `${userRow.name} commented on a subtask.`
+            await Promise.all(Array.from(recipients).map(uid =>
+              db.insert(dbSchema.notifications).values({
+                id: randomUUID(),
+                type: 'task_commented',
+                title,
+                message,
+                read: 0 as any,
+                userId: uid,
+                relatedId: subt.taskId,
+                relatedType: 'task',
+              })
+            ))
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to create comment notifications', e)
+    }
+
     const created = (await db.select().from(dbSchema.comments).where(eq(dbSchema.comments.id, id)))[0]
     return NextResponse.json({ success: true, data: created }, { status: 201 })
   } catch (error) {

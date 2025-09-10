@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -9,77 +9,76 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/contexts/auth-context"
 import { Search, ArrowLeft, Inbox, MessageSquare, Clock, User, CheckCircle2, AlertCircle, Filter } from "lucide-react"
+type Priority = "high" | "medium" | "low"
+type InboxItem = {
+  id: string
+  type: string
+  title: string
+  message: string
+  timestamp: string
+  isRead: boolean
+  priority: Priority
+  taskId?: string
+}
 
-const inboxItems = [
-  {
-    id: 1,
-    type: "task_assigned",
-    title: "New task assigned: Design system components",
-    message: "You have been assigned a new task by Admin User",
-    timestamp: "2 hours ago",
-    isRead: false,
-    priority: "high",
-    taskId: 1,
-  },
-  {
-    id: 2,
-    type: "comment",
-    title: "New comment on: API integration testing",
-    message: "John Doe commented: 'Great progress on the API endpoints!'",
-    timestamp: "4 hours ago",
-    isRead: false,
-    priority: "medium",
-    taskId: 2,
-  },
-  {
-    id: 3,
-    type: "task_approved",
-    title: "Task approved: Implement dark mode toggle",
-    message: "Your task has been approved by Admin User",
-    timestamp: "1 day ago",
-    isRead: true,
-    priority: "low",
-    taskId: 4,
-  },
-  {
-    id: 4,
-    type: "deadline_reminder",
-    title: "Deadline reminder: Mobile app UI improvements",
-    message: "This task is due in 2 days",
-    timestamp: "1 day ago",
-    isRead: true,
-    priority: "high",
-    taskId: 2,
-  },
-  {
-    id: 5,
-    type: "task_completed",
-    title: "Task completed: User feedback analysis",
-    message: "Task has been marked as completed",
-    timestamp: "2 days ago",
-    isRead: true,
-    priority: "low",
-    taskId: 3,
-  },
-]
+function mapPriorityByType(type: string): Priority {
+  switch (type) {
+    case "task_assigned":
+    case "task_rejected":
+    case "deadline_reminder":
+      return "high"
+    case "task_pending":
+    case "task_commented":
+      return "medium"
+    case "task_approved":
+    case "task_completed":
+    default:
+      return "low"
+  }
+}
 
 export default function InboxPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState("all")
-  const [items, setItems] = useState(inboxItems)
+  const [items, setItems] = useState<InboxItem[]>([])
   const router = useRouter()
   const { user } = useAuth()
+
+  useEffect(() => {
+    let abort = false
+    const load = async () => {
+      try {
+        const res = await fetch('/api/notifications')
+        const json = await res.json()
+        if (!res.ok || !json?.success) return
+        const mapped: InboxItem[] = (json.data || []).map((n: any) => ({
+          id: String(n.id),
+          type: String(n.type),
+          title: n.title || 'Notification',
+          message: n.message || '',
+          timestamp: new Date(n.createdAt).toLocaleString(),
+          isRead: !!n.read,
+          priority: mapPriorityByType(String(n.type)),
+          taskId: n.relatedType === 'task' ? String(n.relatedId) : undefined,
+        }))
+        if (!abort) setItems(mapped)
+      } catch {}
+    }
+    load()
+    return () => { abort = true }
+  }, [])
 
   const handleBackToDashboard = () => {
     router.push("/")
   }
 
-  const handleItemClick = (item: (typeof inboxItems)[0]) => {
+  const handleItemClick = async (item: InboxItem) => {
     if (item.taskId) {
       router.push(`/tasks/${item.taskId}`)
     }
-    // Mark as read
+    // Optimistically mark as read
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, isRead: true } : i)))
+    try { await fetch(`/api/notifications/${encodeURIComponent(item.id)}`, { method: 'PATCH' }) } catch {}
   }
 
   const filteredItems = items.filter((item) => {
