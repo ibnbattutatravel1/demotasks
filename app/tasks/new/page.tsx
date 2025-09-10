@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
@@ -11,14 +11,8 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, User, Flag, Clock, Plus, X, AlertCircle, CheckCircle2, FolderOpen } from "lucide-react"
-
-// Mock projects data
-const mockProjects = [
-  { id: "1", name: "Website Redesign", color: "indigo" },
-  { id: "2", name: "Mobile App Development", color: "emerald" },
-  { id: "3", name: "Marketing Campaign", color: "purple" },
-  { id: "4", name: "Database Migration", color: "orange" },
-]
+type ProjectOption = { id: string; name: string; color?: string }
+type UserOption = { id: string; name: string; avatar?: string }
 
 export default function NewTaskPage() {
   const router = useRouter()
@@ -32,46 +26,79 @@ export default function NewTaskPage() {
   const [tags, setTags] = useState<string[]>([])
   const [newTag, setNewTag] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [projects, setProjects] = useState<ProjectOption[]>([])
+  const [users, setUsers] = useState<UserOption[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let abort = false
+    const load = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const [projRes, usersRes] = await Promise.all([
+          fetch('/api/projects'),
+          fetch('/api/users'),
+        ])
+        const projJson = await projRes.json()
+        const usersJson = await usersRes.json()
+        if (!projRes.ok || !projJson?.success) throw new Error(projJson?.error || 'Failed to fetch projects')
+        if (!usersRes.ok || !usersJson?.success) throw new Error(usersJson?.error || 'Failed to fetch users')
+        const projList: ProjectOption[] = (projJson.data || []).map((p: any) => ({ id: p.id, name: p.name, color: p.color }))
+        const userList: UserOption[] = (usersJson.data || []).map((u: any) => ({ id: u.id, name: u.name, avatar: u.avatar || undefined }))
+        if (!abort) {
+          setProjects(projList)
+          setUsers(userList)
+        }
+      } catch (e: any) {
+        if (!abort) setError(e?.message || 'Failed to load data')
+      } finally {
+        if (!abort) setLoading(false)
+      }
+    }
+    load()
+    return () => { abort = true }
+  }, [])
 
   const handleSave = async () => {
-    if (!projectId) {
-      console.log("[v0] Error: Project selection is required")
+    if (!projectId || !title.trim() || !priority) {
+      console.log("Validation error: title, project and priority are required")
+      return
+    }
+
+    if (!user?.id) {
+      console.log("No authenticated user; cannot create task")
       return
     }
 
     setIsSubmitting(true)
+    try {
+      const body: any = {
+        projectId,
+        title: title.trim(),
+        description: description ?? '',
+        priority,
+        dueDate: dueDate || undefined,
+        createdById: user.id,
+        approvalStatus: user.role === 'admin' ? 'approved' : 'pending',
+        assigneeIds: assignees,
+        tags,
+      }
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to create task')
 
-    const taskData = {
-      title,
-      description,
-      projectId, // Include project ID in task data
-      priority,
-      dueDate,
-      assignees,
-      tags,
-      createdBy: user?.name || "Unknown User",
-      createdAt: new Date().toISOString(),
-      status: user?.role === "admin" ? "approved" : "pending_approval",
-    }
-
-    console.log("[v0] Creating new task:", taskData)
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    if (user?.role === "admin") {
-      console.log("[v0] Task created and auto-approved (admin user)")
-    } else {
-      console.log("[v0] Task created and sent for approval (regular user)")
-    }
-
-    setIsSubmitting(false)
-
-    const selectedProject = mockProjects.find((p) => p.id === projectId)
-    if (selectedProject) {
+      // Navigate to project details
       router.push(`/projects/${projectId}`)
-    } else {
-      router.push("/")
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -160,10 +187,10 @@ export default function NewTaskPage() {
                   <label className="text-sm font-medium text-slate-700 mb-2 block">Project *</label>
                   <Select value={projectId} onValueChange={setProjectId}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a project" />
+                      <SelectValue placeholder={loading ? 'Loading projects…' : 'Select a project'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockProjects.map((project) => (
+                      {projects.map((project) => (
                         <SelectItem key={project.id} value={project.id}>
                           <div className="flex items-center gap-2">
                             <FolderOpen className="h-4 w-4 text-slate-500" />
@@ -269,31 +296,34 @@ export default function NewTaskPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src="/diverse-woman-portrait.png" />
-                      <AvatarFallback>A</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-medium">Alice Johnson</p>
-                      <p className="text-xs text-slate-500">Designer</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src="/thoughtful-man.png" />
-                      <AvatarFallback>B</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-medium">Bob Smith</p>
-                      <p className="text-xs text-slate-500">Developer</p>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm" className="w-full bg-transparent">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Assignee
-                  </Button>
+                <div className="space-y-2">
+                  {error && (
+                    <div className="text-xs text-red-600">{error}</div>
+                  )}
+                  {users.map((u) => {
+                    const selected = assignees.includes(u.id)
+                    return (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => {
+                          setAssignees((prev) =>
+                            prev.includes(u.id) ? prev.filter((id) => id !== u.id) : [...prev, u.id],
+                          )
+                        }}
+                        className={`w-full flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 ${selected ? 'bg-slate-50 border border-slate-200' : ''}`}
+                      >
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={u.avatar || '/placeholder-user.jpg'} />
+                          <AvatarFallback>{u.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 text-left">
+                          <p className="text-sm font-medium">{u.name}</p>
+                          <p className="text-xs text-slate-500">{selected ? 'Selected' : 'Tap to assign'}</p>
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -309,9 +339,7 @@ export default function NewTaskPage() {
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-slate-600">Project</span>
-                    <span className="font-medium">
-                      {projectId ? mockProjects.find((p) => p.id === projectId)?.name : "Not selected"}
-                    </span>
+                    <span className="font-medium">{projectId ? (projects.find((p) => p.id === projectId)?.name || 'Unknown') : "Not selected"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">Created by</span>

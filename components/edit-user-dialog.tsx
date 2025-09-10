@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge"
 import { Edit, Mail, User, Shield, Calendar } from "lucide-react"
 
 interface TeamMember {
-  id: number
+  id: string
   name: string
   email: string
   avatar: string
@@ -47,7 +47,7 @@ export function EditUserDialog({ user, open, onOpenChange, onUserUpdated }: Edit
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   // Update form data when user prop changes
-  useState(() => {
+  useEffect(() => {
     if (user) {
       setFormData({
         name: user.name,
@@ -92,24 +92,40 @@ export function EditUserDialog({ user, open, onOpenChange, onUserUpdated }: Edit
     setIsUpdating(true)
 
     try {
-      // Simulate API call delay
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      const updatedUser: TeamMember = {
-        ...user,
+      const payload: any = {
         name: formData.name,
         email: formData.email,
-        role: formData.role,
-        status: formData.status,
         avatar: formData.avatar,
+        status: formData.status as 'Active' | 'Away' | 'Inactive',
+      }
+      const roleLower = (formData.role || '').toLowerCase()
+      if (roleLower === 'admin' || roleLower === 'user') payload.role = roleLower
+
+      const res = await fetch(`/api/users/${encodeURIComponent(user.id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.success) {
+        throw new Error(json?.error || 'Failed to update user')
       }
 
-      console.log("[v0] Updating user:", updatedUser)
+      const saved = json.data as { id: string; name: string; email: string; avatar?: string; role: 'admin' | 'user'; status?: 'Active' | 'Away' | 'Inactive' }
+      const updatedUser: TeamMember = {
+        ...user,
+        name: saved.name,
+        email: saved.email,
+        role: saved.role === 'admin' ? 'Admin' : 'User',
+        status: saved.status ?? formData.status,
+        avatar: saved.avatar || '',
+      }
+
       onUserUpdated(updatedUser)
       onOpenChange(false)
-    } catch (error) {
-      console.error("[v0] Error updating user:", error)
-      setErrors({ submit: "Failed to update user. Please try again." })
+    } catch (error: any) {
+      console.error("Update user error:", error)
+      setErrors({ submit: error?.message || "Failed to update user. Please try again." })
     } finally {
       setIsUpdating(false)
     }
@@ -203,15 +219,16 @@ export function EditUserDialog({ user, open, onOpenChange, onUserUpdated }: Edit
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 <Shield className="h-4 w-4 inline mr-1" />
-                Role *
+                Account Role
               </label>
-              <Input
+              <select
                 value={formData.role}
                 onChange={(e) => handleInputChange("role", e.target.value)}
-                placeholder="Enter role (e.g., Developer, Designer, Manager)"
-                className={errors.role ? "border-red-500" : ""}
-              />
-              {errors.role && <p className="text-sm text-red-600 mt-1">{errors.role}</p>}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="User">User</option>
+                <option value="Admin">Admin</option>
+              </select>
             </div>
 
             <div>

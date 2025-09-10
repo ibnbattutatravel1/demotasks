@@ -9,6 +9,7 @@ export const users = sqliteTable('users', {
   avatar: text('avatar'),
   initials: text('initials').notNull(),
   role: text('role', { length: 16 }).notNull(), // 'admin' | 'user'
+  status: text('status', { length: 16 }), // 'Active' | 'Away' | 'Inactive'
   passwordHash: text('password_hash'),
 })
 

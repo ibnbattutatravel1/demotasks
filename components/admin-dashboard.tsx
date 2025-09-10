@@ -141,47 +141,68 @@ export function AdminDashboard() {
     router.push(path)
   }
 
-  const handleApproveTask = (taskId: string) => {
-    setProjects((prevProjects) =>
-      prevProjects.map((project) => ({
-        ...project,
-        tasks: project.tasks.map((task) =>
-          task.id === taskId
-            ? { ...task, approvalStatus: "approved" as const, approvedAt: new Date().toISOString() }
-            : task,
-        ),
-      })),
-    )
-
-    const task = projects.flatMap((p) => p.tasks).find((t) => t.id === taskId)
-    if (task) {
-      toast({
-        title: "Task Approved",
-        description: `"${task.title}" has been approved and assigned to ${task.assignees[0]?.name || "team member"}.`,
-        variant: "default",
+  const handleApproveTask = async (taskId: string) => {
+    try {
+      const now = new Date().toISOString()
+      await fetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approvalStatus: 'approved', approvedAt: now, approvedById: user?.id ?? null }),
       })
+      // Optimistically update UI
+      setProjects((prevProjects) =>
+        prevProjects.map((project) => ({
+          ...project,
+          tasks: project.tasks.map((task) =>
+            task.id === taskId
+              ? { ...task, approvalStatus: 'approved' as const, approvedAt: now, approvedById: user?.id ?? undefined }
+              : task,
+          ),
+        })),
+      )
+
+      const task = projects.flatMap((p) => p.tasks).find((t) => t.id === taskId)
+      if (task) {
+        toast({
+          title: 'Task Approved',
+          description: `"${task.title}" has been approved and assigned to ${task.assignees[0]?.name || 'team member'}.`,
+          variant: 'default',
+        })
+      }
+    } catch (e: any) {
+      toast({ title: 'Failed to approve task', description: e?.message || 'Please try again', variant: 'destructive' })
     }
   }
 
-  const handleRejectTask = (taskId: string) => {
-    setProjects((prevProjects) =>
-      prevProjects.map((project) => ({
-        ...project,
-        tasks: project.tasks.map((task) =>
-          task.id === taskId
-            ? { ...task, approvalStatus: "rejected" as const, rejectionReason: "Needs more details" }
-            : task,
-        ),
-      })),
-    )
-
-    const task = projects.flatMap((p) => p.tasks).find((t) => t.id === taskId)
-    if (task) {
-      toast({
-        title: "Task Rejected",
-        description: `"${task.title}" has been rejected and returned to ${task.createdBy.name}.`,
-        variant: "destructive",
+  const handleRejectTask = async (taskId: string) => {
+    try {
+      await fetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approvalStatus: 'rejected', approvedAt: null, approvedById: null, rejectionReason: 'Needs more details' }),
       })
+      // Optimistically update UI
+      setProjects((prevProjects) =>
+        prevProjects.map((project) => ({
+          ...project,
+          tasks: project.tasks.map((task) =>
+            task.id === taskId
+              ? { ...task, approvalStatus: 'rejected' as const, rejectionReason: 'Needs more details', approvedAt: undefined, approvedById: undefined }
+              : task,
+          ),
+        })),
+      )
+
+      const task = projects.flatMap((p) => p.tasks).find((t) => t.id === taskId)
+      if (task) {
+        toast({
+          title: 'Task Rejected',
+          description: `"${task.title}" has been rejected and returned to ${task.createdBy.name}.`,
+          variant: 'destructive',
+        })
+      }
+    } catch (e: any) {
+      toast({ title: 'Failed to reject task', description: e?.message || 'Please try again', variant: 'destructive' })
     }
   }
 

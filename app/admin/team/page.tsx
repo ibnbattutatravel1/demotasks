@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Users, ArrowLeft, Mail, Calendar, MoreVertical, Edit, UserX } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { EditUserDialog } from "@/components/edit-user-dialog"
 
 interface TeamMember {
-  id: number
+  id: string
   name: string
   email: string
   avatar: string
@@ -32,87 +32,97 @@ export default function TeamManagementPage() {
   const [newMemberName, setNewMemberName] = useState("")
   const [newMemberEmail, setNewMemberEmail] = useState("")
   const [newMemberRole, setNewMemberRole] = useState("")
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([
-    {
-      id: 1,
-      name: "Sarah Chen",
-      email: "sarah.chen@taskara.com",
-      avatar: "/diverse-woman-portrait.png",
-      role: "Senior Developer",
-      status: "Active",
-      tasksAssigned: 8,
-      tasksCompleted: 12,
-      joinDate: "2023-06-15",
-      lastActive: "2024-01-16",
-    },
-    {
-      id: 2,
-      name: "Mike Johnson",
-      email: "mike.johnson@taskara.com",
-      avatar: "/thoughtful-man.png",
-      role: "UI/UX Designer",
-      status: "Active",
-      tasksAssigned: 5,
-      tasksCompleted: 18,
-      joinDate: "2023-08-20",
-      lastActive: "2024-01-16",
-    },
-    {
-      id: 3,
-      name: "Alex Rivera",
-      email: "alex.rivera@taskara.com",
-      avatar: "/developer-working.png",
-      role: "Backend Developer",
-      status: "Active",
-      tasksAssigned: 6,
-      tasksCompleted: 15,
-      joinDate: "2023-09-10",
-      lastActive: "2024-01-15",
-    },
-    {
-      id: 4,
-      name: "Emma Wilson",
-      email: "emma.wilson@taskara.com",
-      avatar: "/professional-woman.png",
-      role: "Product Manager",
-      status: "Away",
-      tasksAssigned: 4,
-      tasksCompleted: 22,
-      joinDate: "2023-05-01",
-      lastActive: "2024-01-14",
-    },
-    {
-      id: 5,
-      name: "David Kim",
-      email: "david.kim@taskara.com",
-      avatar: "/diverse-team-manager.png",
-      role: "QA Engineer",
-      status: "Active",
-      tasksAssigned: 7,
-      tasksCompleted: 9,
-      joinDate: "2023-11-05",
-      lastActive: "2024-01-16",
-    },
-  ])
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleDeleteUser = (userId: number, userName: string) => {
+  useEffect(() => {
+    let abort = false
+    const load = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const [usersRes, tasksRes] = await Promise.all([
+          fetch("/api/users"),
+          fetch("/api/tasks"),
+        ])
+        const usersJson = await usersRes.json()
+        const tasksJson = await tasksRes.json()
+        if (!usersRes.ok || !usersJson?.success) throw new Error(usersJson?.error || "Failed to fetch users")
+        if (!tasksRes.ok || !tasksJson?.success) throw new Error(tasksJson?.error || "Failed to fetch tasks")
+
+        const users = (usersJson.data || []) as Array<{
+          id: string; name: string; email: string; avatar?: string; initials: string; role: string; status?: 'Active' | 'Away' | 'Inactive'
+        }>
+        const tasks = (tasksJson.data || []) as Array<{
+          id: string; status: string; createdAt: string; updatedAt?: string; completedAt?: string; assignees: Array<{ id: string }>
+        }>
+
+        const stats = new Map<string, { assigned: number; completed: number; lastActive?: string }>()
+        for (const u of users) {
+          stats.set(u.id, { assigned: 0, completed: 0, lastActive: undefined })
+        }
+        for (const t of tasks) {
+          const ts = (t.updatedAt || t.completedAt || t.createdAt)
+          for (const a of t.assignees || []) {
+            const cur = stats.get(a.id) || { assigned: 0, completed: 0, lastActive: undefined }
+            cur.assigned += 1
+            if (t.status === "done") cur.completed += 1
+            if (!cur.lastActive || (ts && ts > cur.lastActive)) cur.lastActive = ts
+            stats.set(a.id, cur)
+          }
+        }
+
+        const mapped: TeamMember[] = users.map((u) => {
+          const s = stats.get(u.id) || { assigned: 0, completed: 0, lastActive: undefined }
+          return {
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            avatar: u.avatar || "",
+            role: u.role === "admin" ? "Admin" : "User",
+            status: u.status ?? (s.assigned > 0 ? "Active" : "Inactive"),
+            tasksAssigned: s.assigned,
+            tasksCompleted: s.completed,
+            joinDate: "-",
+            lastActive: s.lastActive ? s.lastActive.split("T")[0] : "-",
+          }
+        })
+        if (!abort) setTeamMembers(mapped)
+      } catch (e: any) {
+        if (!abort) setError(e?.message || "Failed to load team data")
+      } finally {
+        if (!abort) setLoading(false)
+      }
+    }
+    load()
+    return () => { abort = true }
+  }, [])
+
+  const handleDeleteUser = async (userId: string, userName: string) => {
     if (user?.role !== "admin") {
       alert("Only administrators can delete users.")
       return
     }
 
-    if (
-      confirm(
-        `Are you sure you want to delete user "${userName}"? This action cannot be undone and will remove all their data.`,
-      )
-    ) {
-      setTeamMembers(teamMembers.filter((member) => member.id !== userId))
-      console.log("[v0] User deleted by admin:", userName)
+    if (!confirm(`Are you sure you want to delete user "${userName}"? This action cannot be undone and will remove all their data.`)) {
+      return
+    }
+
+    try {
+      const res = await fetch(`/api/users/${encodeURIComponent(userId)}`, { method: "DELETE" })
+      const json = await res.json()
+      if (!res.ok || !json?.success) {
+        throw new Error(json?.error || "Failed to delete user")
+      }
+      setTeamMembers((prev) => prev.filter((member) => member.id !== userId))
       alert(`User "${userName}" has been deleted`)
+    } catch (e: any) {
+      alert(e?.message || "Failed to delete user")
     }
   }
 
-  const handleEditUser = (userId: number) => {
+  const handleEditUser = (userId: string) => {
     const userToEdit = teamMembers.find((member) => member.id === userId)
     if (userToEdit) {
       setSelectedUser(userToEdit)
@@ -154,6 +164,15 @@ export default function TeamManagementPage() {
           <div className="flex-1">
             <h1 className="text-3xl font-bold text-gray-900">Team Management</h1>
           </div>
+
+        {error && (
+          <div className="mb-6 p-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+        {loading && (
+          <div className="mb-6 text-sm text-gray-500">Loading team…</div>
+        )}
           <Button className="bg-indigo-500 hover:bg-indigo-600" onClick={() => setShowAddMemberModal(true)}>
             <Users className="w-4 h-4 mr-2" />
             Add Member
@@ -225,7 +244,7 @@ export default function TeamManagementPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <img
-                      src={member.avatar || "/placeholder.svg"}
+                      src={member.avatar || "/placeholder-user.jpg"}
                       alt={member.name}
                       className="w-12 h-12 rounded-full"
                     />
@@ -331,12 +350,42 @@ export default function TeamManagementPage() {
                 Cancel
               </Button>
               <Button
-                onClick={() => {
-                  console.log("[v0] Adding member:", { newMemberName, newMemberEmail, newMemberRole })
-                  setShowAddMemberModal(false)
-                  setNewMemberName("")
-                  setNewMemberEmail("")
-                  setNewMemberRole("")
+                onClick={async () => {
+                  try {
+                    const body: any = {
+                      name: newMemberName.trim(),
+                      email: newMemberEmail.trim(),
+                    }
+                    const roleLower = newMemberRole.trim().toLowerCase()
+                    if (roleLower === 'admin' || roleLower === 'user') body.role = roleLower
+                    const res = await fetch('/api/users', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(body),
+                    })
+                    const json = await res.json()
+                    if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to create user')
+                    const u = json.data as { id: string; name: string; email: string; avatar?: string; role: 'admin' | 'user' }
+                    const newMember: TeamMember = {
+                      id: u.id,
+                      name: u.name,
+                      email: u.email,
+                      avatar: u.avatar || '',
+                      role: u.role === 'admin' ? 'Admin' : 'User',
+                      status: 'Inactive',
+                      tasksAssigned: 0,
+                      tasksCompleted: 0,
+                      joinDate: '-',
+                      lastActive: '-',
+                    }
+                    setTeamMembers((prev) => [newMember, ...prev])
+                    setShowAddMemberModal(false)
+                    setNewMemberName("")
+                    setNewMemberEmail("")
+                    setNewMemberRole("")
+                  } catch (e: any) {
+                    alert(e?.message || 'Failed to add member')
+                  }
                 }}
                 className="flex-1 bg-indigo-500 hover:bg-indigo-600"
               >
