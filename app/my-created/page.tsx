@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,125 +22,47 @@ import {
 } from "lucide-react"
 import type { Project, Task } from "@/lib/types"
 
-const mockProjects: Project[] = [
-  {
-    id: "1",
-    name: "Website Redesign",
-    description: "Complete website overhaul",
-    status: "active",
-    priority: "high",
-    createdAt: "2024-01-01",
-    updatedAt: "2024-01-14",
-    createdBy: "admin",
-    assignees: ["Alice Johnson"],
-    dueDate: "2024-02-15",
-    progress: 68,
-    tags: ["Design", "Frontend"],
-  },
-  {
-    id: "2",
-    name: "Mobile App Development",
-    description: "iOS and Android app development",
-    status: "active",
-    priority: "medium",
-    createdAt: "2024-01-05",
-    updatedAt: "2024-01-14",
-    createdBy: "admin",
-    assignees: ["Charlie Brown"],
-    dueDate: "2024-03-30",
-    progress: 45,
-    tags: ["Mobile", "Development"],
-  },
-]
-
-const createdTasks: Task[] = [
-  {
-    id: "1",
-    projectId: "1",
-    title: "Implement dark mode toggle",
-    description: "Add dark mode support across all components with user preference persistence",
-    status: "in-progress",
-    priority: "medium",
-    assignees: ["Alice Johnson"],
-    dueDate: "2024-01-20",
-    tags: ["Frontend", "Feature"],
-    approvalStatus: "pending",
-    createdAt: "2024-01-14",
-    updatedAt: "2024-01-14",
-    createdBy: "current-user",
-    progress: 30,
-  },
-  {
-    id: "2",
-    projectId: "1",
-    title: "Fix responsive layout issues",
-    description: "Resolve mobile layout problems on dashboard and improve tablet experience",
-    status: "in-progress",
-    priority: "high",
-    assignees: ["Bob Smith", "Charlie Brown"],
-    dueDate: "2024-01-18",
-    tags: ["Frontend", "Bug Fix"],
-    approvalStatus: "approved",
-    createdAt: "2024-01-12",
-    updatedAt: "2024-01-14",
-    createdBy: "current-user",
-    progress: 65,
-  },
-  {
-    id: "3",
-    projectId: "2",
-    title: "Database performance optimization",
-    description: "Optimize slow queries and implement proper indexing for better performance",
-    status: "in-progress",
-    priority: "high",
-    assignees: ["Diana Wilson"],
-    dueDate: "2024-01-25",
-    tags: ["Backend", "Performance"],
-    approvalStatus: "approved",
-    createdAt: "2024-01-10",
-    updatedAt: "2024-01-14",
-    createdBy: "current-user",
-    progress: 40,
-  },
-  {
-    id: "4",
-    projectId: "1",
-    title: "User onboarding flow redesign",
-    description: "Complete redesign of user onboarding to improve conversion rates",
-    status: "done",
-    priority: "medium",
-    assignees: ["Eve Davis"],
-    dueDate: "2024-01-14",
-    tags: ["Design", "UX"],
-    approvalStatus: "approved",
-    createdAt: "2024-01-05",
-    updatedAt: "2024-01-14",
-    createdBy: "current-user",
-    progress: 100,
-  },
-  {
-    id: "5",
-    projectId: "2",
-    title: "API rate limiting implementation",
-    description: "Implement proper rate limiting to prevent API abuse and improve stability",
-    status: "todo",
-    priority: "low",
-    assignees: [],
-    dueDate: "2024-02-01",
-    tags: ["Backend", "Security"],
-    approvalStatus: "rejected",
-    createdAt: "2024-01-08",
-    updatedAt: "2024-01-14",
-    createdBy: "current-user",
-    progress: 0,
-  },
-]
+// Data loads from backend
 
 export default function MyCreatedPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const router = useRouter()
   const { user } = useAuth()
+
+  // backend data
+  const [projects, setProjects] = useState<Project[]>([])
+  const [createdTasks, setCreatedTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!user?.id) return
+    let abort = false
+    const load = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const [pres, tres] = await Promise.all([
+          fetch('/api/projects'),
+          fetch(`/api/tasks?createdById=${encodeURIComponent(user.id)}`),
+        ])
+        const pjson = await pres.json()
+        const tjson = await tres.json()
+        if (abort) return
+        if (!pres.ok || !pjson?.success) throw new Error(pjson?.error || 'Failed to fetch projects')
+        if (!tres.ok || !tjson?.success) throw new Error(tjson?.error || 'Failed to fetch tasks')
+        setProjects(pjson.data || [])
+        setCreatedTasks(tjson.data || [])
+      } catch (e: any) {
+        if (!abort) setError(e?.message || 'Failed to load data')
+      } finally {
+        if (!abort) setLoading(false)
+      }
+    }
+    load()
+    return () => { abort = true }
+  }, [user?.id])
 
   const handleBackToDashboard = () => {
     router.push("/")
@@ -151,12 +73,11 @@ export default function MyCreatedPage() {
   }
 
   const handleCreateTask = () => {
-    router.push("/tasks/new")
+    router.push("/projects")
   }
 
-  const getProjectForTask = (taskId: string) => {
-    const task = createdTasks.find((t) => t.id === taskId)
-    return mockProjects.find((p) => p.id === task?.projectId)
+  const getProjectForTask = (projectId: string) => {
+    return projects.find((p) => p.id === projectId)
   }
 
   const filteredTasks = createdTasks.filter((task) => {
@@ -293,7 +214,7 @@ export default function MyCreatedPage() {
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {filteredTasks.map((task) => {
-                const project = getProjectForTask(task.id)
+                const project = getProjectForTask(task.projectId)
 
                 return (
                   <Card
@@ -352,17 +273,10 @@ export default function MyCreatedPage() {
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-slate-600">Assigned to:</span>
                           <div className="flex -space-x-2">
-                            {task.assignees.map((assignee, index) => (
-                              <Avatar key={index} className="h-6 w-6 border-2 border-white">
-                                <AvatarImage
-                                  src={`/abstract-geometric-shapes.png?height=24&width=24&query=${assignee}`}
-                                />
-                                <AvatarFallback className="text-xs">
-                                  {assignee
-                                    .split(" ")
-                                    .map((n) => n[0])
-                                    .join("")}
-                                </AvatarFallback>
+                            {task.assignees.map((a) => (
+                              <Avatar key={a.id} className="h-6 w-6 border-2 border-white">
+                                <AvatarImage src={a.avatar || "/placeholder-user.jpg"} />
+                                <AvatarFallback className="text-xs">{a.initials || (a.name?.[0] || 'U')}</AvatarFallback>
                               </Avatar>
                             ))}
                           </div>

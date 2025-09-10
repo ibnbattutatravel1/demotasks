@@ -141,6 +141,27 @@ export function UserDashboard() {
     return true
   })
 
+  // Tasks I created (enriched with project name)
+  type CreatedTask = Task & { projectName: string }
+  const myCreatedTasks: CreatedTask[] = myTasks
+    .filter((t) => t.createdById === (user?.id || ""))
+    .map((t) => ({
+      ...t,
+      projectName: projects.find((p) => p.id === t.projectId)?.name || "Project",
+    }))
+
+  // Recent activity (very simple derivation from my tasks)
+  type Activity = { action: string; task: string; project: string; time: string }
+  const activities: Activity[] = myTasks
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
+    .slice(0, 10)
+    .map((t) => ({
+      action: t.status === 'done' ? 'completed' : 'updated',
+      task: t.title,
+      project: projects.find((p) => p.id === t.projectId)?.name || 'Project',
+      time: (t.updatedAt || t.createdAt || '').replace('T', ' ').split('.')[0] || '',
+    }))
+
   const toggleProjectExpansion = (projectId: string) => {
     setExpandedProjects((prev) => ({
       ...prev,

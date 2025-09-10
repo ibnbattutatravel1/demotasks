@@ -65,6 +65,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const projectId = searchParams.get('projectId')
     const assigneeId = searchParams.get('assigneeId')
+    const createdById = searchParams.get('createdById')
 
     let where = undefined as any
     if (projectId && assigneeId) {
@@ -74,6 +75,8 @@ export async function GET(req: NextRequest) {
         .where(eq(dbSchema.taskAssignees.userId, assigneeId))
       const taskIds = taskIdsForUser.map(t => t.taskId)
       where = and(inArray(dbSchema.tasks.id, taskIds), eq(dbSchema.tasks.projectId, projectId))
+    } else if (projectId && createdById) {
+      where = and(eq(dbSchema.tasks.projectId, projectId), eq(dbSchema.tasks.createdById, createdById))
     } else if (assigneeId) {
       const taskIdsForUser = await db.select({ taskId: dbSchema.taskAssignees.taskId })
         .from(dbSchema.taskAssignees)
@@ -82,6 +85,8 @@ export async function GET(req: NextRequest) {
       where = inArray(dbSchema.tasks.id, taskIds)
     } else if (projectId) {
       where = eq(dbSchema.tasks.projectId, projectId)
+    } else if (createdById) {
+      where = eq(dbSchema.tasks.createdById, createdById)
     }
 
     const rows = where
