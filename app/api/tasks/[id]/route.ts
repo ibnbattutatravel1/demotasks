@@ -96,6 +96,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     if (body.assigneeIds) {
       // replace assignees
+      // capture existing before replacement to compute new ones
+      const existingAssignees = await db
+        .select({ userId: dbSchema.taskAssignees.userId })
+        .from(dbSchema.taskAssignees)
+        .where(eq(dbSchema.taskAssignees.taskId, id))
+      const prevSet = new Set(existingAssignees.map(a => a.userId))
+
       await db.delete(dbSchema.taskAssignees).where(eq(dbSchema.taskAssignees.taskId, id))
       if (body.assigneeIds.length) {
         try {
@@ -122,6 +129,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
               userId,
             }))
           )
+
+          // Notify new assignees
+          try {
+            const newAssignees = body.assigneeIds.filter(uid => !prevSet.has(uid))
+            if (newAssignees.length) {
+              const title = current.title
+              await Promise.all(newAssignees.map(uid =>
+                db.insert(dbSchema.notifications).values({
+                  id: randomUUID(),
+                  type: 'task_assigned',
+                  title,
+                  message: 'You were assigned to a task.',
+                  read: 0 as any,
+                  userId: uid,
+                  relatedId: id,
+                  relatedType: 'task',
+                })
+              ))
+            }
+          } catch (e) {
+            console.warn('Failed to create assignment notifications', e)
+          }
         } catch (error) {
           console.error('Error updating assignees:', error)
           throw error
@@ -154,6 +183,32 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const fresh = (await db.select().from(dbSchema.tasks).where(eq(dbSchema.tasks.id, id)))[0]
     const data = await composeTask(fresh)
+
+    // Notifications for approval status change
+    try {
+      if (body.approvalStatus && body.approvalStatus !== current.approvalStatus) {
+        const title = current.title
+        let notifType: string | null = null
+        let message = ''
+        if (body.approvalStatus === 'approved') { notifType = 'task_approved'; message = 'Your task has been approved.' }
+        else if (body.approvalStatus === 'pending') { notifType = 'task_pending'; message = 'Your task is pending approval.' }
+        else if (body.approvalStatus === 'rejected') { notifType = 'task_rejected'; message = 'Your task has been rejected.' }
+        if (notifType) {
+          await db.insert(dbSchema.notifications).values({
+            id: randomUUID(),
+            type: notifType,
+            title,
+            message,
+            read: 0 as any,
+            userId: current.createdById,
+            relatedId: id,
+            relatedType: 'task',
+          })
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to create approval status notification', e)
+    }
 
     return NextResponse.json({ success: true, data })
   } catch (error) {

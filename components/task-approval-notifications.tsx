@@ -1,39 +1,59 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle2, X, Clock, Bell } from "lucide-react"
 
+type ApprovalType = "approved" | "rejected" | "pending"
 interface ApprovalNotification {
   id: string
-  type: "approved" | "rejected" | "pending"
+  type: ApprovalType
   taskTitle: string
   message: string
   timestamp: string
+  read?: boolean
 }
 
 export function TaskApprovalNotifications() {
-  const [notifications, setNotifications] = useState<ApprovalNotification[]>([
-    {
-      id: "1",
-      type: "approved",
-      taskTitle: "Fix responsive layout issues",
-      message: "Your task has been approved by Admin User",
-      timestamp: "2 hours ago",
-    },
-    {
-      id: "2",
-      type: "pending",
-      taskTitle: "Implement dark mode toggle",
-      message: "Your task is pending approval",
-      timestamp: "1 day ago",
-    },
-  ])
+  const [notifications, setNotifications] = useState<ApprovalNotification[]>([])
 
-  const dismissNotification = (id: string) => {
+  useEffect(() => {
+    let abort = false
+    const load = async () => {
+      try {
+        const res = await fetch('/api/notifications')
+        const json = await res.json()
+        if (!res.ok || !json?.success) return
+        const items = (json.data || []) as Array<{
+          id: string;
+          type: string;
+          title: string;
+          message: string;
+          createdAt: string;
+          read?: boolean;
+        }>
+        const mapped: ApprovalNotification[] = items
+          .filter(n => n.type?.includes('task_'))
+          .map(n => ({
+            id: n.id,
+            type: n.type === 'task_approved' ? 'approved' : n.type === 'task_rejected' ? 'rejected' : 'pending',
+            taskTitle: n.title || 'Task Update',
+            message: n.message,
+            timestamp: new Date(n.createdAt).toLocaleString(),
+            read: !!n.read,
+          }))
+        if (!abort) setNotifications(mapped)
+      } catch {}
+    }
+    load()
+    return () => { abort = true }
+  }, [])
+
+  const dismissNotification = async (id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id))
+    try { await fetch(`/api/notifications/${encodeURIComponent(id)}`, { method: 'PATCH' }) } catch {}
   }
 
   if (notifications.length === 0) return null

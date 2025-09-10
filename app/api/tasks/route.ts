@@ -204,6 +204,36 @@ export async function POST(req: NextRequest) {
     const task = created[0]
     const data = await composeTask(task)
 
+    // Create a notification for the creator based on approval status
+    try {
+      let notifType: string | null = null
+      let message = ''
+      if (approvalStatus === 'approved') {
+        notifType = 'task_approved'
+        message = 'Your task has been approved.'
+      } else if (approvalStatus === 'pending') {
+        notifType = 'task_pending'
+        message = 'Your task is pending approval.'
+      } else if (approvalStatus === 'rejected') {
+        notifType = 'task_rejected'
+        message = 'Your task has been rejected.'
+      }
+      if (notifType) {
+        await db.insert(dbSchema.notifications).values({
+          id: (globalThis.crypto?.randomUUID?.() ?? randomUUID()) as string,
+          type: notifType,
+          title: title,
+          message,
+          read: 0 as any,
+          userId: createdById,
+          relatedId: id,
+          relatedType: 'task',
+        })
+      }
+    } catch (e) {
+      console.warn('Failed to create notification for task creation', e)
+    }
+
     return NextResponse.json({ success: true, data }, { status: 201 })
   } catch (error) {
     console.error('POST /api/tasks error', error)
