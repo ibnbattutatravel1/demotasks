@@ -690,7 +690,7 @@ export function UserDashboard() {
                                     <span>
                                       {task.subtasksCompleted}/{task.totalSubtasks} subtasks
                                     </span>
-                                    <span>{task.comments.length} comments</span>
+                                    <span>{((task as any).commentsCount ?? (task as any).comments?.length ?? 0)} comments</span>
                                   </div>
                                   <div className="flex items-center justify-between">
                                     <div className="flex gap-1">

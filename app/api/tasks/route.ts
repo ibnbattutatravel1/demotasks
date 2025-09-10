@@ -24,11 +24,12 @@ async function ensureUsers(ids: string[]) {
 }
 
 async function composeTask(task: any) {
-  const [assignees, tags, subtasks] = await Promise.all([
+  const [assignees, tags, subtasks, commentRows] = await Promise.all([
     db.select().from(dbSchema.taskAssignees).where(eq(dbSchema.taskAssignees.taskId, task.id))
       .leftJoin(dbSchema.users, eq(dbSchema.taskAssignees.userId, dbSchema.users.id)),
     db.select().from(dbSchema.taskTags).where(eq(dbSchema.taskTags.taskId, task.id)),
     db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.taskId, task.id)),
+    db.select().from(dbSchema.comments).where(and(eq(dbSchema.comments.entityType, 'task'), eq(dbSchema.comments.entityId, task.id))),
   ])
 
   const assigneeUsers = assignees.map((row) => row.users).filter(Boolean)
@@ -49,6 +50,7 @@ async function composeTask(task: any) {
 
   const subtasksCompleted = subtaskList.filter(s => s.completed).length
   const totalSubtasks = subtaskList.length
+  const commentsCount = commentRows.length
 
   return {
     ...task,
@@ -57,6 +59,7 @@ async function composeTask(task: any) {
     subtasks: subtaskList,
     subtasksCompleted,
     totalSubtasks,
+    commentsCount,
   }
 }
 
@@ -66,6 +69,7 @@ export async function GET(req: NextRequest) {
     const projectId = searchParams.get('projectId')
     const assigneeId = searchParams.get('assigneeId')
     const createdById = searchParams.get('createdById')
+    const approvalStatus = searchParams.get('approvalStatus')
 
     let where = undefined as any
     if (projectId && assigneeId) {
@@ -87,6 +91,12 @@ export async function GET(req: NextRequest) {
       where = eq(dbSchema.tasks.projectId, projectId)
     } else if (createdById) {
       where = eq(dbSchema.tasks.createdById, createdById)
+    }
+
+    // Add approvalStatus filter if provided
+    if (approvalStatus) {
+      const statusCond = eq(dbSchema.tasks.approvalStatus, approvalStatus)
+      where = where ? and(where, statusCond) : statusCond
     }
 
     const rows = where
@@ -189,7 +199,7 @@ export async function POST(req: NextRequest) {
         taskId: id,
         title: st.title,
         description: st.description ?? '',
-        completed: 0,
+        completed: false,
         startDate: st.startDate ?? null as unknown as string | null,
         dueDate: st.dueDate ?? null as unknown as string | null,
         createdAt: now,

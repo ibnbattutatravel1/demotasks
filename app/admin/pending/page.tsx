@@ -5,68 +5,101 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Clock, Calendar, User, ArrowLeft, Check, X, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 export default function PendingTasksPage() {
   const { user } = useAuth()
   const router = useRouter()
-  const [pendingTasks, setPendingTasks] = useState([
-    {
-      id: 4,
-      title: "Mobile app optimization",
-      description: "Improve app performance and reduce loading times",
-      assignee: "Emma Wilson",
-      assigneeAvatar: "/professional-woman.png",
-      submittedDate: "2024-01-16",
-      dueDate: "2024-02-10",
-      priority: "High",
-      status: "Pending Approval",
-      type: "creation", // creation or deletion
-    },
-    {
-      id: 5,
-      title: "User feedback system",
-      description: "Implement feedback collection and analysis",
-      assignee: "David Kim",
-      assigneeAvatar: "/diverse-team-manager.png",
-      submittedDate: "2024-01-15",
-      dueDate: "2024-02-15",
-      priority: "Medium",
-      status: "Pending Approval",
-      type: "creation",
-    },
-    {
-      id: 6,
-      title: "Legacy API cleanup",
-      description: "Remove deprecated API endpoints",
-      assignee: "Sarah Chen",
-      assigneeAvatar: "/diverse-woman-portrait.png",
-      submittedDate: "2024-01-17",
-      dueDate: "2024-01-30",
-      priority: "Low",
-      status: "Pending Deletion",
-      type: "deletion",
-    },
-  ])
+  const [pendingTasks, setPendingTasks] = useState<Array<{
+    id: string
+    title: string
+    description: string
+    assignee: string
+    assigneeAvatar?: string
+    submittedDate: string
+    dueDate: string
+    priority: "High" | "Medium" | "Low"
+    status: string
+    type: "creation" | "deletion"
+  }>>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleApprove = (taskId: number) => {
-    setPendingTasks((tasks) => tasks.filter((task) => task.id !== taskId))
-    // In a real app, this would make an API call
-    console.log(`[v0] Task ${taskId} approved`)
+  const load = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const res = await fetch('/api/tasks?approvalStatus=pending')
+      const json = await res.json()
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to fetch pending tasks')
+      const rows: any[] = json.data || []
+      const mapped = rows.map((t) => ({
+        id: t.id as string,
+        title: t.title as string,
+        description: t.description as string,
+        assignee: (t.assignees?.[0]?.name as string) || 'Unassigned',
+        assigneeAvatar: t.assignees?.[0]?.avatar as string | undefined,
+        submittedDate: String(t.createdAt || '').split('T')[0] || '-',
+        dueDate: String(t.dueDate || '-'),
+        priority: String(t.priority || 'medium').toLowerCase() === 'high'
+          ? 'High'
+          : String(t.priority).toLowerCase() === 'low'
+            ? 'Low'
+            : 'Medium',
+        status: 'Pending Approval',
+        type: 'creation' as const,
+      }))
+      setPendingTasks(mapped)
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load data')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleReject = (taskId: number) => {
-    setPendingTasks((tasks) => tasks.filter((task) => task.id !== taskId))
-    // In a real app, this would make an API call
-    console.log(`[v0] Task ${taskId} rejected`)
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleApprove = async (taskId: string) => {
+    try {
+      const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approvalStatus: 'approved', approvedAt: new Date().toISOString(), approvedById: user?.id }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Approve failed')
+      setPendingTasks((tasks) => tasks.filter((task) => task.id !== taskId))
+    } catch (e) {
+      console.error('Approve failed', e)
+      await load()
+    }
   }
 
-  const handleApproveDeletion = (taskId: number) => {
+  const handleReject = async (taskId: string) => {
+    try {
+      const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approvalStatus: 'rejected', rejectionReason: '' }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Reject failed')
+      setPendingTasks((tasks) => tasks.filter((task) => task.id !== taskId))
+    } catch (e) {
+      console.error('Reject failed', e)
+      await load()
+    }
+  }
+
+  const handleApproveDeletion = (taskId: string) => {
     setPendingTasks((tasks) => tasks.filter((task) => task.id !== taskId))
     console.log(`[v0] Task deletion approved for task ${taskId}`)
   }
 
-  const handleRejectDeletion = (taskId: number) => {
+  const handleRejectDeletion = (taskId: string) => {
     setPendingTasks((tasks) => tasks.filter((task) => task.id !== taskId))
     console.log(`[v0] Task deletion rejected for task ${taskId}`)
   }
@@ -136,7 +169,12 @@ export default function PendingTasksPage() {
           <div className="p-6 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">Tasks Awaiting Approval</h2>
           </div>
-          {pendingTasks.length === 0 ? (
+          {loading ? (
+            <div className="p-12 text-center">
+              <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4 animate-pulse" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Loading...</h3>
+            </div>
+          ) : pendingTasks.length === 0 ? (
             <div className="p-12 text-center">
               <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No pending tasks</h3>
