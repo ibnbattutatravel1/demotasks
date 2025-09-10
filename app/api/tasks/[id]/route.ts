@@ -13,9 +13,9 @@ async function recomputeTaskProgress(taskId: string) {
   return pct
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = params.id
+    const { id } = await params
     const rows = await db.select().from(dbSchema.tasks).where(eq(dbSchema.tasks.id, id))
     if (!rows.length) return NextResponse.json({ success: false, error: 'Task not found' }, { status: 404 })
     const data = await composeTask(rows[0])
@@ -60,9 +60,9 @@ async function composeTask(task: any) {
   return { ...task, assignees: assigneeUsers, tags: tagList, subtasks: subtaskList, subtasksCompleted, totalSubtasks }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = params.id
+    const { id } = await params
     const body = (await req.json()) as Partial<{
       title: string
       description: string
@@ -110,23 +110,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
                   email: `${userId}@example.com`,
                   initials: (userId[0] || 'U').toUpperCase(),
                   role: 'user',
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
                 })
-                .onConflictDoUpdate({
-                  target: dbSchema.users.id,
-                  set: { updatedAt: new Date().toISOString() },
-                })
+                .onConflictDoNothing()
             )
           )
           
-          // Insert new assignees
+          // Insert new assignees (schema has composite PK: taskId + userId)
           await db.insert(dbSchema.taskAssignees).values(
             body.assigneeIds.map((userId) => ({
-              id: randomUUID(),
               taskId: id,
               userId,
-              assignedAt: new Date().toISOString(),
             }))
           )
         } catch (error) {
@@ -169,9 +162,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = params.id
+    const { id } = await params
     const existing = await db.select().from(dbSchema.tasks).where(eq(dbSchema.tasks.id, id))
     if (!existing.length) {
       return NextResponse.json({ success: false, error: 'Task not found' }, { status: 404 })

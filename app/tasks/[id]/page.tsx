@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useState, useCallback } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
@@ -84,8 +84,10 @@ const formatTimeAgo = (dateString: string) => {
   return "Just now"
 }
 
-export default function TaskDetailPage({ params }: { params: { id: string } }) {
+export default function TaskDetailPage() {
   const router = useRouter()
+  const pathname = usePathname()
+  const taskId = (pathname?.split('/')?.[2] as string) || ""
   const { user } = useAuth() // Fixed import to use useAuth instead of useUser
   const [task, setTask] = useState<Task | null>(null)
   const [project, setProject] = useState<Project | null>(null)
@@ -137,7 +139,8 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
     const load = async () => {
       try {
         setLoading(true)
-        const res = await fetch(`/api/tasks/${params.id}`)
+        if (!taskId) return
+        const res = await fetch(`/api/tasks/${taskId}`)
         const json = await res.json()
         if (ignore) return
         if (res.ok && json.success) {
@@ -161,7 +164,7 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
           } catch {}
           // Load task comments
           try {
-            const cres = await fetch(`/api/comments?entityType=task&entityId=${encodeURIComponent(params.id)}`)
+            const cres = await fetch(`/api/comments?entityType=task&entityId=${encodeURIComponent(taskId)}`)
             const cjson = await cres.json()
             if (cres.ok && cjson.success) {
               setTaskComments(cjson.data || [])
@@ -179,11 +182,11 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
     load()
     loadUsers()
     return () => { ignore = true }
-  }, [params.id, loadUsers])
+  }, [taskId, loadUsers])
 
   const refreshTaskComments = async () => {
     try {
-      const cres = await fetch(`/api/comments?entityType=task&entityId=${encodeURIComponent(params.id)}`)
+      const cres = await fetch(`/api/comments?entityType=task&entityId=${encodeURIComponent(taskId)}`)
       const cjson = await cres.json()
       if (cres.ok && cjson.success) setTaskComments(cjson.data || [])
     } catch (e) {
@@ -238,7 +241,8 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
 
   const refreshTask = async () => {
     try {
-      const res = await fetch(`/api/tasks/${params.id}`)
+      if (!taskId) return
+      const res = await fetch(`/api/tasks/${taskId}`)
       const json = await res.json()
       if (res.ok && json.success) {
         const t = json.data as Task
@@ -516,7 +520,8 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
       // Admins can delete immediately
       if (confirm("Are you sure you want to delete this task? This action cannot be undone.")) {
         try {
-          await fetch(`/api/tasks/${params.id}`, { method: 'DELETE' })
+          if (!taskId) return
+          await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
           toast({ title: 'Task deleted', description: 'Task has been permanently deleted.', variant: 'destructive' })
           router.back()
         } catch (e) {

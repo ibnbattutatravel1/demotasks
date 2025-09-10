@@ -3,9 +3,9 @@ import { db, dbSchema } from '@/lib/db/client'
 import { and, eq, inArray } from 'drizzle-orm'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = params.id
+    const { id } = await params
     const rows = await db.select({
       id: dbSchema.users.id,
       name: dbSchema.users.name,
@@ -24,7 +24,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     // Admin auth required
     const token = req.cookies.get(AUTH_COOKIE)?.value
@@ -34,7 +34,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
     }
 
-    const id = params.id
+    const { id } = await params
     const body = await req.json() as { name?: string; email?: string; avatar?: string | null; role?: 'admin' | 'user'; status?: 'Active' | 'Away' | 'Inactive' }
 
     const update: any = {}
@@ -68,7 +68,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     // Admin auth required
     const token = req.cookies.get(AUTH_COOKIE)?.value
@@ -78,7 +78,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
     }
 
-    const id = params.id
+    const { id } = await params
 
     // Prevent deleting self
     if (payload.sub === id) {
