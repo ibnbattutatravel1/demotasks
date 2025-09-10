@@ -32,6 +32,7 @@ export default function TeamManagementPage() {
   const [newMemberName, setNewMemberName] = useState("")
   const [newMemberEmail, setNewMemberEmail] = useState("")
   const [newMemberRole, setNewMemberRole] = useState("")
+  const [newMemberPassword, setNewMemberPassword] = useState("")
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -335,6 +336,16 @@ export default function TeamManagementPage() {
                   placeholder="Enter role (e.g., Developer, Designer)"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password (optional)</label>
+                <Input
+                  type="password"
+                  value={newMemberPassword}
+                  onChange={(e) => setNewMemberPassword(e.target.value)}
+                  placeholder="Set initial password (min 8 characters)"
+                />
+                <p className="text-xs text-gray-500 mt-1">If left blank, the user will not have a password set.</p>
+              </div>
             </div>
             <div className="flex gap-3 mt-6">
               <Button
@@ -358,6 +369,14 @@ export default function TeamManagementPage() {
                     }
                     const roleLower = newMemberRole.trim().toLowerCase()
                     if (roleLower === 'admin' || roleLower === 'user') body.role = roleLower
+                    const pwd = newMemberPassword.trim()
+                    if (pwd) {
+                      if (pwd.length < 8) {
+                        alert('Password must be at least 8 characters')
+                        return
+                      }
+                      body.password = pwd
+                    }
                     const res = await fetch('/api/users', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -383,6 +402,7 @@ export default function TeamManagementPage() {
                     setNewMemberName("")
                     setNewMemberEmail("")
                     setNewMemberRole("")
+                    setNewMemberPassword("")
                   } catch (e: any) {
                     alert(e?.message || 'Failed to add member')
                   }

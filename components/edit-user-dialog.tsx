@@ -45,6 +45,8 @@ export function EditUserDialog({ user, open, onOpenChange, onUserUpdated }: Edit
     avatar: user?.avatar || "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
 
   // Update form data when user prop changes
   useEffect(() => {
@@ -101,6 +103,21 @@ export function EditUserDialog({ user, open, onOpenChange, onUserUpdated }: Edit
       const roleLower = (formData.role || '').toLowerCase()
       if (roleLower === 'admin' || roleLower === 'user') payload.role = roleLower
 
+      const pwd = newPassword.trim()
+      if (pwd) {
+        if (pwd.length < 8) {
+          setErrors({ submit: 'Password must be at least 8 characters' })
+          setIsUpdating(false)
+          return
+        }
+        if (pwd !== confirmPassword.trim()) {
+          setErrors({ submit: 'Passwords do not match' })
+          setIsUpdating(false)
+          return
+        }
+        payload.password = pwd
+      }
+
       const res = await fetch(`/api/users/${encodeURIComponent(user.id)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -123,6 +140,8 @@ export function EditUserDialog({ user, open, onOpenChange, onUserUpdated }: Edit
 
       onUserUpdated(updatedUser)
       onOpenChange(false)
+      setNewPassword("")
+      setConfirmPassword("")
     } catch (error: any) {
       console.error("Update user error:", error)
       setErrors({ submit: error?.message || "Failed to update user. Please try again." })
@@ -254,6 +273,29 @@ export function EditUserDialog({ user, open, onOpenChange, onUserUpdated }: Edit
               <p className="text-xs text-slate-500 mt-1">
                 Enter a URL for the user's profile picture or leave blank to use initials.
               </p>
+            </div>
+
+            {/* Change Password (Admin) */}
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">New Password (optional)</label>
+                <Input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Min 8 characters"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Confirm New Password</label>
+                <Input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Re-enter new password"
+                />
+              </div>
+              <p className="text-xs text-slate-500">Leave both fields blank to keep the current password.</p>
             </div>
           </div>
 

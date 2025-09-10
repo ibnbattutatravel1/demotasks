@@ -35,7 +35,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const { id } = await params
-    const body = await req.json() as { name?: string; email?: string; avatar?: string | null; role?: 'admin' | 'user'; status?: 'Active' | 'Away' | 'Inactive' }
+    const body = await req.json() as { name?: string; email?: string; avatar?: string | null; role?: 'admin' | 'user'; status?: 'Active' | 'Away' | 'Inactive'; password?: string }
 
     const update: any = {}
     if (typeof body.name === 'string' && body.name.trim()) update.name = body.name.trim()
@@ -44,6 +44,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (body.avatar === null) update.avatar = null as unknown as string | null
     if (body.role === 'admin' || body.role === 'user') update.role = body.role
     if (body.status === 'Active' || body.status === 'Away' || body.status === 'Inactive') update.status = body.status
+
+    if (typeof body.password === 'string' && body.password.trim()) {
+      if (body.password.trim().length < 8) {
+        return NextResponse.json({ success: false, error: 'Password must be at least 8 characters' }, { status: 400 })
+      }
+      // lazy import to avoid top-level dep here
+      const { hashSync } = await import('bcryptjs')
+      update.passwordHash = hashSync(body.password.trim(), 10)
+    }
 
     if (Object.keys(update).length === 0) {
       return NextResponse.json({ success: false, error: 'No valid fields to update' }, { status: 400 })

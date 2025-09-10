@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
       avatar?: string
       role?: string // 'admin' | 'user'
       status?: string // 'Active' | 'Away' | 'Inactive'
+      password?: string
     }
 
     const name = (body.name || '').trim()
@@ -69,6 +70,16 @@ export async function POST(req: NextRequest) {
     const id = (globalThis.crypto?.randomUUID?.() ?? randomUUID()) as string
     const initials = name.split(/\s+/).map(p => p[0]?.toUpperCase() ?? '').slice(0, 2).join('') || name[0]?.toUpperCase() || 'U'
 
+    let passwordHash: string | null = null
+    if (typeof body.password === 'string' && body.password.trim()) {
+      const pwd = body.password.trim()
+      if (pwd.length < 8) {
+        return NextResponse.json({ success: false, error: 'Password must be at least 8 characters' }, { status: 400 })
+      }
+      const { hashSync } = await import('bcryptjs')
+      passwordHash = hashSync(pwd, 10)
+    }
+
     await db.insert(dbSchema.users).values({
       id,
       name,
@@ -77,7 +88,7 @@ export async function POST(req: NextRequest) {
       initials,
       role,
       status,
-      passwordHash: null as unknown as string | null,
+      passwordHash,
     })
 
     const created = await db.select({
