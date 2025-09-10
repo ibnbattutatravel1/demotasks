@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -7,18 +7,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ArrowLeft, Check } from "lucide-react"
-
-// Mock team members - in real app this would come from API
-const mockTeamMembers = [
-  { id: "1", name: "Alice Johnson", email: "alice@company.com", initials: "AJ" },
-  { id: "2", name: "Bob Smith", email: "bob@company.com", initials: "BS" },
-  { id: "3", name: "Charlie Brown", email: "charlie@company.com", initials: "CB" },
-  { id: "4", name: "Diana Prince", email: "diana@company.com", initials: "DP" },
-  { id: "5", name: "Eve Wilson", email: "eve@company.com", initials: "EW" },
-]
+import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/hooks/use-toast"
 
 export default function NewProjectPage() {
   const router = useRouter()
+  const { user } = useAuth()
+  const { toast } = useToast()
 
   const [projectName, setProjectName] = useState("")
   const [description, setDescription] = useState("")
@@ -26,10 +21,39 @@ export default function NewProjectPage() {
   const [dueDate, setDueDate] = useState("")
   const [priority, setPriority] = useState("")
   const [selectedTeamMembers, setSelectedTeamMembers] = useState<string[]>([])
-  const [projectOwner, setProjectOwner] = useState("1") // Default to first user
+  const [projectOwner, setProjectOwner] = useState("")
   const [tags, setTags] = useState("")
   const [color, setColor] = useState("#6366f1") // Default indigo
   const [isCreating, setIsCreating] = useState(false)
+  const [users, setUsers] = useState<Array<{ id: string; name: string; email: string; avatar?: string; initials?: string }>>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let abort = false
+    const load = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const res = await fetch('/api/users')
+        const json = await res.json()
+        if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to fetch users')
+        const list = (json.data || []) as Array<{ id: string; name: string; email: string; avatar?: string; initials?: string }>
+        if (!abort) {
+          setUsers(list)
+          // default owner: current user if present, otherwise first user
+          const defaultOwner = user?.id && list.find(u => u.id === user.id) ? user.id : (list[0]?.id || '')
+          setProjectOwner(defaultOwner)
+        }
+      } catch (e: any) {
+        if (!abort) setError(e?.message || 'Failed to load users')
+      } finally {
+        if (!abort) setLoading(false)
+      }
+    }
+    load()
+    return () => { abort = true }
+  }, [user?.id])
 
   const handleTeamMemberToggle = (memberId: string) => {
     setSelectedTeamMembers((prev) =>
@@ -38,59 +62,41 @@ export default function NewProjectPage() {
   }
 
   const handleSubmit = async () => {
-    setIsCreating(true)
-
-    const newProjectId = Date.now().toString()
-    const selectedMembers = mockTeamMembers.filter((member) => selectedTeamMembers.includes(member.id))
-    const owner = mockTeamMembers.find((member) => member.id === projectOwner)
-
-    const newProject = {
-      id: newProjectId,
-      name: projectName,
-      description: description,
-      status: "planning",
-      priority: priority.toLowerCase(),
-      createdAt: new Date().toISOString().split("T")[0],
-      updatedAt: new Date().toISOString().split("T")[0],
-      startDate: startDate,
-      dueDate: dueDate,
-      progress: 0,
-      tags: tags
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter((tag) => tag),
-
-      // Team information
-      ownerId: projectOwner,
-      owner: owner,
-      assignees: selectedMembers.map((member) => member.name),
-      team: selectedMembers,
-
-      // Project settings
-      color: color,
-      actualHours: 0,
-
-      // Task tracking
-      tasks: [],
-      tasksCompleted: 0,
-      totalTasks: 0,
+    if (!projectName.trim() || !priority || !projectOwner || selectedTeamMembers.length === 0) {
+      toast({ title: 'Missing fields', description: 'Project name, priority, owner and at least one team member are required.', variant: 'destructive' })
+      return
     }
-
-    console.log("[v0] Creating project:", newProject)
-
-    // Save to localStorage
-    const existingProjects = JSON.parse(localStorage.getItem("projects") || "[]")
-    existingProjects.push(newProject)
-    localStorage.setItem("projects", JSON.stringify(existingProjects))
-
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-
-    setIsCreating(false)
-    router.push(`/projects/${newProjectId}`)
+    setIsCreating(true)
+    try {
+      const body = {
+        name: projectName.trim(),
+        description,
+        priority: priority.toLowerCase() as 'low' | 'medium' | 'high',
+        startDate: startDate || undefined,
+        dueDate: dueDate || undefined,
+        ownerId: projectOwner,
+        teamIds: selectedTeamMembers,
+        tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+        color,
+      }
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to create project')
+      const created = json.data as { id: string }
+      toast({ title: 'Project created', description: 'Your project has been created successfully.' })
+      router.push(`/projects/${created.id}`)
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message || 'Failed to create project', variant: 'destructive' })
+    } finally {
+      setIsCreating(false)
+    }
   }
 
-  const canCreate = projectName.trim() && priority && selectedTeamMembers.length > 0
+  const canCreate = projectName.trim() && priority && selectedTeamMembers.length > 0 && projectOwner
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
@@ -110,6 +116,12 @@ export default function NewProjectPage() {
             <CardTitle>Project Details</CardTitle>
           </CardHeader>
           <CardContent>
+            {error && (
+              <div className="mb-4 p-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm">{error}</div>
+            )}
+            {loading && (
+              <div className="mb-4 text-sm text-slate-500">Loading users…</div>
+            )}
             <div className="space-y-6">
               {/* Basic Information */}
               <div>
@@ -166,7 +178,7 @@ export default function NewProjectPage() {
                   onChange={(e) => setProjectOwner(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  {mockTeamMembers.map((member) => (
+                  {users.map((member) => (
                     <option key={member.id} value={member.id}>
                       {member.name} ({member.email})
                     </option>
@@ -177,7 +189,7 @@ export default function NewProjectPage() {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-4">Team Members *</label>
                 <div className="space-y-3">
-                  {mockTeamMembers.map((member) => (
+                  {users.map((member) => (
                     <div
                       key={member.id}
                       className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
@@ -189,8 +201,8 @@ export default function NewProjectPage() {
                     >
                       <div className="flex items-center gap-3">
                         <Avatar className="h-8 w-8">
-                          <AvatarImage src={`/abstract-geometric-shapes.png?height=32&width=32&query=${member.name}`} />
-                          <AvatarFallback>{member.initials}</AvatarFallback>
+                          <AvatarImage src={member.avatar || "/placeholder-user.jpg"} />
+                          <AvatarFallback>{member.initials || (member.name?.[0] || 'U')}</AvatarFallback>
                         </Avatar>
                         <div>
                           <p className="font-medium text-slate-900">{member.name}</p>

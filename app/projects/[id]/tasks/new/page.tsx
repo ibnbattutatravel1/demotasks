@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useEffect, useState } from "react"
+import { useRouter, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -13,20 +13,16 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/contexts/auth-context"
 import { ArrowLeft, Calendar, Users, Flag, Tag, Plus, X } from "lucide-react"
 
-// Mock data for project and team members
-const mockProject = {
-  id: "1",
-  name: "Website Redesign",
-  assignees: ["Alice Johnson", "Bob Smith", "Charlie Brown", "Diana Prince", "Eve Wilson"],
-}
 
 export default function NewTaskPage() {
   const router = useRouter()
-  const params = useParams()
+  const pathname = usePathname()
   const { toast } = useToast()
-  const projectId = params.id as string
+  const { user } = useAuth()
+  const projectId = (pathname?.split('/')?.[2] as string) || ""
 
   const [taskData, setTaskData] = useState({
     title: "",
@@ -34,18 +30,44 @@ export default function NewTaskPage() {
     priority: "medium" as "low" | "medium" | "high",
     startDate: "",
     dueDate: "",
-    assignees: [] as string[],
+    assignees: [] as string[], // user IDs
     tags: [] as string[],
   })
 
   const [newTag, setNewTag] = useState("")
+  const [team, setTeam] = useState<Array<{ id: string; name: string; avatar?: string; initials?: string }>>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleAssigneeToggle = (assignee: string) => {
+  useEffect(() => {
+    let abort = false
+    const load = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const res = await fetch('/api/projects')
+        const json = await res.json()
+        if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to fetch projects')
+        const proj = (json.data || []).find((p: any) => p.id === projectId)
+        if (!proj) throw new Error('Project not found')
+        if (!abort) setTeam(proj.team || [])
+      } catch (e: any) {
+        if (!abort) setError(e?.message || 'Failed to load project')
+      } finally {
+        if (!abort) setLoading(false)
+      }
+    }
+    load()
+    return () => { abort = true }
+  }, [projectId])
+
+  const handleAssigneeToggle = (assigneeId: string) => {
     setTaskData((prev) => ({
       ...prev,
-      assignees: prev.assignees.includes(assignee)
-        ? prev.assignees.filter((a) => a !== assignee)
-        : [...prev.assignees, assignee],
+      assignees: prev.assignees.includes(assigneeId)
+        ? prev.assignees.filter((a) => a !== assigneeId)
+        : [...prev.assignees, assigneeId],
     }))
   }
 
@@ -66,50 +88,46 @@ export default function NewTaskPage() {
     }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
     if (!taskData.title.trim()) {
-      toast({
-        title: "Error",
-        description: "Task title is required",
-        variant: "destructive",
-      })
+      toast({ title: 'Error', description: 'Task title is required', variant: 'destructive' })
       return
     }
-
-    const newTask = {
-      id: `task-${Date.now()}`,
-      projectId: projectId,
-      title: taskData.title,
-      description: taskData.description,
-      status: "todo" as const,
-      priority: taskData.priority,
-      assignees: taskData.assignees,
-      startDate: taskData.startDate,
-      dueDate: taskData.dueDate,
-      tags: taskData.tags,
-      approvalStatus: "pending" as const,
-      createdAt: new Date().toISOString().split("T")[0],
-      updatedAt: new Date().toISOString().split("T")[0],
-      createdBy: "Current User", // In real app, this would come from auth context
-      progress: 0,
+    if (!user?.id) {
+      toast({ title: 'Error', description: 'You must be signed in to create a task', variant: 'destructive' })
+      return
     }
-
-    // Save to localStorage
-    const existingTasks = JSON.parse(localStorage.getItem("tasks") || "[]")
-    existingTasks.push(newTask)
-    localStorage.setItem("tasks", JSON.stringify(existingTasks))
-
-    console.log("[v0] Task created and saved:", newTask)
-
-    toast({
-      title: "Success",
-      description: "Task created successfully!",
-    })
-
-    // Navigate back to project page
-    router.push(`/projects/${projectId}`)
+    setIsSubmitting(true)
+    try {
+      const body = {
+        projectId,
+        title: taskData.title.trim(),
+        description: taskData.description,
+        status: 'todo' as const,
+        priority: taskData.priority,
+        assigneeIds: taskData.assignees,
+        startDate: taskData.startDate || undefined,
+        dueDate: taskData.dueDate || undefined,
+        tags: taskData.tags,
+        approvalStatus: user.role === 'admin' ? 'approved' as const : 'pending' as const,
+        createdById: user.id,
+        progress: 0,
+      }
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to create task')
+      toast({ title: 'Success', description: 'Task created successfully!' })
+      router.push(`/projects/${projectId}`)
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message || 'Failed to create task', variant: 'destructive' })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const getPriorityColor = (priority: string) => {
@@ -149,6 +167,12 @@ export default function NewTaskPage() {
       </div>
 
       <div className="max-w-4xl mx-auto p-6">
+        {error && (
+          <div className="mb-4 p-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm">{error}</div>
+        )}
+        {loading && (
+          <div className="mb-4 text-sm text-slate-500">Loading team…</div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information */}
           <Card>
@@ -254,23 +278,18 @@ export default function NewTaskPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {mockProject.assignees.map((member) => (
-                  <div key={member} className="flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-50">
+                {team.map((member) => (
+                  <div key={member.id} className="flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-50">
                     <Checkbox
-                      checked={taskData.assignees.includes(member)}
-                      onCheckedChange={() => handleAssigneeToggle(member)}
+                      checked={taskData.assignees.includes(member.id)}
+                      onCheckedChange={(checked) => handleAssigneeToggle(member.id)}
                     />
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={`/abstract-geometric-shapes.png?height=32&width=32&query=${member}`} />
-                      <AvatarFallback className="text-xs">
-                        {member
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </AvatarFallback>
+                      <AvatarImage src={member.avatar || "/placeholder-user.jpg"} />
+                      <AvatarFallback className="text-xs">{member.initials || (member.name?.[0] || 'U')}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
-                      <p className="font-medium text-slate-900">{member}</p>
+                      <p className="font-medium text-slate-900">{member.name}</p>
                       <p className="text-sm text-slate-600">Team Member</p>
                     </div>
                   </div>
@@ -281,11 +300,14 @@ export default function NewTaskPage() {
                 <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                   <p className="text-sm font-medium text-blue-900 mb-2">Selected Assignees:</p>
                   <div className="flex flex-wrap gap-2">
-                    {taskData.assignees.map((assignee) => (
-                      <Badge key={assignee} variant="secondary" className="bg-blue-100 text-blue-800">
-                        {assignee}
-                      </Badge>
-                    ))}
+                    {taskData.assignees.map((assigneeId) => {
+                      const m = team.find(t => t.id === assigneeId)
+                      return (
+                        <Badge key={assigneeId} variant="secondary" className="bg-blue-100 text-blue-800">
+                          {m?.name || assigneeId}
+                        </Badge>
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -375,7 +397,7 @@ export default function NewTaskPage() {
             <Button type="button" variant="outline" onClick={() => router.push(`/projects/${projectId}`)}>
               Cancel
             </Button>
-            <Button type="submit" className="bg-indigo-500 hover:bg-indigo-600">
+            <Button type="submit" disabled={isSubmitting} className="bg-indigo-500 hover:bg-indigo-600">
               Create Task
             </Button>
           </div>

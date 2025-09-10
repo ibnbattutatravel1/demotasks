@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,110 +26,104 @@ import {
   Copy,
   Trash2,
 } from "lucide-react"
-import type { Project, Task } from "@/lib/types"
-
-// Mock data - in real app this would come from API
-const mockProject: Project = {
-  id: "1",
-  name: "Website Redesign",
-  description:
-    "Complete overhaul of the company website with modern design and improved UX. This project involves redesigning the entire user interface, improving the user experience, and implementing new features to enhance customer engagement.",
-  status: "active",
-  priority: "high",
-  createdAt: "2024-01-01",
-  updatedAt: "2024-01-14",
-  createdBy: "admin",
-  assignees: ["Alice Johnson", "Bob Smith", "Charlie Brown"],
-  dueDate: "2024-02-15",
-  progress: 68,
-  tags: ["Design", "Frontend", "UX"],
-}
-
-const mockTasks: Task[] = [
-  {
-    id: "1",
-    projectId: "1",
-    title: "Design System Creation",
-    description: "Create comprehensive design system with components, colors, and typography",
-    status: "done",
-    priority: "high",
-    assignees: ["Alice Johnson"],
-    dueDate: "2024-01-15",
-    tags: ["Design", "System"],
-    approvalStatus: "approved",
-    createdAt: "2024-01-01",
-    updatedAt: "2024-01-15",
-    createdBy: "Alice Johnson",
-    progress: 100,
-  },
-  {
-    id: "2",
-    projectId: "1",
-    title: "Homepage Layout Design",
-    description: "Design new homepage layout with improved navigation and hero section",
-    status: "in-progress",
-    priority: "high",
-    assignees: ["Bob Smith", "Alice Johnson"],
-    dueDate: "2024-01-20",
-    tags: ["Design", "Homepage"],
-    approvalStatus: "approved",
-    createdAt: "2024-01-05",
-    updatedAt: "2024-01-14",
-    createdBy: "Bob Smith",
-    progress: 60,
-  },
-  {
-    id: "3",
-    projectId: "1",
-    title: "Mobile Responsiveness",
-    description: "Ensure all pages are fully responsive across different device sizes",
-    status: "todo",
-    priority: "medium",
-    assignees: ["Charlie Brown"],
-    dueDate: "2024-01-25",
-    tags: ["Mobile", "Responsive"],
-    approvalStatus: "pending",
-    createdAt: "2024-01-10",
-    updatedAt: "2024-01-14",
-    createdBy: "Charlie Brown",
-    progress: 0,
-  },
-]
+import type { Project, Task, TeamMember } from "@/lib/types"
 
 export default function ProjectDetailPage() {
   const router = useRouter()
-  const params = useParams()
-  const projectId = params.id as string
+  const pathname = usePathname()
+  const projectId = (pathname?.split('/')?.[2] as string) || ""
   const { user } = useAuth()
 
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [projectTasks, setProjectTasks] = useState<Task[]>([])
 
   useEffect(() => {
-    // Load project from localStorage
-    const projects = JSON.parse(localStorage.getItem("projects") || "[]")
-    const foundProject = projects.find((p: Project) => p.id === projectId)
+    let abort = false
+    const load = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const [projRes, tasksRes] = await Promise.all([
+          fetch('/api/projects'),
+          fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}`),
+        ])
+        const projJson = await projRes.json()
+        const tasksJson = await tasksRes.json()
+        if (!projRes.ok || !projJson?.success) throw new Error(projJson?.error || 'Failed to fetch project')
+        if (!tasksRes.ok || !tasksJson?.success) throw new Error(tasksJson?.error || 'Failed to fetch tasks')
 
-    if (foundProject) {
-      setProject(foundProject)
-    } else {
-      // Fallback to mock project if not found
-      setProject(mockProject)
+        const p = (projJson.data || []).find((x: any) => x.id === projectId)
+        if (!p) throw new Error('Project not found')
+
+        const mappedProject: Project = {
+          id: p.id,
+          name: p.name,
+          description: p.description ?? '',
+          status: p.status,
+          priority: p.priority,
+          startDate: p.startDate,
+          dueDate: p.dueDate,
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt,
+          completedAt: p.completedAt,
+          progress: p.progress ?? 0,
+          tasks: [],
+          tasksCompleted: 0,
+          totalTasks: 0,
+          ownerId: p.ownerId,
+          owner: p.owner,
+          team: p.team || [],
+          tags: p.tags || [],
+          color: p.color || '#6366f1',
+          budget: p.budget,
+          estimatedHours: p.estimatedHours,
+          actualHours: p.actualHours,
+        }
+
+        const tasks: Task[] = (tasksJson.data || []).map((t: any) => ({
+          id: t.id,
+          projectId: t.projectId,
+          title: t.title,
+          description: t.description || '',
+          status: t.status,
+          priority: t.priority,
+          startDate: t.startDate || t.createdAt,
+          dueDate: t.dueDate || '',
+          createdAt: t.createdAt,
+          updatedAt: t.updatedAt,
+          completedAt: t.completedAt,
+          assigneeId: undefined,
+          assignee: undefined,
+          assignees: (t.assignees || []).map((a: any) => ({ id: a.id, name: a.name, avatar: a.avatar, initials: a.initials } as TeamMember)),
+          createdById: t.createdById,
+          createdBy: t.createdBy ? ({ id: t.createdBy.id, name: t.createdBy.name, avatar: t.createdBy.avatar, initials: t.createdBy.initials } as TeamMember) : ({ id: t.createdById, name: `User ${t.createdById}`, initials: (t.createdById?.[0] || 'U') } as TeamMember),
+          approvalStatus: t.approvalStatus,
+          approvedAt: t.approvedAt,
+          approvedById: t.approvedById,
+          rejectionReason: t.rejectionReason,
+          progress: t.progress ?? 0,
+          subtasks: t.subtasks || [],
+          subtasksCompleted: t.subtasksCompleted ?? 0,
+          totalSubtasks: t.totalSubtasks ?? 0,
+          tags: t.tags || [],
+          comments: t.comments || [],
+          attachments: t.attachments || [],
+        }))
+
+        if (!abort) {
+          setProject(mappedProject)
+          setProjectTasks(tasks)
+        }
+      } catch (e: any) {
+        if (!abort) setError(e?.message || 'Failed to load project')
+      } finally {
+        if (!abort) setLoading(false)
+      }
     }
-
-    const allTasks = JSON.parse(localStorage.getItem("tasks") || "[]")
-    const tasksForProject = allTasks.filter((task: Task) => task.projectId === projectId)
-
-    // If no tasks in localStorage, fall back to mockTasks for this project
-    if (tasksForProject.length === 0) {
-      const mockTasksForProject = mockTasks.filter((task) => task.projectId === projectId)
-      setProjectTasks(mockTasksForProject)
-    } else {
-      setProjectTasks(tasksForProject)
-    }
-
-    setLoading(false)
+    load()
+    return () => { abort = true }
   }, [projectId])
 
   const [viewMode, setViewMode] = useState<"grid" | "list">("list")
@@ -235,10 +229,6 @@ export default function ProjectDetailPage() {
               <ArrowLeft className="h-4 w-4" />
               Back to Projects
             </Button>
-            <div className="border-l border-slate-200 h-6" />
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">{project.name}</h1>
-            </div>
           </div>
           <div className="flex items-center gap-4">
             <DropdownMenu>
@@ -280,12 +270,12 @@ export default function ProjectDetailPage() {
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Project
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleDuplicateProject}>
+                <DropdownMenuItem onClick={() => alert('Duplicate not implemented yet with backend')}>
                   <Copy className="h-4 w-4 mr-2" />
                   Duplicate Project
                 </DropdownMenuItem>
                 {user?.role === "admin" && (
-                  <DropdownMenuItem onClick={handleDeleteProject} className="text-red-600 focus:text-red-600">
+                  <DropdownMenuItem onClick={() => alert('Delete project API not implemented')} className="text-red-600 focus:text-red-600">
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete Project
                   </DropdownMenuItem>
@@ -341,7 +331,7 @@ export default function ProjectDetailPage() {
                     <Users className="h-4 w-4" />
                     <span>Project Lead</span>
                   </div>
-                  <p className="font-medium text-slate-900">{project.createdBy}</p>
+                  <p className="font-medium text-slate-900">{project.owner?.name || '-'}</p>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm text-slate-600">
@@ -349,18 +339,11 @@ export default function ProjectDetailPage() {
                     <span>Team Members</span>
                   </div>
                   <div className="flex -space-x-2">
-                    {project.assignees.length > 0 ? (
-                      project.assignees.map((member, index) => (
-                        <Avatar key={index} className="h-8 w-8 border-2 border-white">
-                          <AvatarImage
-                            src={`/abstract-geometric-shapes.png?key=mv5rd&height=32&width=32&query=${member}`}
-                          />
-                          <AvatarFallback className="text-xs">
-                            {member
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
+                    {project.team && project.team.length > 0 ? (
+                      project.team.slice(0, 6).map((member) => (
+                        <Avatar key={member.id} className="h-8 w-8 border-2 border-white">
+                          <AvatarImage src={member.avatar || "/placeholder-user.jpg"} />
+                          <AvatarFallback className="text-xs">{member.initials || (member.name?.[0] || 'U')}</AvatarFallback>
                         </Avatar>
                       ))
                     ) : (
@@ -472,17 +455,10 @@ export default function ProjectDetailPage() {
                       <p className="text-sm text-slate-600 line-clamp-2">{task.description}</p>
                       <div className="flex items-center justify-between">
                         <div className="flex -space-x-2">
-                          {task.assignees.slice(0, 2).map((member, index) => (
-                            <Avatar key={index} className="h-6 w-6 border-2 border-white">
-                              <AvatarImage
-                                src={`/abstract-geometric-shapes.png?key=mv5rd&height=24&width=24&query=${member}`}
-                              />
-                              <AvatarFallback className="text-xs">
-                                {member
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")}
-                              </AvatarFallback>
+                          {task.assignees.slice(0, 2).map((member) => (
+                            <Avatar key={member.id} className="h-6 w-6 border-2 border-white">
+                              <AvatarImage src={member.avatar || "/placeholder-user.jpg"} />
+                              <AvatarFallback className="text-xs">{member.initials || (member.name?.[0] || 'U')}</AvatarFallback>
                             </Avatar>
                           ))}
                         </div>
@@ -512,17 +488,10 @@ export default function ProjectDetailPage() {
                           </div>
                           <div className="flex items-center gap-4">
                             <div className="flex -space-x-2">
-                              {task.assignees.slice(0, 2).map((member, index) => (
-                                <Avatar key={index} className="h-6 w-6 border-2 border-white">
-                                  <AvatarImage
-                                    src={`/abstract-geometric-shapes.png?key=ao24f&height=24&width=24&query=${member}`}
-                                  />
-                                  <AvatarFallback className="text-xs">
-                                    {member
-                                      .split(" ")
-                                      .map((n) => n[0])
-                                      .join("")}
-                                  </AvatarFallback>
+                              {task.assignees.slice(0, 2).map((member) => (
+                                <Avatar key={member.id} className="h-6 w-6 border-2 border-white">
+                                  <AvatarImage src={member.avatar || "/placeholder-user.jpg"} />
+                                  <AvatarFallback className="text-xs">{member.initials || (member.name?.[0] || 'U')}</AvatarFallback>
                                 </Avatar>
                               ))}
                             </div>
@@ -546,30 +515,23 @@ export default function ProjectDetailPage() {
               <CardTitle>Team Members</CardTitle>
             </CardHeader>
             <CardContent>
-              {project.assignees.length > 0 ? (
+              {project.team && project.team.length > 0 ? (
                 <div className="space-y-4">
-                  {project.assignees.map((member, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  {project.team.map((member) => (
+                    <div key={member.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
-                          <AvatarImage
-                            src={`/abstract-geometric-shapes.png?key=ao24f&height=40&width=40&query=${member}`}
-                          />
-                          <AvatarFallback>
-                            {member
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
+                          <AvatarImage src={member.avatar || "/placeholder-user.jpg"} />
+                          <AvatarFallback>{member.initials || (member.name?.[0] || 'U')}</AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="font-medium text-slate-900">{member}</p>
+                          <p className="font-medium text-slate-900">{member.name}</p>
                           <p className="text-sm text-slate-600">Team Member</p>
                         </div>
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-medium text-slate-900">
-                          {projectTasks.filter((task) => task.assignees.includes(member)).length} tasks
+                          {projectTasks.filter((task) => task.assignees.some((a) => a.id === member.id)).length} tasks
                         </p>
                         <p className="text-xs text-slate-500">assigned</p>
                       </div>
