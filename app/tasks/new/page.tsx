@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
@@ -30,6 +30,9 @@ export default function NewTaskPage() {
   const [users, setUsers] = useState<UserOption[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [projectFilter, setProjectFilter] = useState("")
+  const [assigneeFilter, setAssigneeFilter] = useState("")
 
   useEffect(() => {
     let abort = false
@@ -61,14 +64,33 @@ export default function NewTaskPage() {
     return () => { abort = true }
   }, [])
 
+  const filteredProjects = useMemo(() => {
+    const q = projectFilter.trim().toLowerCase()
+    if (!q) return projects
+    return projects.filter(p => p.name.toLowerCase().includes(q))
+  }, [projects, projectFilter])
+
+  const filteredUsers = useMemo(() => {
+    const q = assigneeFilter.trim().toLowerCase()
+    if (!q) return users
+    return users.filter(u => u.name.toLowerCase().includes(q))
+  }, [users, assigneeFilter])
+
   const handleSave = async () => {
     if (!projectId || !title.trim() || !priority) {
       console.log("Validation error: title, project and priority are required")
+      setFormError("Please fill in title, project and priority.")
       return
     }
 
     if (!user?.id) {
       console.log("No authenticated user; cannot create task")
+      setFormError("You must be signed in to create a task.")
+      return
+    }
+
+    if (description.trim().length < 10) {
+      setFormError("Description must be at least 10 characters long.")
       return
     }
 
@@ -97,6 +119,7 @@ export default function NewTaskPage() {
       router.push(`/projects/${projectId}`)
     } catch (e) {
       console.error(e)
+      setFormError((e as any)?.message || 'Failed to create task')
     } finally {
       setIsSubmitting(false)
     }
@@ -132,7 +155,7 @@ export default function NewTaskPage() {
             <Button
               onClick={handleSave}
               className="bg-indigo-500 hover:bg-indigo-600"
-              disabled={!title.trim() || !projectId || isSubmitting} // Added project validation
+              disabled={!title.trim() || !projectId || !priority || description.trim().length < 10 || isSubmitting}
             >
               {isSubmitting ? "Creating..." : "Create Task"}
             </Button>
@@ -142,6 +165,9 @@ export default function NewTaskPage() {
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto p-6">
+        {formError && (
+          <div className="mb-4 p-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm">{formError}</div>
+        )}
         {user?.role !== "admin" && (
           <Card className="mb-6 border-orange-200 bg-orange-50">
             <CardContent className="p-4">
@@ -185,12 +211,18 @@ export default function NewTaskPage() {
               <CardContent className="space-y-4">
                 <div>
                   <label className="text-sm font-medium text-slate-700 mb-2 block">Project *</label>
+                  <Input
+                    value={projectFilter}
+                    onChange={(e) => setProjectFilter(e.target.value)}
+                    placeholder="Filter projects…"
+                    className="mb-2"
+                  />
                   <Select value={projectId} onValueChange={setProjectId}>
                     <SelectTrigger>
                       <SelectValue placeholder={loading ? 'Loading projects…' : 'Select a project'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {projects.map((project) => (
+                      {filteredProjects.map((project) => (
                         <SelectItem key={project.id} value={project.id}>
                           <div className="flex items-center gap-2">
                             <FolderOpen className="h-4 w-4 text-slate-500" />
@@ -297,10 +329,16 @@ export default function NewTaskPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
+                  <Input
+                    value={assigneeFilter}
+                    onChange={(e) => setAssigneeFilter(e.target.value)}
+                    placeholder="Filter team…"
+                    className="mb-2"
+                  />
                   {error && (
                     <div className="text-xs text-red-600">{error}</div>
                   )}
-                  {users.map((u) => {
+                  {filteredUsers.map((u) => {
                     const selected = assignees.includes(u.id)
                     return (
                       <button

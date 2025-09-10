@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,118 +16,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-const events = [
-  {
-    id: 1,
-    title: "Design Review Meeting",
-    time: "09:00 - 10:00",
-    date: "2024-01-15",
-    type: "meeting",
-    attendees: [
-      { name: "Alice", avatar: "/diverse-woman-portrait.png" },
-      { name: "Bob", avatar: "/thoughtful-man.png" },
-    ],
-    color: "indigo",
-  },
-  {
-    id: 2,
-    title: "API Integration Testing",
-    time: "14:00 - 16:00",
-    date: "2024-01-15",
-    createdDate: "2024-01-10",
-    type: "task",
-    assignee: { name: "Charlie", avatar: "/developer-working.png" },
-    color: "emerald",
-    subtasks: [
-      {
-        id: "2-1",
-        title: "Setup test environment",
-        date: "2024-01-12",
-        time: "10:00 - 12:00",
-        completed: true,
-      },
-      {
-        id: "2-2",
-        title: "Write integration tests",
-        date: "2024-01-14",
-        time: "14:00 - 16:00",
-        completed: false,
-      },
-    ],
-  },
-  {
-    id: 3,
-    title: "Sprint Planning",
-    time: "10:00 - 11:30",
-    date: "2024-01-16",
-    type: "meeting",
-    attendees: [
-      { name: "Diana", avatar: "/diverse-team-manager.png" },
-      { name: "Eve", avatar: "/professional-woman.png" },
-      { name: "Alice", avatar: "/diverse-woman-portrait.png" },
-    ],
-    color: "blue",
-  },
-  {
-    id: 4,
-    title: "Code Review Session",
-    time: "15:00 - 16:00",
-    date: "2024-01-17",
-    createdDate: "2024-01-12",
-    type: "task",
-    assignee: { name: "Bob", avatar: "/thoughtful-man.png" },
-    color: "purple",
-    subtasks: [
-      {
-        id: "4-1",
-        title: "Review authentication module",
-        date: "2024-01-16",
-        time: "09:00 - 11:00",
-        completed: false,
-      },
-      {
-        id: "4-2",
-        title: "Review API endpoints",
-        date: "2024-01-17",
-        time: "13:00 - 15:00",
-        completed: false,
-      },
-    ],
-  },
-  {
-    id: 5,
-    title: "Database Migration",
-    time: "All Day",
-    date: "2024-01-20",
-    createdDate: "2024-01-14",
-    type: "task",
-    assignee: { name: "Alice", avatar: "/diverse-woman-portrait.png" },
-    color: "red",
-    subtasks: [
-      {
-        id: "5-1",
-        title: "Backup current database",
-        date: "2024-01-18",
-        time: "08:00 - 09:00",
-        completed: false,
-      },
-      {
-        id: "5-2",
-        title: "Run migration scripts",
-        date: "2024-01-19",
-        time: "10:00 - 14:00",
-        completed: false,
-      },
-      {
-        id: "5-3",
-        title: "Verify data integrity",
-        date: "2024-01-20",
-        time: "15:00 - 17:00",
-        completed: false,
-      },
-    ],
-  },
-]
+// Derived events from real backend tasks/projects
+type CalendarEvent = {
+  id: string
+  title: string
+  time?: string
+  date: string
+  createdDate?: string
+  type: "task"
+  assignee?: { name: string; avatar?: string }
+  color: string // tailwind color token, e.g., 'indigo'
+  subtasks?: Array<{ id: string; title: string; date: string; time?: string; completed?: boolean }>
+  projectId: string
+  approvalStatus?: 'pending' | 'approved' | 'rejected'
+}
+
+function normalizeColor(color?: string) {
+  if (!color) return "indigo"
+  if (color.startsWith("#")) return "indigo"
+  return color
+}
 
 const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 const months = [
@@ -146,7 +54,7 @@ const months = [
 ]
 
 export default function CalendarPage() {
-  const [currentDate, setCurrentDate] = useState(new Date(2024, 0, 15)) // January 15, 2024
+  const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month")
   const [filters, setFilters] = useState({
     showMeetings: true,
@@ -154,8 +62,72 @@ export default function CalendarPage() {
     showCompleted: true,
     showPending: true,
     assignees: [] as string[],
+    projects: [] as string[],
+    showApproved: true,
+    showPendingApproval: true,
   })
   const router = useRouter()
+  const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [projects, setProjects] = useState<Array<{ id: string; name: string; color: string }>>([])
+
+  useEffect(() => {
+    let abort = false
+    const load = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const [tasksRes, projectsRes] = await Promise.all([
+          fetch('/api/tasks'),
+          fetch('/api/projects'),
+        ])
+        const tasksJson = await tasksRes.json()
+        const projectsJson = await projectsRes.json()
+        if (!tasksRes.ok || !tasksJson?.success) throw new Error(tasksJson?.error || 'Failed to fetch tasks')
+        if (!projectsRes.ok || !projectsJson?.success) throw new Error(projectsJson?.error || 'Failed to fetch projects')
+
+        const projectColors = new Map<string, string>()
+        const projList = (projectsJson.data || []).map((p: any) => ({ id: p.id, name: p.name, color: normalizeColor(p.color) }))
+        projList.forEach((p) => projectColors.set(p.id, p.color))
+
+        const evts: CalendarEvent[] = (tasksJson.data || []).map((t: any) => {
+          const color = projectColors.get(t.projectId) || 'indigo'
+          const firstAssignee = (t.assignees && t.assignees[0]) ? { name: t.assignees[0].name, avatar: t.assignees[0].avatar } : undefined
+          const subs = (t.subtasks || []).map((st: any) => ({
+            id: st.id,
+            title: st.title,
+            date: st.dueDate || st.startDate || t.dueDate,
+            time: undefined as string | undefined,
+            completed: !!st.completed,
+          }))
+          return {
+            id: t.id,
+            title: t.title,
+            date: t.dueDate || t.startDate,
+            createdDate: t.createdAt,
+            type: 'task',
+            assignee: firstAssignee,
+            color,
+            subtasks: subs,
+            projectId: t.projectId,
+            approvalStatus: t.approvalStatus,
+          }
+        })
+
+        if (!abort) {
+          setEvents(evts)
+          setProjects(projList)
+        }
+      } catch (e: any) {
+        if (!abort) setError(e?.message || 'Failed to load calendar')
+      } finally {
+        if (!abort) setLoading(false)
+      }
+    }
+    load()
+    return () => { abort = true }
+  }, [])
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear()
@@ -197,24 +169,22 @@ export default function CalendarPage() {
 
   const getEventsForDate = (date: Date) => {
     const dateString = date.toISOString().split("T")[0]
-    const allItems = []
+    const allItems: any[] = []
 
-    // Add main events/tasks
-    events.forEach((event) => {
-      if (event.date === dateString) {
-        allItems.push({ ...event, isSubtask: false })
+    events.forEach((evt: CalendarEvent) => {
+      if (evt.date === dateString) {
+        allItems.push({ ...evt, isSubtask: false })
       }
-
-      // Add subtasks
-      if (event.subtasks) {
-        event.subtasks.forEach((subtask) => {
-          if (subtask.date === dateString) {
+      if (evt.subtasks && evt.subtasks.length) {
+        evt.subtasks.forEach((sub: { id: string; title: string; date: string; time?: string; completed?: boolean }) => {
+          if (sub.date === dateString) {
             allItems.push({
-              ...subtask,
-              parentTitle: event.title,
-              parentColor: event.color,
-              assignee: event.assignee,
+              ...sub,
+              parentTitle: evt.title,
+              parentColor: evt.color,
+              assignee: evt.assignee,
               isSubtask: true,
+              type: 'task',
             })
           }
         })
@@ -247,30 +217,27 @@ export default function CalendarPage() {
   }
 
   const toggleFilter = (filterType: keyof typeof filters, value?: string) => {
-    if (filterType === "assignees" && value) {
+    if ((filterType === "assignees" || filterType === "projects") && value) {
       setFilters((prev) => ({
         ...prev,
-        assignees: prev.assignees.includes(value)
-          ? prev.assignees.filter((a) => a !== value)
-          : [...prev.assignees, value],
+        [filterType]: (prev as any)[filterType].includes(value)
+          ? (prev as any)[filterType].filter((v: string) => v !== value)
+          : [...(prev as any)[filterType], value],
       }))
-    } else {
-      setFilters((prev) => ({
-        ...prev,
-        [filterType]: !prev[filterType],
-      }))
+      return
     }
+    setFilters((prev) => ({
+      ...prev,
+      [filterType]: !(prev as any)[filterType],
+    }))
   }
 
   const getUniqueAssignees = () => {
-    const assignees = new Set<string>()
-    events.forEach((event) => {
-      if (event.assignee) assignees.add(event.assignee.name)
-      if (event.attendees) {
-        event.attendees.forEach((attendee) => assignees.add(attendee.name))
-      }
+    const names = new Set<string>()
+    events.forEach((evt) => {
+      if (evt.assignee?.name) names.add(evt.assignee.name)
     })
-    return Array.from(assignees)
+    return Array.from(names)
   }
 
   const filterEvents = (eventList: any[]) => {
@@ -278,6 +245,12 @@ export default function CalendarPage() {
       // Filter by type
       if (item.type === "meeting" && !filters.showMeetings) return false
       if (item.type === "task" && !filters.showTasks) return false
+
+      // Filter by approval
+      if (item.type === 'task') {
+        if (!filters.showApproved && item.approvalStatus === 'approved') return false
+        if (!filters.showPendingApproval && item.approvalStatus === 'pending') return false
+      }
 
       // Filter by completion status (for subtasks)
       if (item.completed !== undefined) {
@@ -289,13 +262,15 @@ export default function CalendarPage() {
       if (filters.assignees.length > 0) {
         const itemAssignees = []
         if (item.assignee) itemAssignees.push(item.assignee.name)
-        if (item.attendees) {
-          item.attendees.forEach((attendee: any) => itemAssignees.push(attendee.name))
-        }
 
         if (!itemAssignees.some((name) => filters.assignees.includes(name))) {
           return false
         }
+      }
+
+      // Filter by project selection
+      if (filters.projects.length > 0) {
+        if (!filters.projects.includes(item.projectId)) return false
       }
 
       return true
@@ -306,7 +281,9 @@ export default function CalendarPage() {
     let count = 0
     if (!filters.showMeetings || !filters.showTasks) count++
     if (!filters.showCompleted || !filters.showPending) count++
+    if (!filters.showApproved || !filters.showPendingApproval) count++
     if (filters.assignees.length > 0) count++
+    if (filters.projects.length > 0) count++
     return count
   }
 
@@ -378,7 +355,7 @@ export default function CalendarPage() {
                   )}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuContent align="end" className="w-64">
                 <DropdownMenuLabel>Filter by Type</DropdownMenuLabel>
                 <DropdownMenuCheckboxItem
                   checked={filters.showMeetings}
@@ -394,6 +371,21 @@ export default function CalendarPage() {
                     <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
                     Tasks
                   </div>
+                </DropdownMenuCheckboxItem>
+
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Filter by Approval</DropdownMenuLabel>
+                <DropdownMenuCheckboxItem
+                  checked={filters.showApproved}
+                  onCheckedChange={() => toggleFilter('showApproved')}
+                >
+                  Approved
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={filters.showPendingApproval}
+                  onCheckedChange={() => toggleFilter('showPendingApproval')}
+                >
+                  Pending Approval
                 </DropdownMenuCheckboxItem>
 
                 <DropdownMenuSeparator />
@@ -426,6 +418,18 @@ export default function CalendarPage() {
                     onCheckedChange={() => toggleFilter("assignees", assignee)}
                   >
                     {assignee}
+                  </DropdownMenuCheckboxItem>
+                ))}
+
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Filter by Project</DropdownMenuLabel>
+                {projects.map((p) => (
+                  <DropdownMenuCheckboxItem
+                    key={p.id}
+                    checked={filters.projects.includes(p.id)}
+                    onCheckedChange={() => toggleFilter('projects', p.id)}
+                  >
+                    {p.name}
                   </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuContent>
@@ -588,9 +592,9 @@ export default function CalendarPage() {
                 <CardTitle className="text-lg">Upcoming Events & Tasks</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {filterEvents(events)
+                {filterEvents(events as any)
                   .slice(0, 3)
-                  .map((event) => (
+                  .map((event: any) => (
                     <div key={event.id} className="space-y-2">
                       <TaskTooltip task={event}>
                         <div
@@ -607,21 +611,14 @@ export default function CalendarPage() {
                               </div>
                               <div className="flex items-center gap-1 text-sm text-slate-600">
                                 <Clock className="h-3 w-3" />
-                                <span>{event.time}</span>
+                                <span>{event.time || 'All Day'}</span>
                               </div>
                             </div>
                           </div>
                           <div className="flex -space-x-2">
-                            {event.type === "meeting" && event.attendees ? (
-                              event.attendees.slice(0, 3).map((attendee, index) => (
-                                <Avatar key={index} className="h-6 w-6 border-2 border-white">
-                                  <AvatarImage src={attendee.avatar || "/placeholder.svg"} />
-                                  <AvatarFallback className="text-xs">{attendee.name[0]}</AvatarFallback>
-                                </Avatar>
-                              ))
-                            ) : event.assignee ? (
+                            {event.assignee ? (
                               <Avatar className="h-6 w-6 border-2 border-white">
-                                <AvatarImage src={event.assignee.avatar || "/placeholder.svg"} />
+                                <AvatarImage src={event.assignee.avatar || "/placeholder-user.jpg"} />
                                 <AvatarFallback className="text-xs">{event.assignee.name[0]}</AvatarFallback>
                               </Avatar>
                             ) : null}
@@ -643,7 +640,7 @@ export default function CalendarPage() {
                             })),
                           )
                             .slice(0, 2)
-                            .map((subtask) => (
+                            .map((subtask: any) => (
                               <TaskTooltip key={subtask.id} task={subtask}>
                                 <div
                                   className={`flex items-center gap-2 p-2 rounded text-sm bg-${event.color}-25 border-l-2 border-${event.color}-300 cursor-pointer hover:bg-${event.color}-50 transition-colors`}

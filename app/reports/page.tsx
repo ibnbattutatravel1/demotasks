@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -54,6 +54,158 @@ export default function ReportsPage() {
   const router = useRouter()
   const [selectedPeriod, setSelectedPeriod] = useState("This Month")
   const [showFilterOptions, setShowFilterOptions] = useState(false)
+  const [reportDataReal, setReportDataReal] = useState<typeof reportData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let abort = false
+    const load = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const res = await fetch('/api/tasks')
+        const json = await res.json()
+        if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to fetch tasks')
+        const tasks: any[] = json.data || []
+
+        // Helpers
+        const parseDate = (s?: string | null) => (s ? new Date(s) : null)
+        const isDone = (t: any) => t.status === 'done'
+        const today = new Date()
+        const clampStart = (d: Date) => { const x = new Date(d); x.setHours(0,0,0,0); return x }
+        const clampEnd = (d: Date) => { const x = new Date(d); x.setHours(23,59,59,999); return x }
+        const startOfWeek = (d: Date) => { const x = new Date(d); const day = x.getDay(); x.setDate(x.getDate() - day); return clampStart(x) }
+        const endOfWeek = (d: Date) => { const x = new Date(d); const day = x.getDay(); x.setDate(x.getDate() + (6 - day)); return clampEnd(x) }
+
+        // Period range from selectedPeriod
+        const now = new Date()
+        const year = now.getFullYear()
+        const month = now.getMonth()
+        let periodStart: Date
+        let periodEnd: Date
+        switch (selectedPeriod) {
+          case 'This Week': {
+            periodStart = startOfWeek(now)
+            periodEnd = endOfWeek(now)
+            break
+          }
+          case 'This Month': {
+            periodStart = clampStart(new Date(year, month, 1))
+            periodEnd = clampEnd(new Date(year, month + 1, 0))
+            break
+          }
+          case 'Last Month': {
+            const m = month - 1
+            const y = m < 0 ? year - 1 : year
+            const mm = (m + 12) % 12
+            periodStart = clampStart(new Date(y, mm, 1))
+            periodEnd = clampEnd(new Date(y, mm + 1, 0))
+            break
+          }
+          case 'This Quarter': {
+            const q = Math.floor(month / 3)
+            const qs = q * 3
+            periodStart = clampStart(new Date(year, qs, 1))
+            periodEnd = clampEnd(new Date(year, qs + 3, 0))
+            break
+          }
+          case 'This Year':
+          default: {
+            periodStart = clampStart(new Date(year, 0, 1))
+            periodEnd = clampEnd(new Date(year, 11, 31))
+            break
+          }
+        }
+
+        const inRange = (d: Date | null) => !!d && d >= periodStart && d <= periodEnd
+
+        // Derive sets
+        const tasksCreatedInRange = tasks.filter(t => inRange(parseDate(t.createdAt)))
+        const tasksCompletedInRange = tasks.filter(t => inRange(parseDate(t.completedAt)))
+        const tasksDueInRange = tasks.filter(t => inRange(parseDate(t.dueDate)))
+        // Any task relevant to period (created/completed/due inside)
+        const tasksInPeriod = tasks.filter(t =>
+          inRange(parseDate(t.createdAt)) || inRange(parseDate(t.completedAt)) || inRange(parseDate(t.dueDate))
+        )
+
+        // Overview
+        const totalTasks = tasksCreatedInRange.length
+        const completedTasks = tasksCompletedInRange.length
+        const overdueTasks = tasksDueInRange.filter(t => parseDate(t.dueDate)! < today && !isDone(t)).length
+        const assigneeIds = new Set<string>()
+        tasksInPeriod.forEach(t => (t.assignees || []).forEach((u: any) => u?.id && assigneeIds.add(u.id)))
+        const activeUsers = assigneeIds.size
+        const completionRate = totalTasks ? Math.round((completedTasks / totalTasks) * 100) : 0
+
+        // Avg completion time (for tasks completed in range)
+        const doneWithTimes = tasksCompletedInRange
+          .map(t => ({ createdAt: parseDate(t.createdAt), completedAt: parseDate(t.completedAt) }))
+          .filter(d => d.createdAt && d.completedAt) as Array<{ createdAt: Date; completedAt: Date }>
+        const avgCompletionTime = doneWithTimes.length
+          ? Number(((doneWithTimes.reduce((s, d) => s + ((d.completedAt.getTime() - d.createdAt.getTime()) / 86400000), 0)) / doneWithTimes.length).toFixed(1))
+          : 0
+
+        // Weekly progress: 4 buckets ending at periodEnd
+        const weeks: { label: string; start: Date; end: Date }[] = []
+        let cursor = startOfWeek(periodEnd)
+        for (let i = 0; i < 4; i++) {
+          const start = startOfWeek(cursor)
+          const end = endOfWeek(cursor)
+          weeks.unshift({ label: `Week ${4 - i}`, start, end })
+          // step back 7 days
+          cursor = new Date(start)
+          cursor.setDate(cursor.getDate() - 7)
+        }
+        const weeklyProgress = weeks.map(w => ({
+          week: w.label,
+          completed: tasks.filter(t => inRange(parseDate(t.completedAt)) && parseDate(t.completedAt)! >= w.start && parseDate(t.completedAt)! <= w.end).length,
+          created: tasks.filter(t => inRange(parseDate(t.createdAt)) && parseDate(t.createdAt)! >= w.start && parseDate(t.createdAt)! <= w.end).length,
+        }))
+
+        // Top performers by completed tasks within range
+        const completedByUser = new Map<string, { name: string; completed: number; avatar?: string }>()
+        tasksCompletedInRange.forEach(t => {
+          (t.assignees || []).forEach((u: any) => {
+            if (!u?.name) return
+            const rec = completedByUser.get(u.name) || { name: u.name, completed: 0, avatar: u.avatar }
+            rec.completed += 1
+            if (!rec.avatar && u.avatar) rec.avatar = u.avatar
+            completedByUser.set(u.name, rec)
+          })
+        })
+        const topPerformers = Array.from(completedByUser.values()).sort((a, b) => b.completed - a.completed).slice(0, 5)
+
+        // Tasks by Category from tags (fallback to priority), using tasks created in range
+        const counts = new Map<string, number>()
+        tasksCreatedInRange.forEach(t => {
+          const tags: string[] = t.tags && t.tags.length ? t.tags : [t.priority || 'Other']
+          tags.forEach(tag => counts.set(tag, (counts.get(tag) || 0) + 1))
+        })
+        const totalCount = Array.from(counts.values()).reduce((s, n) => s + n, 0) || 1
+        const tasksByCategory = Array.from(counts.entries()).map(([category, count]) => ({
+          category,
+          count,
+          percentage: Math.round((count / totalCount) * 100),
+        })).sort((a, b) => b.count - a.count).slice(0, 6)
+
+        const computed = {
+          overview: { totalTasks, completedTasks, overdueTasks, activeUsers, completionRate, avgCompletionTime },
+          weeklyProgress,
+          topPerformers,
+          tasksByCategory,
+        } as typeof reportData
+
+        if (!abort) setReportDataReal(computed)
+      } catch (e: any) {
+        if (!abort) setError(e?.message || 'Failed to load reports')
+      } finally {
+        if (!abort) setLoading(false)
+      }
+    }
+    load()
+    return () => { abort = true }
+  }, [selectedPeriod])
 
   const handleBackToDashboard = () => {
     router.push("/")
@@ -61,28 +213,28 @@ export default function ReportsPage() {
 
   const handleExport = () => {
     console.log("[v0] Exporting report data...")
-
+    const r = report
     // Create CSV content
     const csvContent = [
       "Report Type,Value,Description",
-      `Total Tasks,${reportData.overview.totalTasks},All tasks in the system`,
-      `Completed Tasks,${reportData.overview.completedTasks},Successfully completed tasks`,
-      `Overdue Tasks,${reportData.overview.overdueTasks},Tasks past their due date`,
-      `Active Users,${reportData.overview.activeUsers},Currently active users`,
-      `Completion Rate,${reportData.overview.completionRate}%,Overall task completion percentage`,
-      `Avg Completion Time,${reportData.overview.avgCompletionTime} days,Average time to complete tasks`,
+      `Total Tasks,${r.overview.totalTasks},All tasks in the system`,
+      `Completed Tasks,${r.overview.completedTasks},Successfully completed tasks`,
+      `Overdue Tasks,${r.overview.overdueTasks},Tasks past their due date`,
+      `Active Users,${r.overview.activeUsers},Currently active users`,
+      `Completion Rate,${r.overview.completionRate}%,Overall task completion percentage`,
+      `Avg Completion Time,${r.overview.avgCompletionTime} days,Average time to complete tasks`,
       "",
       "Weekly Progress",
       "Week,Completed,Created",
-      ...reportData.weeklyProgress.map((week) => `${week.week},${week.completed},${week.created}`),
+      ...r.weeklyProgress.map((week) => `${week.week},${week.completed},${week.created}`),
       "",
       "Top Performers",
       "Name,Completed Tasks",
-      ...reportData.topPerformers.map((performer) => `${performer.name},${performer.completed}`),
+      ...r.topPerformers.map((performer) => `${performer.name},${performer.completed}`),
       "",
       "Tasks by Category",
       "Category,Count,Percentage",
-      ...reportData.tasksByCategory.map((cat) => `${cat.category},${cat.count},${cat.percentage}%`),
+      ...r.tasksByCategory.map((cat) => `${cat.category},${cat.count},${cat.percentage}%`),
     ].join("\n")
 
     // Create and download file
@@ -110,6 +262,8 @@ export default function ReportsPage() {
   }
 
   const periodOptions = ["This Week", "This Month", "Last Month", "This Quarter", "This Year"]
+
+  const report = reportDataReal ?? reportData
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -154,6 +308,13 @@ export default function ReportsPage() {
             </DropdownMenu>
           </div>
         </div>
+
+        {error && (
+          <div className="mt-3 mx-6 p-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm">{error}</div>
+        )}
+        {loading && (
+          <div className="mt-3 mx-6 text-sm text-slate-500">Loading report…</div>
+        )}
 
         {showFilterOptions && (
           <div className="mt-4 p-4 bg-slate-50 rounded-lg border">
@@ -204,7 +365,7 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
-                <span className="text-2xl font-bold text-slate-900">{reportData.overview.totalTasks}</span>
+                <span className="text-2xl font-bold text-slate-900">{report.overview.totalTasks}</span>
                 <CheckCircle2 className="h-5 w-5 text-indigo-500" />
               </div>
               <p className="text-xs text-slate-500 mt-1">+12% from last month</p>
@@ -217,7 +378,7 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
-                <span className="text-2xl font-bold text-green-600">{reportData.overview.completedTasks}</span>
+                <span className="text-2xl font-bold text-green-600">{report.overview.completedTasks}</span>
                 <TrendingUp className="h-5 w-5 text-green-500" />
               </div>
               <p className="text-xs text-slate-500 mt-1">+8% from last month</p>
@@ -230,7 +391,7 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
-                <span className="text-2xl font-bold text-red-600">{reportData.overview.overdueTasks}</span>
+                <span className="text-2xl font-bold text-red-600">{report.overview.overdueTasks}</span>
                 <AlertTriangle className="h-5 w-5 text-red-500" />
               </div>
               <p className="text-xs text-slate-500 mt-1">-3% from last month</p>
@@ -243,7 +404,7 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
-                <span className="text-2xl font-bold text-blue-600">{reportData.overview.activeUsers}</span>
+                <span className="text-2xl font-bold text-blue-600">{report.overview.activeUsers}</span>
                 <Users className="h-5 w-5 text-blue-500" />
               </div>
               <p className="text-xs text-slate-500 mt-1">+5% from last month</p>
@@ -260,7 +421,7 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {reportData.weeklyProgress.map((week, index) => (
+                {report.weeklyProgress.map((week, index) => (
                   <div key={index} className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-600">{week.week}</span>
@@ -291,13 +452,13 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {reportData.topPerformers.map((performer, index) => (
+                {report.topPerformers.map((performer, index) => (
                   <div key={index} className="flex items-center gap-3">
                     <div className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 text-xs font-semibold">
                       {index + 1}
                     </div>
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={performer.avatar || "/placeholder.svg"} />
+                      <AvatarImage src={performer.avatar || "/placeholder-user.jpg"} />
                       <AvatarFallback>{performer.name[0]}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
@@ -324,10 +485,10 @@ export default function ReportsPage() {
             <CardContent>
               <div className="space-y-4">
                 <div className="text-center">
-                  <span className="text-3xl font-bold text-indigo-600">{reportData.overview.completionRate}%</span>
+                  <span className="text-3xl font-bold text-indigo-600">{report.overview.completionRate}%</span>
                   <p className="text-sm text-slate-500">Overall completion rate</p>
                 </div>
-                <Progress value={reportData.overview.completionRate} className="h-3" />
+                <Progress value={report.overview.completionRate} className="h-3" />
                 <div className="flex items-center justify-center gap-2 text-sm">
                   <TrendingUp className="h-4 w-4 text-green-500" />
                   <span className="text-green-600">+5% from last month</span>
@@ -344,7 +505,7 @@ export default function ReportsPage() {
             <CardContent>
               <div className="space-y-4">
                 <div className="text-center">
-                  <span className="text-3xl font-bold text-blue-600">{reportData.overview.avgCompletionTime}d</span>
+                  <span className="text-3xl font-bold text-blue-600">{report.overview.avgCompletionTime}d</span>
                   <p className="text-sm text-slate-500">Average days to complete</p>
                 </div>
                 <div className="flex items-center justify-center gap-2 text-sm">
@@ -362,7 +523,7 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {reportData.tasksByCategory.map((category, index) => (
+                {report.tasksByCategory.map((category, index) => (
                   <div key={index} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-600">{category.category}</span>
