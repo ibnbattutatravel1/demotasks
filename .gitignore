@@ -25,3 +25,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local sqlite databases (use LibSQL on Vercel)
+sqlite/*.db
+sqlite/*.sqlite
