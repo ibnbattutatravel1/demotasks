@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -19,15 +19,9 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Check, Plus, Users, Calendar, Flag } from "lucide-react"
 import type { Project } from "@/lib/types"
+import { useAuth } from "@/contexts/auth-context"
 
-// Mock team members - in real app this would come from API
-const mockTeamMembers = [
-  { id: "1", name: "Alice Johnson", email: "alice@company.com", initials: "AJ" },
-  { id: "2", name: "Bob Smith", email: "bob@company.com", initials: "BS" },
-  { id: "3", name: "Charlie Brown", email: "charlie@company.com", initials: "CB" },
-  { id: "4", name: "Diana Prince", email: "diana@company.com", initials: "DP" },
-  { id: "5", name: "Eve Wilson", email: "eve@company.com", initials: "EW" },
-]
+type Member = { id: string; name: string; email?: string; initials: string; avatar?: string | null }
 
 interface CreateProjectDialogProps {
   onProjectCreated: (project: Project) => void
@@ -35,9 +29,12 @@ interface CreateProjectDialogProps {
 }
 
 export function CreateProjectDialog({ onProjectCreated, children }: CreateProjectDialogProps) {
+  const { user } = useAuth()
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(1)
   const [isCreating, setIsCreating] = useState(false)
+  const [loadingUsers, setLoadingUsers] = useState(false)
+  const [allUsers, setAllUsers] = useState<Member[]>([])
 
   // Form state
   const [projectName, setProjectName] = useState("")
@@ -46,7 +43,7 @@ export function CreateProjectDialog({ onProjectCreated, children }: CreateProjec
   const [dueDate, setDueDate] = useState("")
   const [priority, setPriority] = useState("")
   const [selectedTeamMembers, setSelectedTeamMembers] = useState<string[]>([])
-  const [projectOwner, setProjectOwner] = useState("1")
+  const [projectOwner, setProjectOwner] = useState("")
   const [tags, setTags] = useState("")
   const [color, setColor] = useState("indigo")
 
@@ -60,12 +57,43 @@ export function CreateProjectDialog({ onProjectCreated, children }: CreateProjec
     setDueDate("")
     setPriority("")
     setSelectedTeamMembers([])
-    setProjectOwner("1")
+    setProjectOwner(user?.id || "")
     setTags("")
     setColor("indigo")
     setErrors({})
     setStep(1)
   }
+
+  // Load users from API
+  useEffect(() => {
+    let ignore = false
+    const load = async () => {
+      try {
+        setLoadingUsers(true)
+        const res = await fetch('/api/users')
+        const json = await res.json()
+        if (!ignore && res.ok && json.success) {
+          const members: Member[] = (json.data || []).map((u: any) => ({
+            id: String(u.id),
+            name: String(u.name || ''),
+            email: u.email ? String(u.email) : undefined,
+            initials: String(u.initials || (String(u.name || 'U')[0] || 'U')).toUpperCase(),
+            avatar: u.avatar || null,
+          }))
+          setAllUsers(members)
+          // Default owner: current user or first available
+          const defaultOwner = user?.id || members[0]?.id || ''
+          setProjectOwner(defaultOwner)
+        }
+      } catch (e) {
+        console.error('Failed to load users', e)
+      } finally {
+        if (!ignore) setLoadingUsers(false)
+      }
+    }
+    load()
+    return () => { ignore = true }
+  }, [user?.id])
 
   const validateStep1 = () => {
     const newErrors: Record<string, string> = {}
@@ -316,9 +344,9 @@ export function CreateProjectDialog({ onProjectCreated, children }: CreateProjec
                 onChange={(e) => setProjectOwner(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
-                {mockTeamMembers.map((member) => (
+                {allUsers.map((member) => (
                   <option key={member.id} value={member.id}>
-                    {member.name} ({member.email})
+                    {member.name}{member.email ? ` (${member.email})` : ''}
                   </option>
                 ))}
               </select>
@@ -331,7 +359,7 @@ export function CreateProjectDialog({ onProjectCreated, children }: CreateProjec
                 Team Members *
               </label>
               <div className="space-y-2 max-h-48 overflow-y-auto">
-                {mockTeamMembers.map((member) => (
+                {allUsers.map((member) => (
                   <div
                     key={member.id}
                     className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
@@ -343,12 +371,12 @@ export function CreateProjectDialog({ onProjectCreated, children }: CreateProjec
                   >
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={`/abstract-geometric-shapes.png?height=32&width=32&query=${member.name}`} />
-                        <AvatarFallback>{member.initials}</AvatarFallback>
+                        <AvatarImage src={member.avatar || `/abstract-geometric-shapes.png?height=32&width=32&query=${member.name}`} />
+                        <AvatarFallback>{member.initials || (member.name[0] || 'U')}</AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="font-medium text-slate-900">{member.name}</p>
-                        <p className="text-sm text-slate-600">{member.email}</p>
+                        {member.email && <p className="text-sm text-slate-600">{member.email}</p>}
                       </div>
                     </div>
                     {selectedTeamMembers.includes(member.id) && <Check className="h-5 w-5 text-indigo-600" />}
