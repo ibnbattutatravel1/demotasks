@@ -34,6 +34,7 @@ import {
   Settings,
   MapPin,
   Bell,
+  MessageSquare,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -59,6 +60,8 @@ export function UserDashboard() {
   const [loadingTasks, setLoadingTasks] = useState(false)
   const [errorTasks, setErrorTasks] = useState<string | null>(null)
   const [createTaskOpen, setCreateTaskOpen] = useState(false)
+  // notifications for unread comment counts
+  const [notifications, setNotifications] = useState<any[]>([])
   const router = useRouter()
   const { toast } = useToast()
   const { user, logout } = useAuth()
@@ -114,6 +117,22 @@ export function UserDashboard() {
     return () => { ignore = true }
   }, [user?.id])
 
+  // Load notifications for unread comment counts
+  useEffect(() => {
+    let ignore = false
+    const load = async () => {
+      try {
+        const res = await fetch('/api/notifications')
+        const json = await res.json()
+        if (!ignore && res.ok && json.success) setNotifications(json.data || [])
+      } catch (e) {
+        console.error('Failed to load notifications', e)
+      }
+    }
+    load()
+    return () => { ignore = true }
+  }, [])
+
   const handleTaskClick = (taskId: string) => {
     router.push(`/tasks/${taskId}`)
   }
@@ -128,6 +147,10 @@ export function UserDashboard() {
 
   const handleCreateTask = () => {
     setCreateTaskOpen(true)
+  }
+
+  const handleViewComments = (taskId: string) => {
+    router.push(`/tasks/${taskId}#comments`)
   }
 
   const getMyTasks = () => {
@@ -149,6 +172,15 @@ export function UserDashboard() {
       ...t,
       projectName: projects.find((p) => p.id === t.projectId)?.name || "Project",
     }))
+
+  // Unread comments per task (via unread task_commented notifications)
+  const unreadCommentsByTaskId: Record<string, number> = (notifications || [])
+    .filter((n: any) => n?.type === 'task_commented' && n?.relatedType === 'task' && !n?.read && n?.relatedId)
+    .reduce((acc: Record<string, number>, n: any) => {
+      const id = String(n.relatedId)
+      acc[id] = (acc[id] || 0) + 1
+      return acc
+    }, {})
 
   // Recent activity (very simple derivation from my tasks)
   type Activity = { action: string; task: string; project: string; time: string }
@@ -690,7 +722,25 @@ export function UserDashboard() {
                                     <span>
                                       {task.subtasksCompleted}/{task.totalSubtasks} subtasks
                                     </span>
-                                    <span>{((task as any).commentsCount ?? (task as any).comments?.length ?? 0)} comments</span>
+                                    <span className="flex items-center gap-2">
+                                      {((task as any).commentsCount ?? (task as any).comments?.length ?? 0)} comments
+                                      {unreadCommentsByTaskId[task.id] > 0 && (
+                                        <Badge variant="secondary" className="text-[10px] leading-3">
+                                          {unreadCommentsByTaskId[task.id]} new
+                                        </Badge>
+                                      )}
+                                    </span>
+                                  </div>
+                                  <div className="mt-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 px-2"
+                                      onClick={(e) => { e.stopPropagation(); handleViewComments(task.id) }}
+                                    >
+                                      <MessageSquare className="h-3.5 w-3.5 mr-1" />
+                                      View comments
+                                    </Button>
                                   </div>
                                   <div className="flex items-center justify-between">
                                     <div className="flex gap-1">

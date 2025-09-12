@@ -119,6 +119,7 @@ export default function TaskDetailPage() {
   // Task-level comments
   const [taskComments, setTaskComments] = useState<Array<{ id: string; userId: string; userName: string; avatar?: string | null; content: string; createdAt: string }>>([])
   const [newTaskComment, setNewTaskComment] = useState("")
+  const [hashHandled, setHashHandled] = useState(false)
 
   // Load available users for assignment
   const loadUsers = useCallback(async () => {
@@ -183,6 +184,34 @@ export default function TaskDetailPage() {
     loadUsers()
     return () => { ignore = true }
   }, [taskId, loadUsers])
+
+  // When navigated with #comments, scroll to comments and mark comment notifications as read
+  useEffect(() => {
+    if (hashHandled) return
+    if (!taskId) return
+    if (typeof window === 'undefined') return
+    if (window.location.hash !== '#comments') return
+    const el = document.getElementById('comments')
+    if (el) {
+      // small timeout ensures DOM is ready
+      setTimeout(() => {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 50)
+    }
+    // mark unread task_commented notifications for this task as read
+    ;(async () => {
+      try {
+        const res = await fetch('/api/notifications')
+        const json = await res.json()
+        if (!res.ok || !json?.success) return
+        const toMark = (json.data || []).filter((n: any) => n?.type === 'task_commented' && n?.relatedType === 'task' && String(n.relatedId) === String(taskId) && !n?.read)
+        await Promise.all(
+          toMark.map((n: any) => fetch(`/api/notifications/${encodeURIComponent(n.id)}`, { method: 'PATCH' }))
+        )
+      } catch {}
+    })()
+    setHashHandled(true)
+  }, [taskId, hashHandled])
 
   const refreshTaskComments = async () => {
     try {
@@ -699,7 +728,7 @@ export default function TaskDetailPage() {
             </Card>
 
             {/* Comments */}
-            <Card>
+            <Card id="comments">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <MessageSquare className="h-5 w-5 text-slate-600" />
