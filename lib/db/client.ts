@@ -10,6 +10,13 @@ const require = createRequire(import.meta.url)
 // If LIBSQL_URL is provided, use libsql client (remote, persistent). Otherwise use better-sqlite3 (local dev).
 
 function makeDb() {
+  // In Vercel (production serverless), do not allow falling back to local SQLite file.
+  // The filesystem is read-only and will cause SQLITE_READONLY on writes.
+  if (process.env.VERCEL && !process.env.LIBSQL_URL) {
+    throw new Error(
+      'Database misconfiguration: LIBSQL_URL is not set in production. Configure Turso/LibSQL env vars in Vercel.'
+    )
+  }
   if (process.env.LIBSQL_URL) {
     const client = createClient({
       url: process.env.LIBSQL_URL!,
