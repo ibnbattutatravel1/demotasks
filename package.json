@@ -48,6 +48,7 @@
     "cmdk": "latest",
     "date-fns": "4.1.0",
     "drizzle-orm": "^0.36.4",
+    "@libsql/client": "^0.8.1",
     "bcryptjs": "^2.4.3",
     "jose": "^5.9.6",
     "embla-carousel-react": "latest",

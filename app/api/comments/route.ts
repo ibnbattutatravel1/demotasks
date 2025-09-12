@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
       .where(and(eq(dbSchema.comments.entityType, entityType), eq(dbSchema.comments.entityId, entityId)))
 
     // Sort by createdAt ascending for conversation feel
-    rows.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))
+    rows.sort((a: { createdAt?: string }, b: { createdAt?: string }) => (a.createdAt || '').localeCompare(b.createdAt || ''))
 
     return NextResponse.json({ success: true, data: rows })
   } catch (error) {
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
             .select({ userId: dbSchema.taskAssignees.userId })
             .from(dbSchema.taskAssignees)
             .where(eq(dbSchema.taskAssignees.taskId, task.id))
-          const recipients = new Set<string>([task.createdById, ...assignees.map(a => a.userId)])
+          const recipients = new Set<string>([task.createdById, ...assignees.map((a: { userId: string }) => a.userId)])
           recipients.delete(userRow.id) // exclude author
           if (recipients.size) {
             const title = task.title
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
             .select({ userId: dbSchema.taskAssignees.userId })
             .from(dbSchema.taskAssignees)
             .where(eq(dbSchema.taskAssignees.taskId, subt.taskId))
-          const recipients = new Set<string>([task?.createdById, subt.assigneeId, ...assignees.map(a => a.userId)].filter(Boolean) as string[])
+          const recipients = new Set<string>([task?.createdById, subt.assigneeId, ...assignees.map((a: { userId: string }) => a.userId)].filter(Boolean) as string[])
           recipients.delete(userRow.id)
           if (recipients.size) {
             const title = task?.title || 'Subtask'
