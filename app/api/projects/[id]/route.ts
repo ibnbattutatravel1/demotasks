@@ -89,20 +89,51 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
       return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
     }
 
-    // Delete related data first (foreign key constraints)
-    await db.delete(dbSchema.projectTeam).where(eq(dbSchema.projectTeam.projectId, projectId))
-    await db.delete(dbSchema.projectTags).where(eq(dbSchema.projectTags.projectId, projectId))
-    
-    // Delete tasks and related data
+    // Get all tasks for this project
     const tasks = await db.select({ id: dbSchema.tasks.id }).from(dbSchema.tasks).where(eq(dbSchema.tasks.projectId, projectId))
-    if (tasks.length > 0) {
-      const taskIds = tasks.map(t => t.id)
+    const taskIds = tasks.map(t => t.id)
+
+    if (taskIds.length > 0) {
+      // Get all subtasks for these tasks
+      const subtasks = await db.select({ id: dbSchema.subtasks.id }).from(dbSchema.subtasks).where(inArray(dbSchema.subtasks.taskId, taskIds))
+      const subtaskIds = subtasks.map(s => s.id)
+
+      // Delete in correct order to avoid foreign key constraints:
+      
+      // 1. Delete comments for subtasks and tasks
+      if (subtaskIds.length > 0) {
+        await db.delete(dbSchema.comments).where(inArray(dbSchema.comments.entityId, subtaskIds))
+      }
+      await db.delete(dbSchema.comments).where(inArray(dbSchema.comments.entityId, taskIds))
+
+      // 2. Delete attachments for subtasks and tasks
+      if (subtaskIds.length > 0) {
+        await db.delete(dbSchema.attachments).where(inArray(dbSchema.attachments.entityId, subtaskIds))
+      }
+      await db.delete(dbSchema.attachments).where(inArray(dbSchema.attachments.entityId, taskIds))
+
+      // 3. Delete subtask tags and subtasks
+      if (subtaskIds.length > 0) {
+        await db.delete(dbSchema.subtaskTags).where(inArray(dbSchema.subtaskTags.subtaskId, subtaskIds))
+        await db.delete(dbSchema.subtasks).where(inArray(dbSchema.subtasks.taskId, taskIds))
+      }
+
+      // 4. Delete task assignees and task tags
       await db.delete(dbSchema.taskAssignees).where(inArray(dbSchema.taskAssignees.taskId, taskIds))
       await db.delete(dbSchema.taskTags).where(inArray(dbSchema.taskTags.taskId, taskIds))
+
+      // 5. Delete tasks
       await db.delete(dbSchema.tasks).where(eq(dbSchema.tasks.projectId, projectId))
     }
 
-    // Finally delete the project
+    // 6. Delete project attachments
+    await db.delete(dbSchema.attachments).where(eq(dbSchema.attachments.entityId, projectId))
+
+    // 7. Delete project team and tags
+    await db.delete(dbSchema.projectTeam).where(eq(dbSchema.projectTeam.projectId, projectId))
+    await db.delete(dbSchema.projectTags).where(eq(dbSchema.projectTags.projectId, projectId))
+    
+    // 8. Finally delete the project itself
     await db.delete(dbSchema.projects).where(eq(dbSchema.projects.id, projectId))
 
     return NextResponse.json({ success: true, message: 'Project deleted successfully' })
