@@ -1,42 +1,138 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
 
-// Mock project data - in real app this would come from API
-const mockProject = {
-  id: "1",
-  name: "Website Redesign",
-  description:
-    "Complete overhaul of the company website with modern design and improved UX. This project involves redesigning the entire user interface, improving the user experience, and implementing new features to enhance customer engagement.",
-  status: "active",
-  priority: "high",
-  dueDate: "2024-02-15",
-  tags: ["Design", "Frontend", "UX"],
+type Project = {
+  id: string
+  name: string
+  description: string
+  status: string
+  priority: string
+  startDate: string
+  dueDate: string
+  tags: string[]
+  color: string
+  ownerId: string
+  team: Array<{ id: string; name: string }>
 }
 
 export default function EditProjectPage() {
   const router = useRouter()
   const params = useParams()
   const projectId = params.id as string
+  const { toast } = useToast()
 
-  const [projectName, setProjectName] = useState(mockProject.name)
-  const [description, setDescription] = useState(mockProject.description)
-  const [dueDate, setDueDate] = useState(mockProject.dueDate)
-  const [priority, setPriority] = useState(mockProject.priority)
-  const [status, setStatus] = useState(mockProject.status)
-  const [tags, setTags] = useState(mockProject.tags.join(", "))
+  const [project, setProject] = useState<Project | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [projectName, setProjectName] = useState("")
+  const [description, setDescription] = useState("")
+  const [startDate, setStartDate] = useState("")
+  const [dueDate, setDueDate] = useState("")
+  const [priority, setPriority] = useState("")
+  const [status, setStatus] = useState("")
+  const [tags, setTags] = useState("")
+  const [color, setColor] = useState("")
+
+  // Load project data
+  useEffect(() => {
+    const loadProject = async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}`)
+        const json = await res.json()
+        if (res.ok && json.success) {
+          const p = json.data
+          setProject(p)
+          setProjectName(p.name || "")
+          setDescription(p.description || "")
+          setStartDate(p.startDate || "")
+          setDueDate(p.dueDate || "")
+          setPriority(p.priority || "")
+          setStatus(p.status || "")
+          setTags((p.tags || []).join(", "))
+          setColor(p.color || "")
+        } else {
+          toast({ title: "Error", description: json.error || "Failed to load project", variant: "destructive" })
+        }
+      } catch (error) {
+        console.error("Failed to load project", error)
+        toast({ title: "Error", description: "Failed to load project", variant: "destructive" })
+      } finally {
+        setLoading(false)
+      }
+    }
+    if (projectId) loadProject()
+  }, [projectId, toast])
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("[v0] Updating project:", { projectName, description, dueDate, priority, status, tags })
-    router.push(`/projects/${projectId}`)
+    if (!project) return
+
+    setSaving(true)
+    try {
+      const payload = {
+        name: projectName.trim(),
+        description: description.trim(),
+        startDate,
+        dueDate,
+        priority,
+        status,
+        tags: tags.split(",").map(t => t.trim()).filter(Boolean),
+        color,
+      }
+
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      const json = await res.json()
+      if (res.ok && json.success) {
+        toast({ title: "Success", description: "Project updated successfully" })
+        router.push(`/projects/${projectId}`)
+      } else {
+        toast({ title: "Error", description: json.error || "Failed to update project", variant: "destructive" })
+      }
+    } catch (error) {
+      console.error("Failed to update project", error)
+      toast({ title: "Error", description: "Failed to update project", variant: "destructive" })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-6">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center justify-center py-12">
+            <div className="text-slate-600">Loading project...</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!project) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-6">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center justify-center py-12">
+            <div className="text-slate-600">Project not found</div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -123,8 +219,8 @@ export default function EditProjectPage() {
                 <Button type="button" variant="outline" onClick={() => router.back()} className="flex-1">
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1 bg-indigo-500 hover:bg-indigo-600">
-                  Save Changes
+                <Button type="submit" disabled={saving} className="bg-indigo-500 hover:bg-indigo-600 text-white">
+                  {saving ? "Updating..." : "Update Project"}
                 </Button>
               </div>
             </form>
