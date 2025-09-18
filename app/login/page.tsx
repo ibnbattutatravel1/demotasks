@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/contexts/auth-context"
-import { Eye, EyeOff, CheckCircle2 } from "lucide-react"
+import { Eye, EyeOff } from "lucide-react"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -32,15 +32,7 @@ export default function LoginPage() {
     }
   }
 
-  const demoAccounts = [
-    { email: "admin@taskara.com", password: "admin123", role: "Admin" },
-    { email: "user@taskara.com", password: "user123", role: "User" },
-  ]
-
-  const fillDemoAccount = (email: string, password: string) => {
-    setEmail(email)
-    setPassword(password)
-  }
+  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
@@ -54,33 +46,7 @@ export default function LoginPage() {
           <p className="text-slate-600">Sign in to manage your tasks efficiently</p>
         </div>
 
-        {/* Demo Accounts */}
-        <Card className="border-mint-200 bg-mint-50/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-mint-700 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4" />
-              Demo Accounts
-            </CardTitle>
-            <CardDescription className="text-xs text-mint-600">Click to auto-fill credentials</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {demoAccounts.map((account, index) => (
-              <button
-                key={index}
-                onClick={() => fillDemoAccount(account.email, account.password)}
-                className="w-full text-left p-3 rounded-xl bg-white border border-mint-200 hover:border-mint-300 hover:bg-mint-50 transition-colors"
-              >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">{account.role}</p>
-                    <p className="text-xs text-slate-600">{account.email}</p>
-                  </div>
-                  <span className="text-xs text-mint-600 font-medium">Click to use</span>
-                </div>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
+        
 
         {/* Login Form */}
         <Card className="border-slate-200">
