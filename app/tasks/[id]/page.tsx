@@ -104,6 +104,7 @@ export default function TaskDetailPage() {
   const [editSubtaskDueDate, setEditSubtaskDueDate] = useState("")
   const [attachments, setAttachments] = useState<any[]>([])
   const [isUploading, setIsUploading] = useState(false)
+  const [loadingAttachments, setLoadingAttachments] = useState(true)
   const [editingTask, setEditingTask] = useState(false)
   const [editingAssignees, setEditingAssignees] = useState(false)
   const [editingTags, setEditingTags] = useState(false)
@@ -185,9 +186,62 @@ export default function TaskDetailPage() {
     return () => { ignore = true }
   }, [taskId, loadUsers])
 
+  const loadTask = useCallback(async () => {
+    if (!taskId) return
+    try {
+      setLoading(true)
+      const res = await fetch(`/api/tasks/${taskId}`)
+      const json = await res.json()
+      if (res.ok && json.success) {
+        const t = json.data as Task
+        setTask(t)
+        setSubtasks(t.subtasks || [])
+        setEditTaskTitle(t.title)
+        setEditTaskDescription(t.description)
+        setEditTaskDueDate(t.dueDate || "")
+        setEditTaskPriority(t.priority)
+        setEditTaskAssignees(t.assignees?.map(a => a.id) || [])
+        setEditTaskTags(t.tags || [])
+      }
+    } catch (e) {
+      console.error('Failed to load task', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [taskId])
+
+  const loadAttachments = useCallback(async () => {
+    if (!taskId) return
+    try {
+      setLoadingAttachments(true)
+      const res = await fetch(`/api/attachments?entityType=task&entityId=${taskId}`)
+      const json = await res.json()
+      if (res.ok && json.success) {
+        const attachmentsWithUser = json.data.map((att: any) => ({
+          ...att,
+          uploadedBy: {
+            id: att.uploadedById,
+            name: att.uploadedByName,
+            avatar: null,
+            initials: att.uploadedByName.split(' ').map((n: string) => n[0]).join('').toUpperCase(),
+          },
+        }))
+        setAttachments(attachmentsWithUser)
+      }
+    } catch (error) {
+      console.error('Failed to load attachments', error)
+    } finally {
+      setLoadingAttachments(false)
+    }
+  }, [taskId])
+
+  useEffect(() => {
+    loadTask()
+    loadAttachments()
+  }, [taskId, loadTask])
+
   // When navigated with #comments, scroll to comments and mark comment notifications as read
   useEffect(() => {
-    if (hashHandled) return
     if (!taskId) return
     if (typeof window === 'undefined') return
     if (window.location.hash !== '#comments') return
@@ -399,49 +453,55 @@ export default function TaskDetailPage() {
     setSubtasks([...subtasks, duplicatedSubtask])
   }
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (!files || files.length === 0) return
+  const handleFileUpload = async (files: FileList) => {
+    if (!files || files.length === 0 || !taskId) return
 
     setIsUploading(true)
 
     try {
-      // Simulate file upload process
-      for (const file of Array.from(files)) {
-        const newAttachment = {
-          id: `attachment-${Date.now()}-${Math.random()}`,
-          name: file.name,
-          size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-          url: URL.createObjectURL(file), // In real app, this would be the uploaded file URL
-          type: file.type,
-          uploadedAt: new Date().toISOString(),
-          uploadedById: "current-user-id",
-          uploadedBy: {
-            id: "current-user-id",
-            name: "Current User",
-            avatar: "/placeholder.svg",
-            initials: "CU",
-          },
+      const uploadPromises = Array.from(files).map(async (file) => {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('entityType', 'task')
+        formData.append('entityId', taskId)
+
+        const res = await fetch('/api/attachments', {
+          method: 'POST',
+          body: formData,
+        })
+
+        const json = await res.json()
+        if (!res.ok || !json.success) {
+          throw new Error(json.error || 'Upload failed')
         }
 
-        setAttachments((prev) => [...prev, newAttachment])
-      }
+        return json.data
+      })
+
+      const uploadedAttachments = await Promise.all(uploadPromises)
+      setAttachments((prev) => [...prev, ...uploadedAttachments])
 
       toast({
         title: "Files uploaded successfully",
-        description: `${files.length} file(s) have been uploaded to the task.`,
+        description: `${files.length} file(s) have been attached to the task.`,
       })
-    } catch (error) {
+    } catch (error: any) {
+      console.error("File upload failed:", error)
       toast({
         title: "Upload failed",
-        description: "There was an error uploading your files. Please try again.",
+        description: error.message || "There was an error uploading your files. Please try again.",
         variant: "destructive",
       })
     } finally {
       setIsUploading(false)
-      // Reset the input
-      event.target.value = ""
     }
+  }
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files || files.length === 0) return
+    await handleFileUpload(files)
+    event.target.value = ""
   }
 
   const handleFileDownload = (attachment: any) => {
@@ -459,12 +519,30 @@ export default function TaskDetailPage() {
     })
   }
 
-  const handleDeleteAttachment = (attachmentId: string) => {
-    setAttachments((prev) => prev.filter((att) => att.id !== attachmentId))
-    toast({
-      title: "Attachment deleted",
-      description: "The attachment has been removed from the task.",
-    })
+  const handleDeleteAttachment = async (attachmentId: string) => {
+    try {
+      const res = await fetch(`/api/attachments/${attachmentId}`, {
+        method: 'DELETE',
+      })
+
+      const json = await res.json()
+      if (res.ok && json.success) {
+        setAttachments((prev) => prev.filter((att) => att.id !== attachmentId))
+        toast({
+          title: "Attachment deleted",
+          description: "The attachment has been removed from the task.",
+        })
+      } else {
+        throw new Error(json.error || 'Failed to delete attachment')
+      }
+    } catch (error: any) {
+      console.error('Failed to delete attachment', error)
+      toast({
+        title: "Delete failed",
+        description: error.message || "Failed to delete attachment. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleEditTask = () => {
@@ -1240,7 +1318,7 @@ export default function TaskDetailPage() {
                     <input
                       type="file"
                       multiple
-                      onChange={handleFileUpload}
+                      onChange={handleFileChange}
                       className="hidden"
                       id="file-upload"
                       accept="*/*"
@@ -1263,7 +1341,12 @@ export default function TaskDetailPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-2">
-                {attachments.map((attachment) => (
+                {loadingAttachments ? (
+                  <div className="text-center py-4 text-slate-500">
+                    <div className="animate-spin h-4 w-4 border-2 border-slate-300 border-t-slate-600 rounded-full mx-auto mb-2"></div>
+                    <p className="text-sm">Loading attachments...</p>
+                  </div>
+                ) : attachments.map((attachment) => (
                   <div key={attachment.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 group">
                     <Paperclip className="h-4 w-4 text-slate-500" />
                     <div className="flex-1 min-w-0">
