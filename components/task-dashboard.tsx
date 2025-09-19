@@ -69,6 +69,7 @@ export function TaskDashboard() {
   const router = useRouter()
   const { user, logout } = useAuth()
   const [tasks, setTasks] = useState<UITask[]>([])
+  const [query, setQuery] = useState("")
   const [activities, setActivities] = useState<UIActivity[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -287,7 +288,12 @@ export function TaskDashboard() {
             <div className="flex items-center gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input placeholder="Search tasks..." className="pl-10 w-80" />
+                <Input
+                  placeholder="Search tasks..."
+                  className="pl-10 w-80"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
               </div>
               <Button onClick={() => handleNavigation("/tasks/new")} className="bg-indigo-500 hover:bg-indigo-600">
                 <Plus className="h-4 w-4 mr-2" />
@@ -331,7 +337,16 @@ export function TaskDashboard() {
             <div className="text-sm text-red-600">{error}</div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {tasks.map((task) => (
+            {tasks
+              .filter((t) => {
+                const q = query.trim().toLowerCase()
+                if (!q) return true
+                return (
+                  t.title.toLowerCase().includes(q) ||
+                  t.tags.some((tag) => tag.toLowerCase().includes(q))
+                )
+              })
+              .map((task) => (
               <Card
                 key={task.id}
                 onClick={() => handleTaskClick(task.id)}

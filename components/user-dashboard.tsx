@@ -62,6 +62,7 @@ export function UserDashboard() {
   const [createTaskOpen, setCreateTaskOpen] = useState(false)
   // notifications for unread comment counts
   const [notifications, setNotifications] = useState<any[]>([])
+  const [query, setQuery] = useState("")
   const router = useRouter()
   const { toast } = useToast()
   const { user, logout } = useAuth()
@@ -395,7 +396,12 @@ export function UserDashboard() {
               <RoleSwitcher />
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input placeholder="Search my projects and tasks..." className="pl-10 w-80" />
+                <Input
+                  placeholder="Search my projects and tasks..."
+                  className="pl-10 w-80"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
               </div>
               <Button onClick={handleCreateTask} className="bg-indigo-500 hover:bg-indigo-600">
                 <Plus className="h-4 w-4 mr-2" />
@@ -631,11 +637,18 @@ export function UserDashboard() {
               const myTasksInProject = myTasks.filter((task) =>
                 task.projectId === project.id && task.assignees?.some((a) => a.id === (user?.id || "")),
               )
+              const q = query.trim().toLowerCase()
               const filteredProjectTasks = myTasksInProject.filter((task) => {
-                if (activeFilter === "all") return true
-                if (activeFilter === "in_progress") return task.status === "in-progress"
-                if (activeFilter === "completed") return task.status === "done"
-                return true
+                const statusOk =
+                  activeFilter === "all" ||
+                  (activeFilter === "in_progress" && task.status === "in-progress") ||
+                  (activeFilter === "completed" && task.status === "done")
+                const queryOk =
+                  !q ||
+                  task.title.toLowerCase().includes(q) ||
+                  (task.tags || []).some((tag) => String(tag).toLowerCase().includes(q)) ||
+                  (project.name || "").toLowerCase().includes(q)
+                return statusOk && queryOk
               })
 
               if (filteredProjectTasks.length === 0) return null

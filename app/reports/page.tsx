@@ -430,14 +430,17 @@ export default function ReportsPage() {
                       </span>
                     </div>
                     <div className="flex gap-1 h-8">
-                      <div
-                        className="bg-green-500 rounded-sm"
-                        style={{ width: `${(week.completed / week.created) * 100}%` }}
-                      />
-                      <div
-                        className="bg-slate-200 rounded-sm"
-                        style={{ width: `${((week.created - week.completed) / week.created) * 100}%` }}
-                      />
+                      {(() => {
+                        const denom = week.created > 0 ? week.created : 1
+                        const completedPct = Math.min(100, Math.max(0, (week.completed / denom) * 100))
+                        const remainingPct = Math.max(0, 100 - completedPct)
+                        return (
+                          <>
+                            <div className="bg-green-500 rounded-sm" style={{ width: `${completedPct}%` }} />
+                            <div className="bg-slate-200 rounded-sm" style={{ width: `${remainingPct}%` }} />
+                          </>
+                        )
+                      })()}
                     </div>
                   </div>
                 ))}

@@ -55,6 +55,7 @@ export function AdminDashboard() {
   const [error, setError] = useState<string | null>(null)
   const [activeFilter, setActiveFilter] = useState("all")
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({})
+  const [query, setQuery] = useState("")
   const router = useRouter()
   const { toast } = useToast()
   const { user, logout } = useAuth()
@@ -223,16 +224,27 @@ export function AdminDashboard() {
   }
 
   const filteredPendingTasks = getPendingTasks().filter((task) => {
-    if (activeFilter === "all") return true
-    if (activeFilter === "high") return task.priority === "high"
-    if (activeFilter === "medium") return task.priority === "medium"
-    if (activeFilter === "low") return task.priority === "low"
-    return true
+    const q = query.trim().toLowerCase()
+    const priorityOk =
+      activeFilter === "all" ||
+      (activeFilter === "high" && task.priority === "high") ||
+      (activeFilter === "medium" && task.priority === "medium") ||
+      (activeFilter === "low" && task.priority === "low")
+    const queryOk =
+      !q ||
+      task.title.toLowerCase().includes(q) ||
+      (task.projectName || "").toLowerCase().includes(q)
+    return priorityOk && queryOk
   })
 
   const filteredProjects = projects.filter((project) => {
-    if (activeFilter === "all") return true
-    return project.tasks.some((task) => task.priority === activeFilter)
+    const q = query.trim().toLowerCase()
+    const priorityOk = activeFilter === "all" || project.tasks.some((task: any) => task.priority === activeFilter)
+    const queryOk =
+      !q ||
+      project.name.toLowerCase().includes(q) ||
+      project.tasks.some((task: any) => String(task.title || "").toLowerCase().includes(q))
+    return priorityOk && queryOk
   })
 
   const toggleProjectExpansion = (projectId: string) => {
@@ -361,7 +373,12 @@ export function AdminDashboard() {
               <RoleSwitcher />
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input placeholder="Search projects and tasks..." className="pl-10 w-80" />
+                <Input
+                  placeholder="Search projects and tasks..."
+                  className="pl-10 w-80"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
               </div>
               <CreateProjectDialog onProjectCreated={handleProjectCreated}>
                 <Button className="bg-indigo-500 hover:bg-indigo-600">
@@ -412,7 +429,7 @@ export function AdminDashboard() {
           {error && !loading && <div className="text-sm text-red-600">{error}</div>}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Card>
-              <CardContent className="p-6">
+              <CardContent className="py-3 px-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-slate-600">Total Projects</p>
@@ -431,7 +448,7 @@ export function AdminDashboard() {
             </Card>
 
               <Card>
-                <CardContent className="p-6">
+                <CardContent className="py-3 px-6">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-slate-600">Pending Approval</p>
@@ -448,7 +465,7 @@ export function AdminDashboard() {
               </Card>
 
               <Card>
-                <CardContent className="p-6">
+                <CardContent className="py-3 px-6">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-slate-600">Active Tasks</p>
@@ -465,7 +482,7 @@ export function AdminDashboard() {
               </Card>
 
               <Card>
-                <CardContent className="p-6">
+                <CardContent className="py-3 px-6">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-slate-600">Team Members</p>

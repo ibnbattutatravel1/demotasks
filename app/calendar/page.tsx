@@ -55,7 +55,7 @@ const months = [
 
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month")
+  const [viewMode, setViewMode] = useState<"month" | "day">("month")
   const [filters, setFilters] = useState({
     showMeetings: true,
     showTasks: true,
@@ -89,7 +89,7 @@ export default function CalendarPage() {
 
         const projectColors = new Map<string, string>()
         const projList = (projectsJson.data || []).map((p: any) => ({ id: p.id, name: p.name, color: normalizeColor(p.color) }))
-        projList.forEach((p) => projectColors.set(p.id, p.color))
+        projList.forEach((p: any) => projectColors.set(p.id, p.color))
 
         const evts: CalendarEvent[] = (tasksJson.data || []).map((t: any) => {
           const color = projectColors.get(t.projectId) || 'indigo'
@@ -200,9 +200,9 @@ export default function CalendarPage() {
     setCurrentDate(newDate)
   }
 
-  const navigateWeek = (direction: "prev" | "next") => {
+  const navigateDay = (direction: "prev" | "next") => {
     const newDate = new Date(currentDate)
-    newDate.setDate(currentDate.getDate() + (direction === "next" ? 7 : -7))
+    newDate.setDate(currentDate.getDate() + (direction === "next" ? 1 : -1))
     setCurrentDate(newDate)
   }
 
@@ -307,7 +307,7 @@ export default function CalendarPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => (viewMode === "week" ? navigateWeek("prev") : navigateMonth("prev"))}
+                onClick={() => (viewMode === "day" ? navigateDay("prev") : navigateMonth("prev"))}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -317,7 +317,7 @@ export default function CalendarPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => (viewMode === "week" ? navigateWeek("next") : navigateMonth("next"))}
+                onClick={() => (viewMode === "day" ? navigateDay("next") : navigateMonth("next"))}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -331,13 +331,6 @@ export default function CalendarPage() {
                 onClick={() => setViewMode("month")}
               >
                 Month
-              </Button>
-              <Button
-                variant={viewMode === "week" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setViewMode("week")}
-              >
-                Week
               </Button>
               <Button variant={viewMode === "day" ? "default" : "outline"} size="sm" onClick={() => setViewMode("day")}>
                 Day
@@ -502,88 +495,7 @@ export default function CalendarPage() {
             </Card>
           )}
 
-          {viewMode === "week" && (
-            <div className="grid grid-cols-8 gap-4">
-              {/* Time Column */}
-              <div className="space-y-4">
-                <div className="h-12"></div> {/* Header spacer */}
-                {Array.from({ length: 12 }, (_, i) => (
-                  <div key={i} className="h-16 flex items-start">
-                    <span className="text-sm text-slate-500">{String(9 + i).padStart(2, "0")}:00</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Week Days */}
-              {getWeekDays(currentDate).map((day, dayIndex) => {
-                const isToday = day.toDateString() === new Date().toDateString()
-
-                return (
-                  <div key={dayIndex} className="space-y-4">
-                    {/* Day Header */}
-                    <div className="h-12 flex flex-col items-center justify-center border-b border-slate-200">
-                      <span className="text-sm font-medium text-slate-600">{daysOfWeek[day.getDay()]}</span>
-                      <span
-                        className={`text-lg font-semibold ${
-                          isToday
-                            ? "text-indigo-600 bg-indigo-100 w-8 h-8 rounded-full flex items-center justify-center"
-                            : "text-slate-900"
-                        }`}
-                      >
-                        {day.getDate()}
-                      </span>
-                    </div>
-
-                    {/* Time Slots */}
-                    <div className="space-y-4 relative">
-                      {Array.from({ length: 12 }, (_, i) => (
-                        <div key={i} className="h-16 border-b border-slate-100"></div>
-                      ))}
-
-                      {getEventsForDate(day).map((item, itemIndex) => {
-                        const startHour = item.time ? Number.parseInt(item.time.split(":")[0]) : 9
-                        const color = item.isSubtask ? item.parentColor : item.color
-
-                        return (
-                          <TaskTooltip key={item.id} task={item}>
-                            <Card
-                              className={`absolute left-0 right-0 cursor-pointer hover:shadow-lg transition-all duration-200 transform hover:scale-105 ${
-                                item.isSubtask
-                                  ? `bg-${color}-25 border-${color}-200 border-l-4 border-l-${color}-400 hover:bg-${color}-50`
-                                  : `bg-${color}-50 border-${color}-200 hover:bg-${color}-100`
-                              }`}
-                              style={{
-                                top: `${(startHour - 9) * 64 + 16 + (item.isSubtask ? itemIndex * 4 : 0)}px`,
-                                height: item.isSubtask ? "40px" : "48px",
-                                zIndex: item.isSubtask ? 1 : 2,
-                              }}
-                              onClick={() => handleTaskClick(item)}
-                            >
-                              <CardContent className="p-2">
-                                <div className="flex items-center gap-2">
-                                  <div className={`w-2 h-2 rounded-full bg-${color}-500`}></div>
-                                  <div className="flex-1 min-w-0">
-                                    <p
-                                      className={`font-medium truncate ${
-                                        item.isSubtask ? `text-xs text-${color}-800` : `text-sm text-${color}-900`
-                                      }`}
-                                    >
-                                      {item.isSubtask ? `↳ ${item.title}` : item.title}
-                                    </p>
-                                    <p className={`text-xs text-${color}-700`}>{item.time}</p>
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          </TaskTooltip>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+          {/* Week view removed per requirements */}
 
           {/* Upcoming Events Sidebar */}
           <div className="mt-8">
@@ -630,7 +542,7 @@ export default function CalendarPage() {
                       {event.subtasks && (
                         <div className="ml-6 space-y-1">
                           {filterEvents(
-                            event.subtasks.map((subtask) => ({
+                            event.subtasks.map((subtask: any) => ({
                               ...subtask,
                               parentTitle: event.title,
                               parentColor: event.color,
