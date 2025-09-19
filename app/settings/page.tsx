@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -35,6 +35,23 @@ export default function SettingsPage() {
     },
   })
 
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch("/api/settings", { cache: "no-store" })
+        if (res.ok) {
+          const json = await res.json()
+          if (json?.success && json.data?.notifications) {
+            setSettings((prev) => ({ ...prev, notifications: json.data.notifications }))
+          }
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+    load()
+  }, [])
+
   const handleSettingChange = (category: string, setting: string, value: any) => {
     setSettings((prev) => ({
       ...prev,
@@ -45,13 +62,103 @@ export default function SettingsPage() {
     }))
   }
 
-  const handleSave = () => {
-    // In a real app, this would save settings via API
-    toast({
-      title: "Settings Saved",
-      description: "Your preferences have been successfully updated.",
-      variant: "default",
-    })
+  const handleSave = async () => {
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notifications: settings.notifications }),
+      })
+      if (!res.ok) throw new Error("Failed to save settings")
+      toast({
+        title: "Settings Saved",
+        description: "Your preferences have been successfully updated.",
+        variant: "default",
+      })
+    } catch (e: any) {
+      toast({ title: "Save Failed", description: e?.message || "Unable to save settings", variant: "destructive" })
+    }
+  }
+
+  // Push helpers
+  const base64UrlToUint8Array = (base64Url: string) => {
+    const padding = '='.repeat((4 - (base64Url.length % 4)) % 4)
+    const base64 = (base64Url + padding).replace(/-/g, '+').replace(/_/g, '/')
+    const rawData = atob(base64)
+    const outputArray = new Uint8Array(rawData.length)
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i)
+    }
+    return outputArray
+  }
+
+  const enablePush = async (): Promise<boolean> => {
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        toast({ title: "Push not supported", description: "Your browser does not support push notifications.", variant: "destructive" })
+        return false
+      }
+      // Register SW
+      const registration = await navigator.serviceWorker.register("/sw.js")
+      // Permission
+      const perm = await Notification.requestPermission()
+      if (perm !== "granted") {
+        toast({ title: "Permission denied", description: "Allow notifications to enable push.", variant: "destructive" })
+        return false
+      }
+      // VAPID key
+      const keyRes = await fetch("/api/settings/push/public-key")
+      const keyJson = await keyRes.json().catch(() => null)
+      const vapidKey = keyJson?.data?.key as string | undefined
+      if (!vapidKey) {
+        toast({
+          title: "Push not configured",
+          description: "VAPID public key missing on server. Ask admin to configure push keys.",
+          variant: "destructive",
+        })
+        return false
+      }
+      const sub = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: base64UrlToUint8Array(vapidKey),
+      })
+      const body = {
+        endpoint: sub.endpoint,
+        keys: {
+          p256dh: (sub.toJSON() as any).keys.p256dh,
+          auth: (sub.toJSON() as any).keys.auth,
+        },
+      }
+      const res = await fetch("/api/settings/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) throw new Error("Failed to subscribe push")
+      return true
+    } catch (e: any) {
+      console.error("enablePush error", e)
+      toast({ title: "Push failed", description: e?.message || "Failed to enable push.", variant: "destructive" })
+      return false
+    }
+  }
+
+  const disablePush = async (): Promise<boolean> => {
+    try {
+      if (!("serviceWorker" in navigator)) return true
+      const reg = await navigator.serviceWorker.getRegistration()
+      const sub = await reg?.pushManager.getSubscription()
+      const endpoint = sub?.endpoint
+      await sub?.unsubscribe()
+      await fetch("/api/settings/push/unsubscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(endpoint ? { endpoint } : {}),
+      }).catch(() => null)
+      return true
+    } catch (e) {
+      return false
+    }
   }
 
   return (
@@ -104,7 +211,15 @@ export default function SettingsPage() {
               </div>
               <Switch
                 checked={settings.notifications.push}
-                onCheckedChange={(checked) => handleSettingChange("notifications", "push", checked)}
+                onCheckedChange={async (checked) => {
+                  if (checked) {
+                    const ok = await enablePush()
+                    if (ok) handleSettingChange("notifications", "push", true)
+                  } else {
+                    await disablePush()
+                    handleSettingChange("notifications", "push", false)
+                  }
+                }}
               />
             </div>
             <div className="flex items-center justify-between">

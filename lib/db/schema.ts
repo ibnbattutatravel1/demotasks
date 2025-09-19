@@ -160,3 +160,26 @@ export const notifications = sqliteTable('notifications', {
   relatedId: text('related_id'),
   relatedType: text('related_type'), // 'task' | 'project' | 'subtask'
 })
+
+// User notification settings
+export const userSettings = sqliteTable('user_settings', {
+  // One row per user
+  userId: text('user_id').primaryKey().references(() => users.id),
+  // Notification preferences
+  emailNotifications: integer('email_notifications', { mode: 'boolean' }).notNull().default(true),
+  pushNotifications: integer('push_notifications', { mode: 'boolean' }).notNull().default(false),
+  taskReminders: integer('task_reminders', { mode: 'boolean' }).notNull().default(true),
+  projectUpdates: integer('project_updates', { mode: 'boolean' }).notNull().default(true),
+  // Timestamps
+  updatedAt: text('updated_at').notNull().default(sql`(CURRENT_TIMESTAMP)`),
+})
+
+// Web Push subscriptions per user (multiple browsers/devices)
+export const pushSubscriptions = sqliteTable('push_subscriptions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  endpoint: text('endpoint').notNull(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  createdAt: text('created_at').notNull().default(sql`(CURRENT_TIMESTAMP)`),
+})

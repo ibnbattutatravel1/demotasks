@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, dbSchema } from '@/lib/db/client'
 import { eq, inArray } from 'drizzle-orm'
+import { notifyUser } from '@/lib/notifications'
 
 // GET /api/projects/[id] - Get single project
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -69,6 +70,27 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       if (body.tags.length > 0) {
         await db.insert(dbSchema.projectTags).values(body.tags.map((tag: string) => ({ projectId, tag })))
       }
+    }
+
+    // Notify owner and team about project updates
+    try {
+      const teamRows = await db.select().from(dbSchema.projectTeam).where(eq(dbSchema.projectTeam.projectId, projectId))
+      const userIds = new Set<string>([existing.ownerId, ...teamRows.map((t: any) => t.userId)])
+      await Promise.all(
+        Array.from(userIds).map((uid) =>
+          notifyUser({
+            userId: uid,
+            type: 'project_updated',
+            title: `Project updated: ${existing.name}`,
+            message: 'Project details have been updated.',
+            relatedId: projectId,
+            relatedType: 'project',
+            topic: 'projectUpdates',
+          })
+        )
+      )
+    } catch (e) {
+      console.warn('Failed to notify project updates', e)
     }
 
     return NextResponse.json({ success: true, message: 'Project updated successfully' })

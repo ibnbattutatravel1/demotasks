@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
 import { db, dbSchema } from '@/lib/db/client'
+import { notifyUser } from '@/lib/notifications'
 import { and, eq, inArray } from 'drizzle-orm'
 
 // Ensure user records exist for provided IDs
 async function ensureUsers(ids: string[]) {
   if (!ids.length) return
   const existing = await db.select().from(dbSchema.users).where(inArray(dbSchema.users.id, ids))
-  const existingIds = new Set(existing.map(u => u.id))
+  const existingIds = new Set(existing.map((u: any) => u.id))
   const toInsert = ids
     .filter(id => !existingIds.has(id))
     .map((id) => ({
@@ -32,9 +33,9 @@ async function composeTask(task: any) {
     db.select().from(dbSchema.comments).where(and(eq(dbSchema.comments.entityType, 'task'), eq(dbSchema.comments.entityId, task.id))),
   ])
 
-  const assigneeUsers = assignees.map((row) => row.users).filter(Boolean)
-  const tagList = tags.map(t => t.tag)
-  const subtaskList = subtasks.map(st => ({
+  const assigneeUsers = assignees.map((row: any) => row.users).filter(Boolean)
+  const tagList = tags.map((t: any) => t.tag)
+  const subtaskList = subtasks.map((st: any) => ({
     id: st.id,
     taskId: st.taskId,
     title: st.title,
@@ -48,7 +49,7 @@ async function composeTask(task: any) {
     priority: st.priority,
   }))
 
-  const subtasksCompleted = subtaskList.filter(s => s.completed).length
+  const subtasksCompleted = subtaskList.filter((s: any) => s.completed).length
   const totalSubtasks = subtaskList.length
   const commentsCount = commentRows.length
 
@@ -77,7 +78,7 @@ export async function GET(req: NextRequest) {
       const taskIdsForUser = await db.select({ taskId: dbSchema.taskAssignees.taskId })
         .from(dbSchema.taskAssignees)
         .where(eq(dbSchema.taskAssignees.userId, assigneeId))
-      const taskIds = taskIdsForUser.map(t => t.taskId)
+      const taskIds = taskIdsForUser.map((t: any) => t.taskId)
       where = and(inArray(dbSchema.tasks.id, taskIds), eq(dbSchema.tasks.projectId, projectId))
     } else if (projectId && createdById) {
       where = and(eq(dbSchema.tasks.projectId, projectId), eq(dbSchema.tasks.createdById, createdById))
@@ -85,7 +86,7 @@ export async function GET(req: NextRequest) {
       const taskIdsForUser = await db.select({ taskId: dbSchema.taskAssignees.taskId })
         .from(dbSchema.taskAssignees)
         .where(eq(dbSchema.taskAssignees.userId, assigneeId))
-      const taskIds = taskIdsForUser.map(t => t.taskId)
+      const taskIds = taskIdsForUser.map((t: any) => t.taskId)
       where = inArray(dbSchema.tasks.id, taskIds)
     } else if (projectId) {
       where = eq(dbSchema.tasks.projectId, projectId)
@@ -184,12 +185,12 @@ export async function POST(req: NextRequest) {
 
     if (assigneeIds.length) {
       await db.insert(dbSchema.taskAssignees).values(
-        assigneeIds.map((userId) => ({ taskId: id, userId }))
+        assigneeIds.map((userId: string) => ({ taskId: id, userId }))
       )
     }
     if (tags.length) {
       await db.insert(dbSchema.taskTags).values(
-        tags.map(tag => ({ taskId: id, tag }))
+        tags.map((tag: string) => ({ taskId: id, tag }))
       )
     }
 
@@ -229,19 +230,18 @@ export async function POST(req: NextRequest) {
         message = 'Your task has been rejected.'
       }
       if (notifType) {
-        await db.insert(dbSchema.notifications).values({
-          id: (globalThis.crypto?.randomUUID?.() ?? randomUUID()) as string,
-          type: notifType,
-          title: title,
-          message,
-          read: 0 as any,
+        await notifyUser({
           userId: createdById,
+          type: notifType,
+          title,
+          message,
           relatedId: id,
           relatedType: 'task',
+          topic: 'generic',
         })
       }
     } catch (e) {
-      console.warn('Failed to create notification for task creation', e)
+      console.warn('Failed to notify for task creation', e)
     }
 
     return NextResponse.json({ success: true, data }, { status: 201 })
