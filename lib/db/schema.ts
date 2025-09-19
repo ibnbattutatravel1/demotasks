@@ -170,6 +170,8 @@ export const userSettings = sqliteTable('user_settings', {
   pushNotifications: integer('push_notifications', { mode: 'boolean' }).notNull().default(false),
   taskReminders: integer('task_reminders', { mode: 'boolean' }).notNull().default(true),
   projectUpdates: integer('project_updates', { mode: 'boolean' }).notNull().default(true),
+  // Appearance
+  timezone: text('timezone').notNull().default('UTC'),
   // Timestamps
   updatedAt: text('updated_at').notNull().default(sql`(CURRENT_TIMESTAMP)`),
 })

@@ -25,13 +25,7 @@ export default function SettingsPage() {
       projectUpdates: true,
     },
     appearance: {
-      theme: "light",
-      language: "en",
       timezone: "UTC",
-    },
-    privacy: {
-      profileVisibility: "team",
-      activityTracking: true,
     },
   })
 
@@ -41,8 +35,15 @@ export default function SettingsPage() {
         const res = await fetch("/api/settings", { cache: "no-store" })
         if (res.ok) {
           const json = await res.json()
-          if (json?.success && json.data?.notifications) {
-            setSettings((prev) => ({ ...prev, notifications: json.data.notifications }))
+          if (json?.success) {
+            setSettings((prev) => ({
+              ...prev,
+              notifications: json.data?.notifications ?? prev.notifications,
+              appearance: {
+                ...prev.appearance,
+                timezone: json.data?.appearance?.timezone || prev.appearance.timezone,
+              },
+            }))
           }
         }
       } catch (_) {
@@ -67,7 +68,10 @@ export default function SettingsPage() {
       const res = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notifications: settings.notifications }),
+        body: JSON.stringify({
+          notifications: settings.notifications,
+          appearance: { timezone: settings.appearance.timezone },
+        }),
       })
       if (!res.ok) throw new Error("Failed to save settings")
       toast({
@@ -245,7 +249,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Appearance */}
+        {/* Appearance (Timezone only) */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -254,41 +258,6 @@ export default function SettingsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Theme</Label>
-                <Select
-                  value={settings.appearance.theme}
-                  onValueChange={(value) => handleSettingChange("appearance", "theme", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="light">Light</SelectItem>
-                    <SelectItem value="dark">Dark</SelectItem>
-                    <SelectItem value="system">System</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Language</Label>
-                <Select
-                  value={settings.appearance.language}
-                  onValueChange={(value) => handleSettingChange("appearance", "language", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="es">Spanish</SelectItem>
-                    <SelectItem value="fr">French</SelectItem>
-                    <SelectItem value="de">German</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
             <div className="space-y-2">
               <Label>Timezone</Label>
               <Select
@@ -309,44 +278,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Privacy & Security */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-indigo-600" />
-              Privacy & Security
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Profile Visibility</Label>
-              <Select
-                value={settings.privacy.profileVisibility}
-                onValueChange={(value) => handleSettingChange("privacy", "profileVisibility", value)}
-              >
-                <SelectTrigger className="w-full md:w-1/2">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="public">Public</SelectItem>
-                  <SelectItem value="team">Team Only</SelectItem>
-                  <SelectItem value="private">Private</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-slate-500">Control who can see your profile information</p>
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label className="text-sm font-medium">Activity Tracking</Label>
-                <p className="text-xs text-slate-500">Allow tracking of your activity for analytics</p>
-              </div>
-              <Switch
-                checked={settings.privacy.activityTracking}
-                onCheckedChange={(checked) => handleSettingChange("privacy", "activityTracking", checked)}
-              />
-            </div>
-          </CardContent>
-        </Card>
+
 
         {/* Account Information */}
         <Card>
@@ -389,7 +321,28 @@ export default function SettingsPage() {
                 <h4 className="font-medium text-slate-900">Export Data</h4>
                 <p className="text-sm text-slate-600">Download a copy of your account data</p>
               </div>
-              <Button variant="outline" size="sm">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const res = await fetch("/api/settings/data/export", { cache: "no-store" })
+                    const json = await res.json()
+                    if (!res.ok || !json?.success) throw new Error(json?.error || "Export failed")
+                    const blob = new Blob([JSON.stringify(json.data, null, 2)], { type: "application/json" })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement("a")
+                    a.href = url
+                    a.download = `taskara-export-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+                    document.body.appendChild(a)
+                    a.click()
+                    a.remove()
+                    URL.revokeObjectURL(url)
+                  } catch (e: any) {
+                    toast({ title: "Export failed", description: e?.message || "Couldn't export data", variant: "destructive" })
+                  }
+                }}
+              >
                 Export
               </Button>
             </div>
@@ -398,7 +351,28 @@ export default function SettingsPage() {
                 <h4 className="font-medium text-red-900">Clear All Data</h4>
                 <p className="text-sm text-red-700">Permanently delete all your tasks and projects</p>
               </div>
-              <Button variant="destructive" size="sm">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={async () => {
+                  const confirm = window.confirm(
+                    "This will permanently delete all your projects, tasks, subtasks, attachments, and notifications. Continue?"
+                  )
+                  if (!confirm) return
+                  try {
+                    const res = await fetch("/api/settings/data/clear", { method: "POST" })
+                    const json = await res.json()
+                    if (!res.ok || !json?.success) throw new Error(json?.error || "Clear failed")
+                    toast({
+                      title: "Data cleared",
+                      description: `Deleted ${json.data?.deletedProjects ?? 0} projects and ${json.data?.deletedTasks ?? 0} tasks`,
+                      variant: "default",
+                    })
+                  } catch (e: any) {
+                    toast({ title: "Clear failed", description: e?.message || "Couldn't clear data", variant: "destructive" })
+                  }
+                }}
+              >
                 Clear Data
               </Button>
             </div>

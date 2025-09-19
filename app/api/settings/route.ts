@@ -20,6 +20,9 @@ export async function GET(req: NextRequest) {
         taskReminders: s ? !!s.taskReminders : true,
         projectUpdates: s ? !!s.projectUpdates : true,
       },
+      appearance: {
+        timezone: s?.timezone || 'UTC',
+      },
     }
 
     return NextResponse.json({ success: true, data })
@@ -42,10 +45,14 @@ export async function PUT(req: NextRequest) {
         push?: boolean
         taskReminders?: boolean
         projectUpdates?: boolean
+      },
+      appearance?: {
+        timezone?: string
       }
     }
 
     const existing = await db.select().from(dbSchema.userSettings).where(eq(dbSchema.userSettings.userId, payload.sub))
+    const current = existing[0] || null
 
     const values = {
       userId: payload.sub,
@@ -53,6 +60,7 @@ export async function PUT(req: NextRequest) {
       pushNotifications: body.notifications?.push ?? false,
       taskReminders: body.notifications?.taskReminders ?? true,
       projectUpdates: body.notifications?.projectUpdates ?? true,
+      timezone: body.appearance?.timezone || current?.timezone || 'UTC',
       updatedAt: new Date().toISOString(),
     } as any
 
