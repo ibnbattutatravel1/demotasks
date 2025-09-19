@@ -35,7 +35,7 @@ export function TaskApprovalNotifications() {
           read?: boolean;
         }>
         const mapped: ApprovalNotification[] = items
-          .filter(n => n.type?.includes('task_'))
+          .filter(n => n.type?.includes('task_') && !n.read)
           .map(n => ({
             id: n.id,
             type: n.type === 'task_approved' ? 'approved' : n.type === 'task_rejected' ? 'rejected' : 'pending',
@@ -56,13 +56,31 @@ export function TaskApprovalNotifications() {
     try { await fetch(`/api/notifications/${encodeURIComponent(id)}`, { method: 'PATCH' }) } catch {}
   }
 
+  const markAsSeen = async (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id))
+    try { await fetch(`/api/notifications/${encodeURIComponent(id)}`, { method: 'PATCH' }) } catch {}
+  }
+
+  const markAllAsSeen = async () => {
+    const ids = notifications.map((n) => n.id)
+    setNotifications([])
+    try {
+      await Promise.all(ids.map((id) => fetch(`/api/notifications/${encodeURIComponent(id)}`, { method: 'PATCH' })))
+    } catch {}
+  }
+
   if (notifications.length === 0) return null
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-        <Bell className="h-4 w-4" />
-        Task Notifications
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+          <Bell className="h-4 w-4" />
+          Task Notifications
+        </div>
+        <Button variant="ghost" size="sm" className="h-7" onClick={markAllAsSeen}>
+          Mark all as seen
+        </Button>
       </div>
       {notifications.map((notification) => (
         <Card key={notification.id} className="border-l-4 border-l-indigo-500">
@@ -91,6 +109,14 @@ export function TaskApprovalNotifications() {
                 >
                   {notification.type}
                 </Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7"
+                  onClick={() => markAsSeen(notification.id)}
+                >
+                  Mark as seen
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"

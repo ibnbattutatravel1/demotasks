@@ -50,7 +50,7 @@ export function RoleBasedLayout({ children }: RoleBasedLayoutProps) {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Role-specific notifications */}
-      {user?.role === "user" && (
+      {(user?.role === "user" || user?.role === "admin") && (
         <div className="fixed top-4 right-4 z-50 w-80">
           <TaskApprovalNotifications />
         </div>
