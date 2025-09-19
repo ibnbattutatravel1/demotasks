@@ -248,7 +248,6 @@ export default function NewTaskPage() {
                       onChange={(e) => setTaskData((prev) => ({ ...prev, startDate: e.target.value }))}
                       className="w-full"
                     />
-                    <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                   </div>
                 </div>
 
@@ -261,7 +260,6 @@ export default function NewTaskPage() {
                       onChange={(e) => setTaskData((prev) => ({ ...prev, dueDate: e.target.value }))}
                       className="w-full"
                     />
-                    <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                   </div>
                 </div>
               </div>
