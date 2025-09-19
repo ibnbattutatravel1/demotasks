@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,6 +23,8 @@ export default function ProfilePage() {
   })
 
   const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({
@@ -31,25 +33,52 @@ export default function ProfilePage() {
     }))
   }
 
-  const handleSave = () => {
-    if (user) {
-      const updatedUser = {
-        ...user,
-        name: formData.name,
-        avatar: formData.avatar,
-      }
-      localStorage.setItem("taskara-user", JSON.stringify(updatedUser))
+  const handleSave = async () => {
+    try {
+      setIsSaving(true)
+      const res = await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: formData.name, avatarUrl: formData.avatar || undefined }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.success) throw new Error(json?.error || "Failed to update profile")
 
-      // Force a page refresh to update the auth context
+      toast({ title: "Profile Updated", description: "Your profile has been updated." })
+      // Refresh auth context
       window.location.reload()
+    } catch (e: any) {
+      toast({ title: "Update failed", description: e?.message || "Could not update profile", variant: "destructive" })
+    } finally {
+      setIsSaving(false)
+      setIsEditing(false)
     }
+  }
 
-    toast({
-      title: "Profile Updated",
-      description: "Your profile information has been successfully updated.",
-      variant: "default",
-    })
-    setIsEditing(false)
+  const handleCameraClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleAvatarFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      setIsSaving(true)
+      const fd = new FormData()
+      fd.append("avatarFile", file)
+      fd.append("name", formData.name)
+      const res = await fetch("/api/profile", { method: "PUT", body: fd })
+      const json = await res.json()
+      if (!res.ok || !json?.success) throw new Error(json?.error || "Failed to upload avatar")
+      setFormData((prev) => ({ ...prev, avatar: json.data?.avatar || prev.avatar }))
+      toast({ title: "Avatar updated", description: "Your profile picture has been changed." })
+      window.location.reload()
+    } catch (e: any) {
+      toast({ title: "Upload failed", description: e?.message || "Could not upload avatar", variant: "destructive" })
+    } finally {
+      setIsSaving(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
   }
 
   const handleCancel = () => {
@@ -114,11 +143,21 @@ export default function ProfilePage() {
                     size="sm"
                     variant="outline"
                     className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0 bg-white"
+                    onClick={handleCameraClick}
+                    disabled={isSaving}
                   >
                     <Camera className="h-4 w-4" />
                   </Button>
                 )}
               </div>
+              {/* Hidden file input for avatar upload */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarFileSelected}
+              />
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-slate-900">{isEditing ? formData.name : user?.name}</h3>
                 <p className="text-sm text-slate-600">{user?.email}</p>
@@ -156,14 +195,19 @@ export default function ProfilePage() {
               {isEditing && (
                 <div className="space-y-2">
                   <Label htmlFor="avatar">Avatar URL</Label>
-                  <Input
-                    id="avatar"
-                    value={formData.avatar}
-                    onChange={(e) => handleInputChange("avatar", e.target.value)}
-                    placeholder="https://example.com/avatar.jpg"
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      id="avatar"
+                      value={formData.avatar}
+                      onChange={(e) => handleInputChange("avatar", e.target.value)}
+                      placeholder="https://example.com/avatar.jpg"
+                    />
+                    <Button type="button" variant="outline" onClick={handleSave} disabled={isSaving}>
+                      Upload
+                    </Button>
+                  </div>
                   <p className="text-xs text-slate-500">
-                    Enter a URL for your profile picture or leave blank to use initials.
+                    Paste an image URL and click Upload, or use the camera button to upload a file.
                   </p>
                 </div>
               )}
