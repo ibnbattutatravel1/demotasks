@@ -35,10 +35,10 @@ export function TaskApprovalNotifications() {
           read?: boolean;
         }>
         const mapped: ApprovalNotification[] = items
-          .filter(n => n.type?.includes('task_') && !n.read)
+          .filter(n => (n.type?.includes('task_') || n.type?.includes('timesheet_')) && !n.read)
           .map(n => ({
             id: n.id,
-            type: n.type === 'task_approved' ? 'approved' : n.type === 'task_rejected' ? 'rejected' : 'pending',
+            type: n.type.endsWith('_approved') ? 'approved' : n.type.endsWith('_rejected') ? 'rejected' : 'pending',
             taskTitle: n.title || 'Task Update',
             message: n.message,
             timestamp: new Date(n.createdAt).toLocaleString(),

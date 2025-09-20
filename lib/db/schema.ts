@@ -185,3 +185,28 @@ export const pushSubscriptions = sqliteTable('push_subscriptions', {
   auth: text('auth').notNull(),
   createdAt: text('created_at').notNull().default(sql`(CURRENT_TIMESTAMP)`),
 })
+
+// Timesheets (monthly per user)
+export const timesheets = sqliteTable('timesheets', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  month: text('month').notNull(), // format YYYY-MM
+  status: text('status', { length: 16 }).notNull().default('draft'), // draft | submitted | approved | returned | rejected
+  submittedAt: text('submitted_at'),
+  approvedAt: text('approved_at'),
+  approvedById: text('approved_by_id').references(() => users.id),
+  returnedAt: text('returned_at'),
+  returnComments: text('return_comments'),
+  rejectedAt: text('rejected_at'),
+  createdAt: text('created_at').notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  updatedAt: text('updated_at'),
+})
+
+// Timesheet entries (per-day hours)
+export const timesheetEntries = sqliteTable('timesheet_entries', {
+  id: text('id').primaryKey(),
+  timesheetId: text('timesheet_id').notNull().references(() => timesheets.id),
+  date: text('date').notNull(), // YYYY-MM-DD
+  hours: real('hours').notNull().default(0),
+  note: text('note'),
+})
