@@ -131,39 +131,6 @@ export default function TaskDetailPage() {
       if (res.ok && json.success) {
         setAvailableUsers(json.data)
       }
-
-  const handleChangeTaskStatus = async (status: "todo" | "in-progress" | "review" | "done") => {
-    if (!task) return
-    try {
-      const res = await fetch(`/api/tasks/${task.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      })
-      const json = await res.json()
-      if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to update status')
-      await refreshTask()
-      toast({ title: 'Status updated', description: `Task marked as ${status}.` })
-    } catch (e: any) {
-      toast({ title: 'Update failed', description: e?.message || 'Could not update status', variant: 'destructive' })
-    }
-  }
-
-  const handleChangeSubtaskStatus = async (subtaskId: string, status: "todo" | "in-progress" | "review" | "done") => {
-    try {
-      const res = await fetch(`/api/subtasks/${subtaskId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      })
-      const json = await res.json()
-      if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to update subtask status')
-      await refreshTask()
-      toast({ title: 'Subtask updated', description: `Subtask marked as ${status}.` })
-    } catch (e: any) {
-      toast({ title: 'Update failed', description: e?.message || 'Could not update subtask', variant: 'destructive' })
-    }
-  }
     } catch (e) {
       console.error('Failed to load users', e)
     }
@@ -219,6 +186,45 @@ export default function TaskDetailPage() {
     loadUsers()
     return () => { ignore = true }
   }, [taskId, loadUsers])
+
+  // Handlers moved to component scope (outside of loadUsers)
+  const handleChangeTaskStatus = async (
+    status: "planning" | "todo" | "in-progress" | "review" | "done"
+  ) => {
+    if (!task) return
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to update status')
+      await refreshTask()
+      toast({ title: 'Status updated', description: `Task marked as ${status}.` })
+    } catch (e: any) {
+      toast({ title: 'Update failed', description: e?.message || 'Could not update status', variant: 'destructive' })
+    }
+  }
+
+  const handleChangeSubtaskStatus = async (
+    subtaskId: string,
+    status: "planning" | "todo" | "in-progress" | "review" | "done"
+  ) => {
+    try {
+      const res = await fetch(`/api/subtasks/${subtaskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to update subtask status')
+      await refreshTask()
+      toast({ title: 'Subtask updated', description: `Subtask marked as ${status}.` })
+    } catch (e: any) {
+      toast({ title: 'Update failed', description: e?.message || 'Could not update subtask', variant: 'destructive' })
+    }
+  }
 
   const loadTask = useCallback(async () => {
     if (!taskId) return
