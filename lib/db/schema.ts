@@ -102,6 +102,7 @@ export const subtasks = sqliteTable('subtasks', {
   taskId: text('task_id').notNull().references(() => tasks.id),
   title: text('title').notNull(),
   description: text('description'),
+  status: text('status', { length: 16 }).notNull().default('todo'), // todo | in-progress | review | done
   completed: integer('completed', { mode: 'boolean' }).notNull().default(false),
   startDate: text('start_date'),
   dueDate: text('due_date'),

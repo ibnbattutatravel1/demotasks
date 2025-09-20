@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
       projectId: string
       title: string
       description?: string
-      status?: 'todo' | 'in-progress' | 'review' | 'done'
+      status?: 'planning' | 'todo' | 'in-progress' | 'review' | 'done'
       priority: 'low' | 'medium' | 'high'
       startDate?: string
       dueDate?: string

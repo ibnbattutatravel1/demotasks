@@ -47,6 +47,7 @@ async function composeTask(task: any) {
     taskId: st.taskId,
     title: st.title,
     description: st.description,
+    status: st.status,
     completed: !!st.completed,
     startDate: st.startDate,
     dueDate: st.dueDate,
@@ -66,7 +67,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const body = (await req.json()) as Partial<{
       title: string
       description: string
-      status: 'todo' | 'in-progress' | 'review' | 'done'
+      status: 'planning' | 'todo' | 'in-progress' | 'review' | 'done'
       priority: 'low' | 'medium' | 'high'
       startDate: string
       dueDate: string

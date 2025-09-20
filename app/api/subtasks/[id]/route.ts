@@ -31,6 +31,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       startDate: string | null
       dueDate: string | null
       priority: 'low' | 'medium' | 'high' | null
+      status: 'todo' | 'in-progress' | 'review' | 'done'
     }>
 
     const existing = await db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.id, id))
@@ -44,6 +45,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (key in body) (update as any)[key] = body[key]
     }
     if (body.completed !== undefined) (update as any).completed = body.completed ? 1 : 0
+    if (body.status) {
+      (update as any).status = body.status
+      // keep completed flag in sync if not explicitly provided
+      if (body.completed === undefined) {
+        (update as any).completed = body.status === 'done' ? 1 : 0
+      }
+    }
 
     await db.update(dbSchema.subtasks).set(update).where(eq(dbSchema.subtasks.id, id))
 

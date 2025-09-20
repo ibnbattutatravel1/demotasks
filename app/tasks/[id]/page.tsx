@@ -97,6 +97,7 @@ export default function TaskDetailPage() {
   const [showAddSubtask, setShowAddSubtask] = useState(false)
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("")
   const [newSubtaskDueDate, setNewSubtaskDueDate] = useState("")
+  const [newSubtaskStatus, setNewSubtaskStatus] = useState<"todo" | "in-progress" | "review" | "done">("todo")
   const [expandedSubtasks, setExpandedSubtasks] = useState<Record<string, boolean>>({})
   const [subtaskComments, setSubtaskComments] = useState<Record<string, string>>({})
   const [editingSubtask, setEditingSubtask] = useState<string | null>(null)
@@ -130,6 +131,39 @@ export default function TaskDetailPage() {
       if (res.ok && json.success) {
         setAvailableUsers(json.data)
       }
+
+  const handleChangeTaskStatus = async (status: "todo" | "in-progress" | "review" | "done") => {
+    if (!task) return
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to update status')
+      await refreshTask()
+      toast({ title: 'Status updated', description: `Task marked as ${status}.` })
+    } catch (e: any) {
+      toast({ title: 'Update failed', description: e?.message || 'Could not update status', variant: 'destructive' })
+    }
+  }
+
+  const handleChangeSubtaskStatus = async (subtaskId: string, status: "todo" | "in-progress" | "review" | "done") => {
+    try {
+      const res = await fetch(`/api/subtasks/${subtaskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to update subtask status')
+      await refreshTask()
+      toast({ title: 'Subtask updated', description: `Subtask marked as ${status}.` })
+    } catch (e: any) {
+      toast({ title: 'Update failed', description: e?.message || 'Could not update subtask', variant: 'destructive' })
+    }
+  }
     } catch (e) {
       console.error('Failed to load users', e)
     }
@@ -344,12 +378,13 @@ export default function TaskDetailPage() {
         const res = await fetch('/api/subtasks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ taskId: task.id, title: newSubtaskTitle.trim(), dueDate: newSubtaskDueDate, tags: [] }),
+          body: JSON.stringify({ taskId: task.id, title: newSubtaskTitle.trim(), dueDate: newSubtaskDueDate, status: newSubtaskStatus, tags: [] }),
         })
         if (res.ok) {
           await refreshTask()
           setNewSubtaskTitle("")
           setNewSubtaskDueDate("")
+          setNewSubtaskStatus("todo")
           setShowAddSubtask(false)
         }
       } catch (e) {
@@ -683,9 +718,20 @@ export default function TaskDetailPage() {
                       >
                         {task?.priority}
                       </Badge>
-                      <Badge variant={task?.status === "completed" ? "default" : "secondary"}>
-                        {task?.status}
-                      </Badge>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-slate-500">Status:</span>
+                        <select
+                          className="h-7 text-xs border border-slate-300 rounded-md px-2 bg-white"
+                          value={task?.status || 'todo'}
+                          onChange={(e) => handleChangeTaskStatus(e.target.value as any)}
+                        >
+                          <option value="planning">Planning</option>
+                          <option value="todo">To Do</option>
+                          <option value="in-progress">In Progress</option>
+                          <option value="review">Review</option>
+                          <option value="done">Done</option>
+                        </select>
+                      </div>
                     </div>
                   </>
                 )}
@@ -891,6 +937,20 @@ export default function TaskDetailPage() {
                       />
                     </div>
                     <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-600">Status</span>
+                      <select
+                        className="h-9 text-sm border border-slate-300 rounded-md px-2 bg-white"
+                        value={newSubtaskStatus}
+                        onChange={(e) => setNewSubtaskStatus(e.target.value as any)}
+                      >
+                        <option value="planning">Planning</option>
+                        <option value="todo">To Do</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="review">Review</option>
+                        <option value="done">Done</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2">
                       <Button
                         onClick={handleAddSubtask}
                         className="bg-indigo-500 hover:bg-indigo-600"
@@ -904,6 +964,7 @@ export default function TaskDetailPage() {
                           setShowAddSubtask(false)
                           setNewSubtaskTitle("")
                           setNewSubtaskDueDate("")
+                          setNewSubtaskStatus("todo")
                         }}
                       >
                         <X className="h-4 w-4" />
@@ -973,6 +1034,20 @@ export default function TaskDetailPage() {
                               >
                                 {subtask.dueDate ? formatDueDate(subtask.dueDate) : "No due date"}
                               </span>
+                              <div className="flex items-center gap-1 ml-2">
+                                <span className="text-[10px] text-slate-500">Status</span>
+                                <select
+                                  className="h-6 text-[10px] border border-slate-300 rounded px-1 bg-white"
+                                  value={subtask.status || 'todo'}
+                                  onChange={(e) => handleChangeSubtaskStatus(subtask.id, e.target.value as any)}
+                                >
+                                  <option value="planning">Planning</option>
+                                  <option value="todo">To Do</option>
+                                  <option value="in-progress">In Progress</option>
+                                  <option value="review">Review</option>
+                                  <option value="done">Done</option>
+                                </select>
+                              </div>
                               {subtask.dueDate && isOverdue(subtask.dueDate, subtask.completed) && (
                                 <Badge
                                   variant="outline"

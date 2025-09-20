@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm'
 async function recomputeTaskProgress(taskId: string) {
   const subtasks = await db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.taskId, taskId))
   if (!subtasks.length) return null
-  const completed = subtasks.filter((s) => !!s.completed).length
+  const completed = (subtasks as any[]).filter((s: any) => !!s.completed).length
   const total = subtasks.length
   const pct = Math.round((completed / total) * 100)
   await db.update(dbSchema.tasks).set({ progress: pct, updatedAt: new Date().toISOString() }).where(eq(dbSchema.tasks.id, taskId))
@@ -16,7 +16,7 @@ async function recomputeTaskProgress(taskId: string) {
 async function recomputeProjectProgress(projectId: string) {
   const rows = await db.select({ progress: dbSchema.tasks.progress }).from(dbSchema.tasks).where(eq(dbSchema.tasks.projectId, projectId))
   if (!rows.length) return null
-  const avg = Math.round(rows.reduce((s, r) => s + (r.progress || 0), 0) / rows.length)
+  const avg = Math.round(((rows as any[]).reduce((sum: number, r: any) => sum + (r.progress || 0), 0)) / rows.length)
   await db.update(dbSchema.projects).set({ progress: avg, updatedAt: new Date().toISOString() }).where(eq(dbSchema.projects.id, projectId))
   return avg
 }
@@ -31,9 +31,10 @@ export async function POST(req: NextRequest) {
       startDate?: string
       dueDate?: string
       priority?: 'low' | 'medium' | 'high'
+      status?: 'todo' | 'in-progress' | 'review' | 'done'
     }
 
-    const { taskId, title, description = '', assigneeId = null, startDate = null, dueDate = null, priority = null } = body as any
+    const { taskId, title, description = '', assigneeId = null, startDate = null, dueDate = null, priority = null, status = 'todo' } = body as any
 
     if (!taskId || !title) {
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 })
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
       taskId,
       title,
       description,
+      status,
       completed: 0,
       startDate,
       dueDate,
