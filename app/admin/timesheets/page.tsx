@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import Link from "next/link"
 // Using a native <select> for status filter
 import { useToast } from "@/hooks/use-toast"
 
@@ -130,6 +131,9 @@ export default function AdminTimesheetsPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button size="sm" variant="secondary" asChild>
+                      <Link href={`/admin/timesheets/${r.id}`}>View</Link>
+                    </Button>
                     {(r.status === "submitted" || r.status === "returned") && (
                       <>
                         <Button size="sm" onClick={() => handleApprove(r.id)} disabled={actingId === r.id}>
