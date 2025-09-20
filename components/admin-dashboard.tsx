@@ -352,6 +352,13 @@ export function AdminDashboard() {
               <BarChart3 className="h-4 w-4 text-slate-600" />
               <span className="text-sm font-medium text-slate-900">Reports</span>
             </button>
+            <button
+              onClick={() => handleNavigation("/admin/timesheets")}
+              className="flex items-center gap-2 mb-3 w-full text-left hover:bg-slate-50 rounded-lg px-2 py-1.5 transition-colors"
+            >
+              <Calendar className="h-4 w-4 text-slate-600" />
+              <span className="text-sm font-medium text-slate-900">Timesheets</span>
+            </button>
           </div>
         </div>
       </div>
