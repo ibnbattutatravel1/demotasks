@@ -130,13 +130,16 @@ export default function ReportsPage() {
         )
 
         // Overview
-        const totalTasks = tasksCreatedInRange.length
+        // Use tasksInPeriod so periods with zero creations still show meaningful totals
+        const totalTasks = tasksInPeriod.length || tasks.length
         const completedTasks = tasksCompletedInRange.length
         const overdueTasks = tasksDueInRange.filter(t => parseDate(t.dueDate)! < today && !isDone(t)).length
         const assigneeIds = new Set<string>()
         tasksInPeriod.forEach(t => (t.assignees || []).forEach((u: any) => u?.id && assigneeIds.add(u.id)))
         const activeUsers = assigneeIds.size
-        const completionRate = totalTasks ? Math.round((completedTasks / totalTasks) * 100) : 0
+        // Denominator: tasksInPeriod (fallback to all tasks) for more stable rates
+        const denom = totalTasks
+        const completionRate = denom ? Math.round((completedTasks / denom) * 100) : 0
 
         // Avg completion time (for tasks completed in range)
         const doneWithTimes = tasksCompletedInRange

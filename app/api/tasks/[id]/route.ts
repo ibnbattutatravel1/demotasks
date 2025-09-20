@@ -91,6 +91,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (key in body && body[key] !== undefined) (update as any)[key] = body[key as keyof typeof body]
     }
 
+    // Handle status transition side-effects for reports and progress
+    const nowIso = new Date().toISOString()
+    const statusChanging = typeof body.status !== 'undefined' && body.status !== current.status
+    if (statusChanging) {
+      // When marking as done: set completedAt and progress=100 if not provided
+      if (body.status === 'done') {
+        if (typeof body.approvedAt === 'undefined') {
+          // leave approvals alone
+        }
+        if (typeof update.completedAt === 'undefined') update.completedAt = nowIso
+        if (typeof body.progress === 'undefined') update.progress = 100
+      } else {
+        // Moving away from done: clear completedAt and if no subtasks and progress not explicitly provided, set progress to 0
+        if (typeof update.completedAt === 'undefined') update.completedAt = null
+        if (typeof body.progress === 'undefined') {
+          const subIds = await db.select({ id: dbSchema.subtasks.id }).from(dbSchema.subtasks).where(eq(dbSchema.subtasks.taskId, id))
+          if (!subIds.length) update.progress = 0
+        }
+      }
+    }
+
     if (Object.keys(update).length > 1) {
       await db.update(dbSchema.tasks).set(update).where(eq(dbSchema.tasks.id, id))
     }
