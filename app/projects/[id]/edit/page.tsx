@@ -42,15 +42,31 @@ export default function EditProjectPage() {
   const [status, setStatus] = useState("")
   const [tags, setTags] = useState("")
   const [color, setColor] = useState("")
+  const [users, setUsers] = useState<Array<{ id: string; name: string }>>([])
+  const [ownerId, setOwnerId] = useState("")
+  const [teamIds, setTeamIds] = useState<string[]>([])
+  const [budget, setBudget] = useState<string>("")
+  const [estimatedHours, setEstimatedHours] = useState<string>("")
 
   // Load project data
   useEffect(() => {
     const loadProject = async () => {
       try {
-        const res = await fetch(`/api/projects/${projectId}`)
-        const json = await res.json()
-        if (res.ok && json.success) {
-          const p = json.data
+        const [resProject, resUsers] = await Promise.all([
+          fetch(`/api/projects/${projectId}`),
+          fetch(`/api/users`),
+        ])
+        const [jsonProject, jsonUsers] = await Promise.all([
+          resProject.json(),
+          resUsers.json(),
+        ])
+
+        if (resUsers.ok && jsonUsers.success) {
+          setUsers((jsonUsers.data || []).map((u: any) => ({ id: u.id, name: u.name || u.email || u.id })))
+        }
+
+        if (resProject.ok && jsonProject.success) {
+          const p = jsonProject.data
           setProject(p)
           setProjectName(p.name || "")
           setDescription(p.description || "")
@@ -60,8 +76,12 @@ export default function EditProjectPage() {
           setStatus(p.status || "")
           setTags((p.tags || []).join(", "))
           setColor(p.color || "")
+          setOwnerId(p.ownerId || "")
+          setTeamIds(Array.isArray(p.team) ? p.team.map((m: any) => m.id) : [])
+          setBudget(p.budget != null ? String(p.budget) : "")
+          setEstimatedHours(p.estimatedHours != null ? String(p.estimatedHours) : "")
         } else {
-          toast({ title: "Error", description: json.error || "Failed to load project", variant: "destructive" })
+          toast({ title: "Error", description: (jsonProject && jsonProject.error) || "Failed to load project", variant: "destructive" })
         }
       } catch (error) {
         console.error("Failed to load project", error)
@@ -88,6 +108,10 @@ export default function EditProjectPage() {
         status,
         tags: tags.split(",").map(t => t.trim()).filter(Boolean),
         color,
+        ownerId: ownerId || project.ownerId,
+        teamIds,
+        budget: budget === "" ? undefined : Number(budget),
+        estimatedHours: estimatedHours === "" ? undefined : Number(estimatedHours),
       }
 
       const res = await fetch(`/api/projects/${projectId}`, {
@@ -193,6 +217,20 @@ export default function EditProjectPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Start Date</label>
+                  <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Color</label>
+                  <div className="flex items-center gap-2">
+                    <input type="color" value={color || "#6366f1"} onChange={(e) => setColor(e.target.value)} />
+                    <Input value={color} onChange={(e) => setColor(e.target.value)} placeholder="#6366f1" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Status</label>
                   <select
                     value={status}
@@ -212,6 +250,69 @@ export default function EditProjectPage() {
                     onChange={(e) => setTags(e.target.value)}
                     placeholder="Enter tags separated by commas"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Budget</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={budget}
+                    onChange={(e) => setBudget(e.target.value)}
+                    placeholder="e.g. 10000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Estimated Hours</label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={estimatedHours}
+                    onChange={(e) => setEstimatedHours(e.target.value)}
+                    placeholder="e.g. 120"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Project Lead</label>
+                  <select
+                    value={ownerId}
+                    onChange={(e) => setOwnerId(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">Select a lead</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Team Members</label>
+                  <div className="max-h-40 overflow-auto border rounded-md p-2 space-y-2">
+                    {users.map((u) => {
+                      const checked = teamIds.includes(u.id)
+                      return (
+                        <label key={u.id} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4"
+                            checked={checked}
+                            onChange={(e) => {
+                              const isChecked = e.target.checked
+                              setTeamIds((prev) =>
+                                isChecked ? Array.from(new Set([...prev, u.id])) : prev.filter((id) => id !== u.id)
+                              )
+                            }}
+                          />
+                          <span>{u.name}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
 
