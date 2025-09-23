@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, dbSchema } from '@/lib/db/client'
-import { and, eq, inArray } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -93,7 +93,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (payload.sub === id) {
       return NextResponse.json({ success: false, error: 'You cannot delete your own account' }, { status: 400 })
     }
-
     // Prevent deleting the last admin
     const admins = await db.select({ id: dbSchema.users.id }).from(dbSchema.users).where(eq(dbSchema.users.role, 'admin'))
     const isTargetAdmin = !!admins.find(a => a.id === id)
@@ -101,37 +100,65 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       return NextResponse.json({ success: false, error: 'Cannot delete the last remaining admin' }, { status: 400 })
     }
 
-    // Check references to prevent orphan records
-    const [ownedProjects, projectTeamRows, createdTasks, approvedTasks, assigneeRows, subtaskAssignees, attachments, notifications] = await Promise.all([
-      db.select({ id: dbSchema.projects.id }).from(dbSchema.projects).where(eq(dbSchema.projects.ownerId, id)),
-      db.select({ userId: dbSchema.projectTeam.userId }).from(dbSchema.projectTeam).where(eq(dbSchema.projectTeam.userId, id)),
-      db.select({ id: dbSchema.tasks.id }).from(dbSchema.tasks).where(eq(dbSchema.tasks.createdById, id)),
-      db.select({ id: dbSchema.tasks.id }).from(dbSchema.tasks).where(eq(dbSchema.tasks.approvedById, id)),
-      db.select({ userId: dbSchema.taskAssignees.userId }).from(dbSchema.taskAssignees).where(eq(dbSchema.taskAssignees.userId, id)),
-      db.select({ id: dbSchema.subtasks.id }).from(dbSchema.subtasks).where(eq(dbSchema.subtasks.assigneeId, id)),
-      db.select({ id: dbSchema.attachments.id }).from(dbSchema.attachments).where(eq(dbSchema.attachments.uploadedById, id)),
-      db.select({ id: dbSchema.notifications.id }).from(dbSchema.notifications).where(eq(dbSchema.notifications.userId, id)),
-    ])
+    // Reassign or clean up references to avoid orphan records.
+    // We'll use a special ghost user as the sink for historical references.
+    const GHOST_USER_ID = 'system-deleted-user'
 
-    const referenced = [
-      ownedProjects.length,
-      projectTeamRows.length,
-      createdTasks.length,
-      approvedTasks.length,
-      assigneeRows.length,
-      subtaskAssignees.length,
-      attachments.length,
-      notifications.length,
-    ].some((n) => n > 0)
+    // Ensure the ghost user exists (id is deterministic)
+    const ghost = await db
+      .select({ id: dbSchema.users.id })
+      .from(dbSchema.users)
+      .where(eq(dbSchema.users.id, GHOST_USER_ID))
 
-    if (referenced) {
-      return NextResponse.json(
-        { success: false, error: 'Cannot delete user with related records (projects/tasks/assignments/etc).' },
-        { status: 400 },
-      )
+    if (!ghost.length) {
+      await db.insert(dbSchema.users).values({
+        id: GHOST_USER_ID,
+        name: 'Deleted User',
+        email: 'deleted@system.local',
+        avatar: null as unknown as string | null,
+        initials: 'DU',
+        role: 'user',
+        status: 'Inactive',
+        passwordHash: null as unknown as string | null,
+      })
     }
 
-    const deleted = await db.delete(dbSchema.users).where(eq(dbSchema.users.id, id))
+    // Perform all changes atomically
+    await db.transaction(async (tx) => {
+      // Reassign ownership/creator references
+      await tx.update(dbSchema.projects).set({ ownerId: GHOST_USER_ID }).where(eq(dbSchema.projects.ownerId, id))
+      await tx.update(dbSchema.tasks).set({ createdById: GHOST_USER_ID }).where(eq(dbSchema.tasks.createdById, id))
+      await tx.update(dbSchema.tasks).set({ approvedById: null as unknown as string | null }).where(eq(dbSchema.tasks.approvedById, id))
+
+      // Memberships (remove)
+      await tx.delete(dbSchema.projectTeam).where(eq(dbSchema.projectTeam.userId, id))
+      await tx.delete(dbSchema.taskAssignees).where(eq(dbSchema.taskAssignees.userId, id))
+
+      // Subtasks: assignee is optional
+      await tx.update(dbSchema.subtasks).set({ assigneeId: null as unknown as string | null }).where(eq(dbSchema.subtasks.assigneeId, id))
+
+      // Attachments and comments keep history but should not point to a deleted user
+      await tx
+        .update(dbSchema.attachments)
+        .set({ uploadedById: GHOST_USER_ID, uploadedByName: 'Deleted User' })
+        .where(eq(dbSchema.attachments.uploadedById, id))
+      await tx
+        .update(dbSchema.comments)
+        .set({ userId: GHOST_USER_ID, userName: 'Deleted User', avatar: null as unknown as string | null })
+        .where(eq(dbSchema.comments.userId, id))
+
+      // Notifications and timesheets
+      await tx.update(dbSchema.notifications).set({ userId: GHOST_USER_ID }).where(eq(dbSchema.notifications.userId, id))
+      await tx.update(dbSchema.timesheets).set({ userId: GHOST_USER_ID }).where(eq(dbSchema.timesheets.userId, id))
+      await tx.update(dbSchema.timesheets).set({ approvedById: null as unknown as string | null }).where(eq(dbSchema.timesheets.approvedById, id))
+
+      // Per-user configs/subscriptions
+      await tx.delete(dbSchema.pushSubscriptions).where(eq(dbSchema.pushSubscriptions.userId, id))
+      await tx.delete(dbSchema.userSettings).where(eq(dbSchema.userSettings.userId, id))
+
+      // Finally, delete the user
+      await tx.delete(dbSchema.users).where(eq(dbSchema.users.id, id))
+    })
     return NextResponse.json({ success: true, data: { id } })
   } catch (error) {
     console.error('DELETE /api/users/[id] error', error)

@@ -15,8 +15,11 @@ export async function GET() {
       role: dbSchema.users.role,
       status: dbSchema.users.status,
     }).from(dbSchema.users)
-    
-    return NextResponse.json({ success: true, data: users })
+
+    // Hide the internal ghost user used for safe deletions
+    const filtered = users.filter((u) => u.id !== 'system-deleted-user')
+
+    return NextResponse.json({ success: true, data: filtered })
   } catch (error) {
     console.error('Failed to fetch users', error)
     return NextResponse.json(
