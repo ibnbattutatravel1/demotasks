@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 import { randomUUID } from 'node:crypto'
 import { db, dbSchema } from '@/lib/db/client'
+import { notifyUser } from '@/lib/notifications'
 import { and, eq } from 'drizzle-orm'
 
 // GET /api/comments?entityType=task|subtask&entityId=...
@@ -38,6 +39,7 @@ export async function POST(req: NextRequest) {
       entityType: 'task' | 'subtask'
       entityId: string
       content: string
+      mentions?: string[]
     }
 
     if (!body?.entityType || !body?.entityId || !body?.content?.trim()) {
@@ -87,22 +89,25 @@ export async function POST(req: NextRequest) {
             .from(dbSchema.taskAssignees)
             .where(eq(dbSchema.taskAssignees.taskId, task.id))
           const recipients = new Set<string>([task.createdById, ...assignees.map((a: { userId: string }) => a.userId)])
+          // Add mentions explicitly
+          for (const m of (body.mentions || [])) recipients.add(m)
           recipients.delete(userRow.id) // exclude author
           if (recipients.size) {
             const title = task.title
             const message = `${userRow.name} commented on a task.`
-            await Promise.all(Array.from(recipients).map(uid =>
-              db.insert(dbSchema.notifications).values({
-                id: randomUUID(),
-                type: 'task_commented',
-                title,
-                message,
-                read: 0 as any,
-                userId: uid,
-                relatedId: task.id,
-                relatedType: 'task',
-              })
-            ))
+            await Promise.all(
+              Array.from(recipients).map(uid =>
+                notifyUser({
+                  userId: uid,
+                  type: (body.mentions || []).includes(uid) ? 'mention' : 'task_commented',
+                  title,
+                  message: (body.mentions || []).includes(uid) ? `${userRow.name} mentioned you in a task comment.` : message,
+                  relatedId: task.id,
+                  relatedType: 'task',
+                  topic: 'projectUpdates',
+                })
+              )
+            )
           }
         }
       } else if (body.entityType === 'subtask') {
@@ -114,22 +119,24 @@ export async function POST(req: NextRequest) {
             .from(dbSchema.taskAssignees)
             .where(eq(dbSchema.taskAssignees.taskId, subt.taskId))
           const recipients = new Set<string>([task?.createdById, subt.assigneeId, ...assignees.map((a: { userId: string }) => a.userId)].filter(Boolean) as string[])
+          for (const m of (body.mentions || [])) recipients.add(m)
           recipients.delete(userRow.id)
           if (recipients.size) {
             const title = task?.title || 'Subtask'
             const message = `${userRow.name} commented on a subtask.`
-            await Promise.all(Array.from(recipients).map(uid =>
-              db.insert(dbSchema.notifications).values({
-                id: randomUUID(),
-                type: 'task_commented',
-                title,
-                message,
-                read: 0 as any,
-                userId: uid,
-                relatedId: subt.taskId,
-                relatedType: 'task',
-              })
-            ))
+            await Promise.all(
+              Array.from(recipients).map(uid =>
+                notifyUser({
+                  userId: uid,
+                  type: (body.mentions || []).includes(uid) ? 'mention' : 'task_commented',
+                  title,
+                  message: (body.mentions || []).includes(uid) ? `${userRow.name} mentioned you in a subtask comment.` : message,
+                  relatedId: subt.taskId,
+                  relatedType: 'task',
+                  topic: 'projectUpdates',
+                })
+              )
+            )
           }
         }
       }

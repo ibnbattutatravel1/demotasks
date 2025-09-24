@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Check, ChevronsUpDown } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { Task, Project, Subtask, User } from "@/lib/types"
+import type { Task, Project, Subtask, User as AppUser } from "@/lib/types"
 import {
   ArrowLeft,
   Calendar,
@@ -31,7 +31,7 @@ import {
   ChevronDown,
   ChevronRight,
   FolderOpen,
-  User,
+  User as UserIcon,
   Trash2,
   Edit,
   Download,
@@ -109,7 +109,7 @@ export default function TaskDetailPage() {
   const [editingTask, setEditingTask] = useState(false)
   const [editingAssignees, setEditingAssignees] = useState(false)
   const [editingTags, setEditingTags] = useState(false)
-  const [availableUsers, setAvailableUsers] = useState<User[]>([])
+  const [availableUsers, setAvailableUsers] = useState<AppUser[]>([])
   const [editTaskTitle, setEditTaskTitle] = useState("")
   const [editTaskDescription, setEditTaskDescription] = useState("")
   const [editTaskDueDate, setEditTaskDueDate] = useState("")
@@ -122,6 +122,10 @@ export default function TaskDetailPage() {
   const [taskComments, setTaskComments] = useState<Array<{ id: string; userId: string; userName: string; avatar?: string | null; content: string; createdAt: string }>>([])
   const [newTaskComment, setNewTaskComment] = useState("")
   const [hashHandled, setHashHandled] = useState(false)
+  // Mentions for task comment composer
+  const [taskMentionQuery, setTaskMentionQuery] = useState("")
+  const [taskMentionOpen, setTaskMentionOpen] = useState(false)
+  const [taskMentionIds, setTaskMentionIds] = useState<string[]>([])
 
   // Load available users for assignment
   const loadUsers = useCallback(async () => {
@@ -331,11 +335,14 @@ export default function TaskDetailPage() {
     }
     setTaskComments((prev) => [...prev, optimistic])
     setNewTaskComment("")
+    setTaskMentionIds([])
+    setTaskMentionQuery("")
+    setTaskMentionOpen(false)
     try {
       const res = await fetch('/api/comments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entityType: 'task', entityId: task.id, userId: user.id, userName: user.name || 'User', avatar: user.avatar || null, content }),
+        body: JSON.stringify({ entityType: 'task', entityId: task.id, content, mentions: taskMentionIds }),
       })
       const json = await res.json()
       if (!res.ok || !json.success) throw new Error(json.error || 'Failed to add comment')
@@ -419,29 +426,69 @@ export default function TaskDetailPage() {
     }))
   }
 
-  const addSubtaskComment = (subtaskId: string) => {
-    const commentText = subtaskComments[subtaskId]?.trim()
+  // Per-subtask mention state
+  const [subtaskMentionQuery, setSubtaskMentionQuery] = useState<Record<string, string>>({})
+  const [subtaskMentionOpen, setSubtaskMentionOpen] = useState<Record<string, boolean>>({})
+  const [subtaskMentionIds, setSubtaskMentionIds] = useState<Record<string, string[]>>({})
+
+  const addSubtaskComment = async (subtaskId: string) => {
+    if (!user) return
+    const commentText = (subtaskComments[subtaskId] || '').trim()
     if (!commentText) return
 
-    const newComment = {
-      id: `comment-${Date.now()}`,
-      userId: "current-user-id",
-      user: "Current User",
-      avatar: "/placeholder.svg",
+    const optimistic = {
+      id: `temp-${Date.now()}`,
+      userId: user.id,
+      user: user.name || 'You',
+      avatar: user.avatar || null,
       content: commentText,
       createdAt: new Date().toISOString(),
     }
 
     setSubtasks(
       subtasks.map((subtask) =>
-        subtask.id === subtaskId ? { ...subtask, comments: [...subtask.comments, newComment] } : subtask,
+        subtask.id === subtaskId ? { ...subtask, comments: [...subtask.comments, optimistic] } : subtask,
       ),
     )
 
-    setSubtaskComments((prev) => ({
-      ...prev,
-      [subtaskId]: "",
-    }))
+    setSubtaskComments((prev) => ({ ...prev, [subtaskId]: '' }))
+    const mentions = subtaskMentionIds[subtaskId] || []
+    setSubtaskMentionIds((prev) => ({ ...prev, [subtaskId]: [] }))
+    setSubtaskMentionQuery((prev) => ({ ...prev, [subtaskId]: '' }))
+    setSubtaskMentionOpen((prev) => ({ ...prev, [subtaskId]: false }))
+
+    try {
+      const res = await fetch('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entityType: 'subtask', entityId: subtaskId, content: commentText, mentions }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to add subtask comment')
+      await refreshTask()
+    } catch (e: any) {
+      toast({ title: 'Failed to add comment', description: e.message, variant: 'destructive' })
+      // rollback
+      setSubtasks((prev) =>
+        prev.map((st) =>
+          st.id === subtaskId ? { ...st, comments: st.comments.filter((c) => c.id !== optimistic.id) } : st,
+        ),
+      )
+      setSubtaskComments((prev) => ({ ...prev, [subtaskId]: commentText }))
+    }
+  }
+
+  // Mention detection helper
+  const detectMentionQuery = (text: string) => {
+    const m = /(^|\s)@([a-zA-Z0-9._-]{0,30})$/.exec(text)
+    return m ? m[2] : ''
+  }
+
+  const applyMentionToText = (text: string, query: string, replacement: string) => {
+    const needle = '@' + query
+    const idx = text.lastIndexOf(needle)
+    if (idx === -1) return text + '@' + replacement + ' '
+    return text.slice(0, idx) + '@' + replacement + ' ' + text.slice(idx + needle.length)
   }
 
   const handleEditSubtask = (subtask: Subtask) => {
@@ -838,7 +885,7 @@ export default function TaskDetailPage() {
                       </div>
                       <div>
                         <label className="text-sm font-medium text-slate-700 mb-2 block">Priority</label>
-                        <Select value={editTaskPriority} onValueChange={setEditTaskPriority}>
+                        <Select value={editTaskPriority} onValueChange={(v) => setEditTaskPriority(v as "low" | "medium" | "high")}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -894,15 +941,54 @@ export default function TaskDetailPage() {
 
                 <div className="flex items-start gap-3">
                   <Avatar className="h-6 w-6">
-                    <AvatarFallback className="text-xs">{(user?.initials || 'U')}</AvatarFallback>
+                    <AvatarFallback className="text-xs">{(user?.name || 'U').split(' ').map((n) => n[0]).join('').toUpperCase()}</AvatarFallback>
                   </Avatar>
-                  <div className="flex-1 space-y-2">
+                  <div className="flex-1 space-y-2 relative">
                     <Textarea
                       placeholder="Write a comment..."
                       value={newTaskComment}
-                      onChange={(e) => setNewTaskComment(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setNewTaskComment(val)
+                        const q = detectMentionQuery(val)
+                        setTaskMentionQuery(q)
+                        setTaskMentionOpen(!!q)
+                      }}
                       className="min-h-[60px]"
                     />
+                    {taskMentionOpen && taskMentionQuery && (
+                      <div className="absolute z-10 left-0 right-0 bottom-full mb-2 bg-white border border-slate-200 rounded-md shadow-md max-h-56 overflow-auto">
+                        <div className="p-2 text-xs text-slate-500">Mention someone</div>
+                        <div>
+                          {availableUsers
+                            .filter((u) =>
+                              (u.name || '').toLowerCase().includes(taskMentionQuery.toLowerCase()) ||
+                              (u.email || '').toLowerCase().includes(taskMentionQuery.toLowerCase())
+                            )
+                            .slice(0, 8)
+                            .map((u) => (
+                              <button
+                                key={u.id}
+                                type="button"
+                                onClick={() => {
+                                  setNewTaskComment((prev) => applyMentionToText(prev, taskMentionQuery, u.name || u.email || 'user'))
+                                  setTaskMentionIds((prev) => (prev.includes(u.id) ? prev : [...prev, u.id]))
+                                  setTaskMentionOpen(false)
+                                  setTaskMentionQuery("")
+                                }}
+                                className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2"
+                              >
+                                <Avatar className="h-5 w-5">
+                                  <AvatarImage src={u.avatar || '/placeholder.svg'} />
+                                  <AvatarFallback className="text-[10px]">{u.initials}</AvatarFallback>
+                                </Avatar>
+                                <span className="text-sm">{u.name}</span>
+                                <span className="text-xs text-slate-500 ml-2">@{u.email}</span>
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+                    )}
                     <div className="flex justify-end">
                       <Button size="sm" onClick={handleAddTaskComment} disabled={!newTaskComment.trim()}>
                         Add Comment
@@ -1064,7 +1150,7 @@ export default function TaskDetailPage() {
                               )}
                               {subtask.assignee && (
                                 <div className="flex items-center gap-1 ml-2">
-                                  <User className="h-3 w-3 text-slate-400" />
+                                  <UserIcon className="h-3 w-3 text-slate-400" />
                                   <span className="text-xs text-slate-500">{subtask.assignee.name}</span>
                                 </div>
                               )}
@@ -1137,18 +1223,60 @@ export default function TaskDetailPage() {
                             <Avatar className="h-6 w-6">
                               <AvatarFallback className="text-xs">CU</AvatarFallback>
                             </Avatar>
-                            <div className="flex-1 space-y-2">
+                            <div className="flex-1 space-y-2 relative">
                               <Textarea
                                 placeholder="Add a comment to this subtask..."
                                 value={subtaskComments[subtask.id] || ""}
-                                onChange={(e) =>
-                                  setSubtaskComments((prev) => ({
-                                    ...prev,
-                                    [subtask.id]: e.target.value,
-                                  }))
-                                }
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  setSubtaskComments((prev) => ({ ...prev, [subtask.id]: val }))
+                                  const q = detectMentionQuery(val)
+                                  setSubtaskMentionQuery((prev) => ({ ...prev, [subtask.id]: q }))
+                                  setSubtaskMentionOpen((prev) => ({ ...prev, [subtask.id]: !!q }))
+                                }}
                                 className="min-h-[60px] bg-white text-sm"
                               />
+                              {subtaskMentionOpen[subtask.id] && subtaskMentionQuery[subtask.id] && (
+                                <div className="absolute z-10 left-0 right-0 bottom-full mb-2 bg-white border border-slate-200 rounded-md shadow-md max-h-56 overflow-auto">
+                                  <div className="p-2 text-xs text-slate-500">Mention someone</div>
+                                  <div>
+                                    {availableUsers
+                                      .filter((u) =>
+                                        (u.name || '').toLowerCase().includes(subtaskMentionQuery[subtask.id].toLowerCase()) ||
+                                        (u.email || '').toLowerCase().includes(subtaskMentionQuery[subtask.id].toLowerCase())
+                                      )
+                                      .slice(0, 8)
+                                      .map((u) => (
+                                        <button
+                                          key={u.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setSubtaskComments((prev) => ({
+                                              ...prev,
+                                              [subtask.id]: applyMentionToText(prev[subtask.id] || '', subtaskMentionQuery[subtask.id], u.name || u.email || 'user')
+                                            }))
+                                            setSubtaskMentionIds((prev) => ({
+                                              ...prev,
+                                              [subtask.id]: prev[subtask.id]?.includes(u.id)
+                                                ? prev[subtask.id]
+                                                : [...(prev[subtask.id] || []), u.id],
+                                            }))
+                                            setSubtaskMentionOpen((prev) => ({ ...prev, [subtask.id]: false }))
+                                            setSubtaskMentionQuery((prev) => ({ ...prev, [subtask.id]: '' }))
+                                          }}
+                                          className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2"
+                                        >
+                                          <Avatar className="h-5 w-5">
+                                            <AvatarImage src={u.avatar || '/placeholder.svg'} />
+                                            <AvatarFallback className="text-[10px]">{u.initials}</AvatarFallback>
+                                          </Avatar>
+                                          <span className="text-sm">{u.name}</span>
+                                          <span className="text-xs text-slate-500 ml-2">@{u.email}</span>
+                                        </button>
+                                      ))}
+                                  </div>
+                                </div>
+                              )}
                               <Button
                                 size="sm"
                                 onClick={() => addSubtaskComment(subtask.id)}
@@ -1189,7 +1317,7 @@ export default function TaskDetailPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <User className="h-4 w-4 text-slate-500" />
+                  <UserIcon className="h-4 w-4 text-slate-500" />
                   <div>
                     <p className="text-sm font-medium text-slate-900">Created By</p>
                     <p className="text-sm text-slate-600">{task?.createdBy?.name || '—'}</p>
