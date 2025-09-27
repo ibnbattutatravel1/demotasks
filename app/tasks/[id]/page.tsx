@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Check, ChevronsUpDown } from "lucide-react"
@@ -1320,7 +1321,16 @@ export default function TaskDetailPage() {
                   <UserIcon className="h-4 w-4 text-slate-500" />
                   <div>
                     <p className="text-sm font-medium text-slate-900">Created By</p>
-                    <p className="text-sm text-slate-600">{task?.createdBy?.name || '—'}</p>
+                    {task?.createdBy ? (
+                      <div className="flex flex-col">
+                        <span className="text-sm text-slate-600">{task.createdBy.name}</span>
+                        {task.createdBy.email && (
+                          <span className="text-xs text-slate-500">{task.createdBy.email}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-slate-400">—</span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -1420,10 +1430,25 @@ export default function TaskDetailPage() {
                     ) : (
                       <div className="flex -space-x-2 mt-1">
                         {(task?.assignees?.length ? task.assignees : []).map((assignee, index) => (
-                          <Avatar key={index} className="h-6 w-6 border-2 border-white">
-                            <AvatarImage src={assignee.avatar || "/placeholder.svg"} />
-                            <AvatarFallback className="text-xs">{assignee.initials}</AvatarFallback>
-                          </Avatar>
+                          <Tooltip key={assignee.id || index}>
+                            <TooltipTrigger asChild>
+                              <Avatar
+                                className="h-6 w-6 border-2 border-white cursor-pointer"
+                                title={assignee.name}
+                              >
+                                <AvatarImage src={assignee.avatar || "/placeholder.svg"} />
+                                <AvatarFallback className="text-xs">{assignee.initials}</AvatarFallback>
+                              </Avatar>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="flex flex-col items-start gap-0.5">
+                              <span className="text-xs font-medium leading-tight">{assignee.name}</span>
+                              {assignee.email && (
+                                <span className="text-[10px] leading-tight text-primary-foreground/80">
+                                  {assignee.email}
+                                </span>
+                              )}
+                            </TooltipContent>
+                          </Tooltip>
                         ))}
                         {!task?.assignees?.length && (
                           <span className="text-sm text-slate-400">No assignees</span>

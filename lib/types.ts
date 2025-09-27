@@ -13,6 +13,7 @@ export interface TeamMember {
   name: string
   avatar?: string
   initials: string
+  email?: string
   role?: string
 }
 
