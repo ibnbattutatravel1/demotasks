@@ -827,83 +827,171 @@ export default function TaskDetailPage() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Project Context Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <FolderOpen className="h-5 w-5 text-slate-600" />
-                  Project Context
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-slate-900 mb-1">{project?.name || 'Project'}</h3>
-                    {project?.description && (
-                      <p className="text-slate-600 text-sm mb-3">{project.description}</p>
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Top Row - 3 Columns on Desktop */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+          {/* Project Context Card */}
+          <Card className="md:col-span-1">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FolderOpen className="h-5 w-5 text-slate-600" />
+                Project Context
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="font-semibold text-slate-900 mb-1">{project?.name || 'Project'}</h3>
+                  {project?.description && (
+                    <p className="text-slate-600 text-sm mb-3">{project.description}</p>
+                  )}
+                  <div className="flex items-center gap-4 text-sm text-slate-500">
+                    {typeof project?.progress === 'number' && <span>Progress: {project.progress}%</span>}
+                    {project?.dueDate && (
+                      <>
+                        <span>•</span>
+                        <span>Due: {project.dueDate}</span>
+                      </>
                     )}
-                    <div className="flex items-center gap-4 text-sm text-slate-500">
-                      {typeof project?.progress === 'number' && <span>Progress: {project.progress}%</span>}
-                      {project?.dueDate && (
-                        <>
-                          <span>•</span>
-                          <span>Due: {project.dueDate}</span>
-                        </>
-                      )}
-                    </div>
                   </div>
-                  {project?.status && <Badge variant="secondary">{project.status}</Badge>}
                 </div>
-              </CardContent>
-            </Card>
+                {project?.status && <Badge variant="secondary">{project.status}</Badge>}
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Task Description */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Description</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {editingTask ? (
-                  <div className="space-y-4">
-                    <Textarea
-                      value={editTaskDescription}
-                      onChange={(e) => setEditTaskDescription(e.target.value)}
-                      placeholder="Task description..."
-                      className="min-h-[100px]"
-                    />
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium text-slate-700 mb-2 block">Due Date</label>
-                        <Input
-                          type="date"
-                          value={editTaskDueDate}
-                          onChange={(e) => setEditTaskDueDate(e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-slate-700 mb-2 block">Priority</label>
-                        <Select value={editTaskPriority} onValueChange={(v) => setEditTaskPriority(v as "low" | "medium" | "high")}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="low">Low</SelectItem>
-                            <SelectItem value="medium">Medium</SelectItem>
-                            <SelectItem value="high">High</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+          {/* Task Description */}
+          <Card className="md:col-span-1">
+            <CardHeader>
+              <CardTitle className="text-lg">Description</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {editingTask ? (
+                <div className="space-y-4">
+                  <Textarea
+                    value={editTaskDescription}
+                    onChange={(e) => setEditTaskDescription(e.target.value)}
+                    placeholder="Task description..."
+                    className="min-h-[100px]"
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 mb-2 block">Due Date</label>
+                      <Input
+                        type="date"
+                        value={editTaskDueDate}
+                        onChange={(e) => setEditTaskDueDate(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 mb-2 block">Priority</label>
+                      <Select value={editTaskPriority} onValueChange={(v) => setEditTaskPriority(v as "low" | "medium" | "high")}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
-                ) : (
-                  <p className="text-slate-700 leading-relaxed">{task?.description}</p>
+                </div>
+              ) : (
+                <p className="text-slate-700 leading-relaxed">{task?.description}</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Tags */}
+          <Card className="md:col-span-2 lg:col-span-1">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Tags</CardTitle>
+                {editingTask && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 px-2 text-xs"
+                    onClick={() => setEditingTags(!editingTags)}
+                  >
+                    {editingTags ? 'Done' : 'Edit'}
+                  </Button>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {editingTags ? (
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Add a tag..."
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newTag.trim()) {
+                          if (!editTaskTags.includes(newTag.trim())) {
+                            setEditTaskTags([...editTaskTags, newTag.trim()])
+                          }
+                          setNewTag('')
+                          e.preventDefault()
+                        }
+                      }}
+                    />
+                    <Button 
+                      size="sm" 
+                      onClick={() => {
+                        if (newTag.trim() && !editTaskTags.includes(newTag.trim())) {
+                          setEditTaskTags([...editTaskTags, newTag.trim()])
+                          setNewTag('')
+                        }
+                      }}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 min-h-[32px]">
+                    {editTaskTags.map((tag, index) => (
+                      <Badge 
+                        key={index} 
+                        variant="secondary"
+                        className="pr-1 pl-2 py-1"
+                      >
+                        {tag}
+                        <button
+                          onClick={() => setEditTaskTags(editTaskTags.filter((_, i) => i !== index))}
+                          className="ml-1 rounded-full hover:bg-slate-300 p-0.5"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                    {!editTaskTags.length && (
+                      <p className="text-sm text-slate-400">No tags yet. Add some above.</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {(task?.tags || []).map((tag, index) => (
+                    <Badge key={index} variant="secondary">
+                      {tag}
+                    </Badge>
+                  ))}
+                  {!task?.tags?.length && (
+                    <p className="text-sm text-slate-400">No tags</p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Layout - Content + Sidebar */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Content Area - Comments and Subtasks */}
+          <div className="lg:col-span-2 space-y-6">
 
             {/* Comments */}
             <Card id="comments">
@@ -1296,8 +1384,11 @@ export default function TaskDetailPage() {
                 ))}
               </CardContent>
             </Card>
+          </div>
 
-            {/* Comments */}
+          {/* Sidebar - Details and Attachments */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Details */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Details</CardTitle>
@@ -1460,173 +1551,74 @@ export default function TaskDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Tags */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">Tags</CardTitle>
-                  {editingTask && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-6 px-2 text-xs"
-                      onClick={() => setEditingTags(!editingTags)}
-                    >
-                      {editingTags ? 'Done' : 'Edit'}
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {editingTags ? (
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Add a tag..."
-                        value={newTag}
-                        onChange={(e) => setNewTag(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && newTag.trim()) {
-                            if (!editTaskTags.includes(newTag.trim())) {
-                              setEditTaskTags([...editTaskTags, newTag.trim()])
-                            }
-                            setNewTag('')
-                            e.preventDefault()
-                          }
-                        }}
-                      />
-                      <Button 
-                        size="sm" 
-                        onClick={() => {
-                          if (newTag.trim() && !editTaskTags.includes(newTag.trim())) {
-                            setEditTaskTags([...editTaskTags, newTag.trim()])
-                            setNewTag('')
-                          }
-                        }}
-                      >
-                        Add
-                      </Button>
-                    </div>
-                    <div className="flex flex-wrap gap-2 min-h-[32px]">
-                      {editTaskTags.map((tag, index) => (
-                        <Badge 
-                          key={index} 
-                          variant="secondary"
-                          className="pr-1 pl-2 py-1"
-                        >
-                          {tag}
-                          <button
-                            onClick={() => setEditTaskTags(editTaskTags.filter((_, i) => i !== index))}
-                            className="ml-1 rounded-full hover:bg-slate-300 p-0.5"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      ))}
-                      {!editTaskTags.length && (
-                        <p className="text-sm text-slate-400">No tags yet. Add some above.</p>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {(task?.tags || []).map((tag, index) => (
-                      <Badge key={index} variant="secondary">
-                        {tag}
-                      </Badge>
-                    ))}
-                    {!task?.tags?.length && (
-                      <p className="text-sm text-slate-400">No tags</p>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
             {/* Attachments */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">Attachments</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Paperclip className="h-5 w-5 text-slate-600" />
+                    Attachments
+                  </CardTitle>
                   <div className="flex items-center gap-2">
                     <input
                       type="file"
+                      id="file-upload"
                       multiple
                       onChange={handleFileChange}
                       className="hidden"
-                      id="file-upload"
-                      accept="*/*"
                     />
-                    <label htmlFor="file-upload">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={isUploading}
-                        className="cursor-pointer bg-transparent"
-                        asChild
-                      >
-                        <span>
-                          <Upload className="h-4 w-4 mr-2" />
-                          {isUploading ? "Uploading..." : "Upload"}
-                        </span>
-                      </Button>
-                    </label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => document.getElementById('file-upload')?.click()}
+                      disabled={isUploading}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {isUploading ? 'Uploading...' : 'Upload'}
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent>
                 {loadingAttachments ? (
-                  <div className="text-center py-4 text-slate-500">
-                    <div className="animate-spin h-4 w-4 border-2 border-slate-300 border-t-slate-600 rounded-full mx-auto mb-2"></div>
-                    <p className="text-sm">Loading attachments...</p>
-                  </div>
-                ) : attachments.map((attachment) => (
-                  <div key={attachment.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 group">
-                    <Paperclip className="h-4 w-4 text-slate-500" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">{attachment.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {attachment.size} • Uploaded by {attachment.uploadedBy.name}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleFileDownload(attachment)}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem onClick={() => handleFileDownload(attachment)}>
-                            <Download className="h-4 w-4 mr-2" />
-                            Download
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => handleDeleteAttachment(attachment.id)}
-                            className="text-red-600 focus:text-red-600"
+                  <div className="text-sm text-slate-500">Loading attachments...</div>
+                ) : attachments.length === 0 ? (
+                  <p className="text-sm text-slate-400">No attachments yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {attachments.map((attachment) => (
+                      <div key={attachment.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Paperclip className="h-4 w-4 text-slate-500 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-900 truncate">{attachment.name}</p>
+                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                              <span>{attachment.size}</span>
+                              <span>•</span>
+                              <span>by {attachment.uploadedBy?.name || 'Unknown'}</span>
+                              <span>•</span>
+                              <span>{formatTimeAgo(attachment.uploadedAt)}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleFileDownload(attachment)}
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                ))}
-                {attachments.length === 0 && (
-                  <div className="text-center py-8 text-slate-500">
-                    <Paperclip className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No attachments yet</p>
-                    <p className="text-xs">Upload files to share with your team</p>
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteAttachment(attachment.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>
