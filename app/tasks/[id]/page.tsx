@@ -900,37 +900,12 @@ export default function TaskDetailPage() {
             </CardHeader>
             <CardContent>
               {editingTask ? (
-                <div className="space-y-4">
-                  <Textarea
-                    value={editTaskDescription}
-                    onChange={(e) => setEditTaskDescription(e.target.value)}
-                    placeholder="Task description..."
-                    className="min-h-[100px]"
-                  />
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-slate-700 mb-2 block">Due Date</label>
-                      <Input
-                        type="date"
-                        value={editTaskDueDate}
-                        onChange={(e) => setEditTaskDueDate(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-slate-700 mb-2 block">Priority</label>
-                      <Select value={editTaskPriority} onValueChange={(v) => setEditTaskPriority(v as "low" | "medium" | "high")}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
+                <Textarea
+                  value={editTaskDescription}
+                  onChange={(e) => setEditTaskDescription(e.target.value)}
+                  placeholder="Task description..."
+                  className="min-h-[100px]"
+                />
               ) : (
                 <div className="text-slate-700 leading-relaxed">
                   <Dialog>
@@ -1461,16 +1436,38 @@ export default function TaskDetailPage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-3">
                   <Calendar className="h-4 w-4 text-slate-500" />
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm font-medium text-slate-900">Due Date</p>
-                    <p className="text-sm text-slate-600">{task?.dueDate || '—'}</p>
+                    {editingTask ? (
+                      <Input
+                        type="date"
+                        value={editTaskDueDate}
+                        onChange={(e) => setEditTaskDueDate(e.target.value)}
+                        className="mt-1 h-8 text-sm"
+                      />
+                    ) : (
+                      <p className="text-sm text-slate-600">{task?.dueDate || '—'}</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <Flag className="h-4 w-4 text-slate-500" />
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm font-medium text-slate-900">Priority</p>
-                    <p className="text-sm text-slate-600">{task?.priority || 'medium'}</p>
+                    {editingTask ? (
+                      <Select value={editTaskPriority} onValueChange={(v) => setEditTaskPriority(v as "low" | "medium" | "high")}>
+                        <SelectTrigger className="mt-1 h-8 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-sm text-slate-600">{task?.priority || 'medium'}</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
