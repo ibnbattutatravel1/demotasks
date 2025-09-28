@@ -16,6 +16,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Task, Project, Subtask, User as AppUser } from "@/lib/types"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import {
   ArrowLeft,
   Calendar,
@@ -83,6 +84,15 @@ const formatTimeAgo = (dateString: string) => {
   if (diffDays > 0) return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`
   if (diffHours > 0) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`
   return "Just now"
+}
+
+// Truncate description by characters and provide a short preview
+const DESCRIPTION_CHAR_LIMIT = 158
+const getTruncatedDescription = (text: string, limit: number = DESCRIPTION_CHAR_LIMIT) => {
+  if (!text) return { display: "", truncated: false }
+  const trimmed = text.trim()
+  if (trimmed.length <= limit) return { display: trimmed, truncated: false }
+  return { display: trimmed.slice(0, limit).trimEnd() + "…", truncated: true }
 }
 
 export default function TaskDetailPage() {
@@ -899,7 +909,39 @@ export default function TaskDetailPage() {
                   </div>
                 </div>
               ) : (
-                <p className="text-slate-700 leading-relaxed">{task?.description}</p>
+                <div className="text-slate-700 leading-relaxed">
+                  <Dialog>
+                    {(() => {
+                      const { display, truncated } = getTruncatedDescription(task?.description || "")
+                      return (
+                        <>
+                          <p className="whitespace-pre-wrap break-words">
+                            {display}
+                            {truncated && (
+                              <>
+                                {" "}
+                                <DialogTrigger asChild>
+                                  <Button variant="link" className="px-0 h-auto align-baseline text-indigo-600">
+                                    Read more
+                                  </Button>
+                                </DialogTrigger>
+                              </>
+                            )}
+                          </p>
+                          <DialogContent className="sm:max-w-2xl">
+                            <DialogHeader>
+                              <DialogTitle>Description</DialogTitle>
+                              <DialogDescription>Full task description</DialogDescription>
+                            </DialogHeader>
+                            <div className="max-h-[70vh] overflow-y-auto whitespace-pre-wrap break-words text-slate-700">
+                              {task?.description || "No description"}
+                            </div>
+                          </DialogContent>
+                        </>
+                      )
+                    })()}
+                  </Dialog>
+                </div>
               )}
             </CardContent>
           </Card>
