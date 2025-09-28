@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import {
   ArrowLeft,
   Calendar,
@@ -172,6 +173,15 @@ export default function ProjectDetailPage() {
       default:
         return "bg-gray-50 text-gray-700 border-gray-200"
     }
+  }
+
+  // Truncate description by characters and provide a short preview
+  const DESCRIPTION_CHAR_LIMIT = 158
+  const getTruncatedDescription = (text: string, limit: number = DESCRIPTION_CHAR_LIMIT) => {
+    if (!text) return { display: "", truncated: false }
+    const trimmed = text.trim()
+    if (trimmed.length <= limit) return { display: trimmed, truncated: false }
+    return { display: trimmed.slice(0, limit).trimEnd() + "…", truncated: true }
   }
 
   const handleEditProject = () => {
@@ -452,7 +462,43 @@ export default function ProjectDetailPage() {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      <p className="text-sm text-slate-600 line-clamp-2">{task.description}</p>
+                      <div className="text-sm text-slate-600">
+                        <Dialog>
+                          {(() => {
+                            const { display, truncated } = getTruncatedDescription(task.description || "")
+                            return (
+                              <>
+                                <p className="whitespace-pre-wrap break-words">
+                                  {display}
+                                  {truncated && (
+                                    <>
+                                      {" "}
+                                      <DialogTrigger asChild>
+                                        <Button
+                                          variant="link"
+                                          className="px-0 h-auto align-baseline text-indigo-600"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          Read more
+                                        </Button>
+                                      </DialogTrigger>
+                                    </>
+                                  )}
+                                </p>
+                                <DialogContent className="sm:max-w-2xl">
+                                  <DialogHeader>
+                                    <DialogTitle>Description</DialogTitle>
+                                    <DialogDescription>Full task description</DialogDescription>
+                                  </DialogHeader>
+                                  <div className="max-h-[70vh] overflow-y-auto whitespace-pre-wrap break-words text-slate-700">
+                                    {task.description || "No description"}
+                                  </div>
+                                </DialogContent>
+                              </>
+                            )
+                          })()}
+                        </Dialog>
+                      </div>
                       <div className="flex items-center justify-between">
                         <div className="flex -space-x-2">
                           {task.assignees.slice(0, 2).map((member) => (
@@ -476,14 +522,53 @@ export default function ProjectDetailPage() {
                       <div
                         key={task.id}
                         className="p-4 hover:bg-slate-50 transition-colors cursor-pointer"
-                        onClick={() => router.push(`/tasks/${task.id}`)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          router.push(`/tasks/${task.id}`)
+                        }}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3 flex-1">
                             {getStatusIcon(task.status)}
                             <div className="flex-1 min-w-0">
                               <h3 className="font-medium text-slate-900">{task.title}</h3>
-                              <p className="text-sm text-slate-600 mt-1">{task.description}</p>
+                              <div className="text-sm text-slate-600 mt-1">
+                                <Dialog>
+                                  {(() => {
+                                    const { display, truncated } = getTruncatedDescription(task.description || "")
+                                    return (
+                                      <>
+                                        <p className="whitespace-pre-wrap break-words">
+                                          {display}
+                                          {truncated && (
+                                            <>
+                                              {" "}
+                                              <DialogTrigger asChild>
+                                                <Button
+                                                  variant="link"
+                                                  className="px-0 h-auto align-baseline text-indigo-600"
+                                                  onClick={(e) => e.stopPropagation()}
+                                                >
+                                                  Read more
+                                                </Button>
+                                              </DialogTrigger>
+                                            </>
+                                          )}
+                                        </p>
+                                        <DialogContent className="sm:max-w-2xl">
+                                          <DialogHeader>
+                                            <DialogTitle>Description</DialogTitle>
+                                            <DialogDescription>Full task description</DialogDescription>
+                                          </DialogHeader>
+                                          <div className="max-h-[70vh] overflow-y-auto whitespace-pre-wrap break-words text-slate-700">
+                                            {task.description || "No description"}
+                                          </div>
+                                        </DialogContent>
+                                      </>
+                                    )
+                                  })()}
+                                </Dialog>
+                              </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-4">
