@@ -6,7 +6,7 @@ import { and, eq, inArray, notInArray } from 'drizzle-orm'
 async function recomputeTaskProgress(taskId: string) {
   const subtasks = await db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.taskId, taskId))
   if (!subtasks.length) return null
-  const completed = subtasks.filter((s) => !!s.completed).length
+  const completed = subtasks.filter((s: any) => !!s.completed).length
   const total = subtasks.length
   const pct = Math.round((completed / total) * 100)
   await db.update(dbSchema.tasks).set({ progress: pct, updatedAt: new Date().toISOString() }).where(eq(dbSchema.tasks.id, taskId))
@@ -29,7 +29,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 async function recomputeProjectProgress(projectId: string) {
   const rows = await db.select({ progress: dbSchema.tasks.progress }).from(dbSchema.tasks).where(eq(dbSchema.tasks.projectId, projectId))
   if (!rows.length) return null
-  const avg = Math.round(rows.reduce((s, r) => s + (r.progress || 0), 0) / rows.length)
+  const avg = Math.round(rows.reduce((s: number, r: { progress?: number | null }) => s + (r.progress || 0), 0) / rows.length)
   await db.update(dbSchema.projects).set({ progress: avg, updatedAt: new Date().toISOString() }).where(eq(dbSchema.projects.id, projectId))
   return avg
 }
@@ -41,9 +41,23 @@ async function composeTask(task: any) {
     db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.taskId, task.id)),
     db.select().from(dbSchema.users).where(eq(dbSchema.users.id, task.createdById)),
   ])
-  const assigneeUsers = assignees.map((row) => row.users).filter(Boolean)
-  const tagList = tags.map((t) => t.tag)
-  const subtaskList = subtasks.map((st) => ({
+  // Load comments for all subtasks in one query
+  const subtaskIds = subtasks.map((st: any) => st.id)
+  const subComments = subtaskIds.length
+    ? await db
+        .select()
+        .from(dbSchema.comments)
+        .where(and(eq(dbSchema.comments.entityType, 'subtask'), inArray(dbSchema.comments.entityId, subtaskIds)))
+    : []
+  const commentsByEntity: Record<string, any[]> = {}
+  for (const c of subComments) {
+    const key = c.entityId
+    if (!commentsByEntity[key]) commentsByEntity[key] = []
+    commentsByEntity[key].push(c)
+  }
+  const assigneeUsers = assignees.map((row: any) => row.users).filter(Boolean)
+  const tagList = tags.map((t: any) => t.tag)
+  const subtaskList = subtasks.map((st: any) => ({
     id: st.id,
     taskId: st.taskId,
     title: st.title,
@@ -56,8 +70,17 @@ async function composeTask(task: any) {
     updatedAt: st.updatedAt,
     assigneeId: st.assigneeId,
     priority: st.priority,
+    comments: (commentsByEntity[st.id] || []).map((c: any) => ({
+      id: c.id,
+      userId: c.userId,
+      user: c.userName,
+      avatar: c.avatar || undefined,
+      content: c.content,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    })),
   }))
-  const subtasksCompleted = subtaskList.filter((s) => s.completed).length
+  const subtasksCompleted = subtaskList.filter((s: any) => s.completed).length
   const totalSubtasks = subtaskList.length
   const createdBy = (creatorRows && creatorRows[0])
     ? {
@@ -138,7 +161,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         .select({ userId: dbSchema.taskAssignees.userId })
         .from(dbSchema.taskAssignees)
         .where(eq(dbSchema.taskAssignees.taskId, id))
-      const prevSet = new Set(existingAssignees.map(a => a.userId))
+      const prevSet = new Set(existingAssignees.map((a: any) => a.userId))
 
       await db.delete(dbSchema.taskAssignees).where(eq(dbSchema.taskAssignees.taskId, id))
       if (body.assigneeIds.length) {
@@ -264,8 +287,13 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     const current = existing[0]
 
     // delete children and relations
-    await db.delete(dbSchema.subtaskTags).where(inArray(dbSchema.subtaskTags.subtaskId,
-      (await db.select({ id: dbSchema.subtasks.id }).from(dbSchema.subtasks).where(eq(dbSchema.subtasks.taskId, id))).map(r => r.id)
+    await db.delete(dbSchema.subtaskTags).where(inArray(
+      dbSchema.subtaskTags.subtaskId,
+      (await db
+        .select({ id: dbSchema.subtasks.id })
+        .from(dbSchema.subtasks)
+        .where(eq(dbSchema.subtasks.taskId, id))
+      ).map((r: any) => r.id)
     ))
     await db.delete(dbSchema.subtasks).where(eq(dbSchema.subtasks.taskId, id))
     await db.delete(dbSchema.taskAssignees).where(eq(dbSchema.taskAssignees.taskId, id))

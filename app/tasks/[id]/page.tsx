@@ -80,9 +80,13 @@ const formatTimeAgo = (dateString: string) => {
   const diffTime = now.getTime() - date.getTime()
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
   const diffHours = Math.floor(diffTime / (1000 * 60 * 60))
+  const diffMinutes = Math.floor(diffTime / (1000 * 60))
+  const diffSeconds = Math.floor(diffTime / 1000)
 
   if (diffDays > 0) return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`
   if (diffHours > 0) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`
+  if (diffMinutes > 0) return `${diffMinutes} minute${diffMinutes > 1 ? "s" : ""} ago`
+  if (diffSeconds >= 0) return "Just now"
   return "Just now"
 }
 
@@ -103,6 +107,12 @@ export default function TaskDetailPage() {
   const [task, setTask] = useState<Task | null>(null)
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
+  // Ticker to force re-render every minute so time-ago labels update
+  const [, forceMinuteRerender] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => forceMinuteRerender((t) => t + 1), 60_000)
+    return () => clearInterval(id)
+  }, [])
   const [newComment, setNewComment] = useState("")
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
   const [showAddSubtask, setShowAddSubtask] = useState(false)
@@ -340,7 +350,7 @@ export default function TaskDetailPage() {
       id: `temp-${Date.now()}`,
       userId: user.id,
       userName: user.name || 'You',
-      avatar: user.avatar || null,
+      avatar: user.avatar || undefined,
       content,
       createdAt: new Date().toISOString(),
     }
@@ -451,7 +461,7 @@ export default function TaskDetailPage() {
       id: `temp-${Date.now()}`,
       userId: user.id,
       user: user.name || 'You',
-      avatar: user.avatar || null,
+      avatar: user.avatar || undefined,
       content: commentText,
       createdAt: new Date().toISOString(),
     }
