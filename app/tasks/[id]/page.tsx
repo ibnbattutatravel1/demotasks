@@ -796,6 +796,19 @@ export default function TaskDetailPage() {
                           <option value="done">Done</option>
                         </select>
                       </div>
+                      {task?.createdBy && (
+                        <div className="flex items-center gap-2 mt-2 text-xs text-slate-600">
+                          <Avatar className="h-5 w-5">
+                            <AvatarImage src={task.createdBy.avatar || "/placeholder-user.jpg"} />
+                            <AvatarFallback className="text-[10px]">{task.createdBy.initials || (task.createdBy.name?.[0] || 'U')}</AvatarFallback>
+                          </Avatar>
+                          <span>
+                            Created by <span className="font-medium text-slate-900">{task.createdBy.name}</span>
+                          </span>
+                          <span>•</span>
+                          <span>{task?.createdAt ? formatTimeAgo(task.createdAt) : ''}</span>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}

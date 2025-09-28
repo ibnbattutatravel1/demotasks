@@ -25,12 +25,13 @@ async function ensureUsers(ids: string[]) {
 }
 
 async function composeTask(task: any) {
-  const [assignees, tags, subtasks, commentRows] = await Promise.all([
+  const [assignees, tags, subtasks, commentRows, creatorRows] = await Promise.all([
     db.select().from(dbSchema.taskAssignees).where(eq(dbSchema.taskAssignees.taskId, task.id))
       .leftJoin(dbSchema.users, eq(dbSchema.taskAssignees.userId, dbSchema.users.id)),
     db.select().from(dbSchema.taskTags).where(eq(dbSchema.taskTags.taskId, task.id)),
     db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.taskId, task.id)),
     db.select().from(dbSchema.comments).where(and(eq(dbSchema.comments.entityType, 'task'), eq(dbSchema.comments.entityId, task.id))),
+    db.select().from(dbSchema.users).where(eq(dbSchema.users.id, task.createdById)),
   ])
 
   const assigneeUsers = assignees.map((row: any) => row.users).filter(Boolean)
@@ -52,6 +53,19 @@ async function composeTask(task: any) {
   const subtasksCompleted = subtaskList.filter((s: any) => s.completed).length
   const totalSubtasks = subtaskList.length
   const commentsCount = commentRows.length
+  const createdBy = (creatorRows && creatorRows[0])
+    ? {
+        id: creatorRows[0].id,
+        name: creatorRows[0].name,
+        avatar: creatorRows[0].avatar,
+        initials: creatorRows[0].initials,
+      }
+    : {
+        id: task.createdById,
+        name: `User ${task.createdById}`,
+        avatar: null as unknown as string | null,
+        initials: (task.createdById?.[0] || 'U').toUpperCase(),
+      }
 
   return {
     ...task,
@@ -61,6 +75,7 @@ async function composeTask(task: any) {
     subtasksCompleted,
     totalSubtasks,
     commentsCount,
+    createdBy,
   }
 }
 
