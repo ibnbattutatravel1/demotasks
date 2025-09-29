@@ -278,7 +278,7 @@ export function AdminDashboard() {
   }
 
   return (
-    <div className="h-screen bg-slate-50 flex">
+    <div className="h-screen bg-slate-50 flex gap-4">
       {/* Left Navigation Rail */}
       <div className="w-[280px] bg-white border-r border-slate-200 flex flex-col">
         {/* Workspace Switcher */}
@@ -442,9 +442,9 @@ export function AdminDashboard() {
         <div className="p-6 space-y-6">
           {loading && <div className="text-sm text-slate-500">Loading data…</div>}
           {error && !loading && <div className="text-sm text-red-600">{error}</div>}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <Card>
-              <CardContent className="py-3 px-6">
+              <CardContent className="py-2 px-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-slate-600">Total Projects</p>
@@ -463,7 +463,7 @@ export function AdminDashboard() {
             </Card>
 
               <Card>
-                <CardContent className="py-3 px-6">
+                <CardContent className="py-2 px-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-slate-600">Pending Approval</p>
@@ -480,7 +480,7 @@ export function AdminDashboard() {
               </Card>
 
               <Card>
-                <CardContent className="py-3 px-6">
+                <CardContent className="py-2 px-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-slate-600">Active Tasks</p>
@@ -497,7 +497,7 @@ export function AdminDashboard() {
               </Card>
 
               <Card>
-                <CardContent className="py-3 px-6">
+                <CardContent className="py-2 px-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-slate-600">Team Members</p>
@@ -522,12 +522,12 @@ export function AdminDashboard() {
           </div>
 
             {/* Quick Actions */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 px-6">
               <Card
                 className="hover:shadow-md transition-shadow cursor-pointer"
                 onClick={() => handleNavigation("/admin/pending")}
               >
-                <CardContent className="p-6">
+                <CardContent className="p-4">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
                       <AlertTriangle className="h-6 w-6 text-orange-600" />
@@ -544,7 +544,7 @@ export function AdminDashboard() {
                 className="hover:shadow-md transition-shadow cursor-pointer"
                 onClick={() => handleNavigation("/admin/team")}
               >
-                <CardContent className="p-6">
+                <CardContent className="p-4">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                       <Users className="h-6 w-6 text-blue-600" />
@@ -561,7 +561,7 @@ export function AdminDashboard() {
                 className="hover:shadow-md transition-shadow cursor-pointer"
                 onClick={() => handleNavigation("/reports")}
               >
-                <CardContent className="p-6">
+                <CardContent className="p-4">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                       <BarChart3 className="h-6 w-6 text-green-600" />
@@ -575,9 +575,9 @@ export function AdminDashboard() {
               </Card>
             </div>
 
-          <div className="mb-6">
+          <div className="mb-6 px-6">
             <h2 className="text-2xl font-bold text-slate-900 mb-2">Project Overview</h2>
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-4">
               <Badge
                 variant="outline"
                 className={`bg-${filteredProjects.length > 0 ? filteredProjects[0].color : "indigo"}-50 text-${filteredProjects.length > 0 ? filteredProjects[0].color : "indigo"}-700 border-${filteredProjects.length > 0 ? filteredProjects[0].color : "indigo"}-200`}
@@ -635,11 +635,11 @@ export function AdminDashboard() {
             </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4 px-6">
             {filteredProjects.length > 0 ? (
               filteredProjects.map((project) => (
                 <Card key={project.id} className="group">
-                  <CardHeader className="pb-3">
+                  <CardHeader className="pb-2 px-4 pt-3">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
@@ -690,10 +690,10 @@ export function AdminDashboard() {
                   </CardHeader>
 
                   {expandedProjects[project.id] && (
-                    <CardContent className="pt-0">
-                      <div className="ml-8 space-y-3 border-l-2 border-slate-200 pl-4">
+                    <CardContent className="pt-0 px-4 pb-3">
+                      <div className="ml-8 space-y-2 border-l-2 border-slate-200 pl-4">
                         {project.tasks.map((task) => (
-                          <div key={task.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                          <div key={task.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <h4 className="font-medium text-slate-900">{task.title}</h4>
