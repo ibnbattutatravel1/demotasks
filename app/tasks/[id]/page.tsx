@@ -739,22 +739,50 @@ export default function TaskDetailPage() {
     if (user?.role !== "admin") {
       // For standard users, send deletion request to admin for approval
       if (confirm("Your task deletion request will be sent to an administrator for approval. Continue?")) {
-        toast({
-          title: "Deletion request sent",
-          description: "Your request to delete this task has been sent to an administrator for approval.",
-        })
-        console.log("[v0] Task deletion request sent to admin for approval")
+        try {
+          if (!taskId || !user?.id) return
+          const res = await fetch(`/api/tasks/${taskId}?userId=${user.id}`, { method: 'DELETE' })
+          const json = await res.json()
+          
+          if (json.success && json.pending) {
+            toast({
+              title: "Deletion request sent",
+              description: "Your request to delete this task has been sent to an administrator for approval.",
+            })
+          } else if (json.success) {
+            toast({ 
+              title: 'Task deleted', 
+              description: 'Task has been deleted.', 
+              variant: 'destructive' 
+            })
+            router.back()
+          } else {
+            throw new Error(json.error || 'Failed to send deletion request')
+          }
+        } catch (e: any) {
+          console.error('Delete task request failed', e)
+          toast({
+            title: "Request failed",
+            description: e.message || "Failed to send deletion request. Please try again.",
+            variant: "destructive",
+          })
+        }
       }
     } else {
       // Admins can delete immediately
       if (confirm("Are you sure you want to delete this task? This action cannot be undone.")) {
         try {
           if (!taskId) return
-          await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
+          await fetch(`/api/tasks/${taskId}?userId=${user?.id}`, { method: 'DELETE' })
           toast({ title: 'Task deleted', description: 'Task has been permanently deleted.', variant: 'destructive' })
           router.back()
         } catch (e) {
           console.error('Delete task failed', e)
+          toast({
+            title: "Deletion failed",
+            description: "Failed to delete task. Please try again.",
+            variant: "destructive",
+          })
         }
       }
     }

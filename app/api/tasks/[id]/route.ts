@@ -362,11 +362,26 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     // Check if user is admin or task creator
     const { searchParams } = new URL(req.url)
     const userId = searchParams.get('userId')
-    const userRows = userId ? await db.select().from(dbSchema.users).where(eq(dbSchema.users.id, userId)) : []
+    
+    if (!userId) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'User ID is required for delete operations' 
+      }, { status: 400 })
+    }
+    
+    const userRows = await db.select().from(dbSchema.users).where(eq(dbSchema.users.id, userId))
     const user = userRows[0]
+    
+    if (!user) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'User not found' 
+      }, { status: 404 })
+    }
 
     // If user is not admin, notify admins about delete request
-    if (user && user.role !== 'admin') {
+    if (user.role !== 'admin') {
       // Notify all admins about the delete request
       const admins = await db
         .select({ id: dbSchema.users.id })
@@ -374,6 +389,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         .where(eq(dbSchema.users.role, 'admin'))
 
       if (admins.length > 0) {
+        console.log(`[DELETE REQUEST] User ${user.name} (${user.id}) requesting to delete task "${current.title}" (${id})`)
+        console.log(`[DELETE REQUEST] Notifying ${admins.length} admin(s)`)
+        
         await Promise.all(
           admins.map((admin: { id: string }) =>
             notifyUser({
@@ -387,6 +405,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
             })
           )
         )
+        
+        console.log(`[DELETE REQUEST] Notifications sent successfully to all admins`)
+      } else {
+        console.warn(`[DELETE REQUEST] No admins found to notify about delete request`)
       }
 
       // Don't actually delete the task - just notify admins

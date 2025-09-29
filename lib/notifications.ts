@@ -83,6 +83,8 @@ export async function notifyUser(args: {
   const { userId, type, title, message, relatedId, relatedType } = args
   const topic: NotificationTopic = args.topic || 'generic'
 
+  console.log(`[NOTIFICATION] Creating notification for user ${userId}:`, { type, title, topic })
+
   // Always create in-app notification
   await db.insert(dbSchema.notifications).values({
     id,
@@ -94,6 +96,8 @@ export async function notifyUser(args: {
     relatedId: relatedId ?? null as unknown as string | null,
     relatedType: relatedType ?? null as unknown as any,
   })
+  
+  console.log(`[NOTIFICATION] In-app notification created with ID: ${id}`)
 
   // Fetch settings once
   const settings = await getUserSettings(userId)
