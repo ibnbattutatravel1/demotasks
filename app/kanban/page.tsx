@@ -291,7 +291,11 @@ export default function KanbanPage() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
-                        <p className="text-xs text-gray-600 mt-1">{task.description}</p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          {task.description && task.description.length > 50 
+                            ? `${task.description.substring(0, 50)}...` 
+                            : task.description || 'No description'}
+                        </p>
                       </CardHeader>
 
                       <CardContent className="pt-0 space-y-3">

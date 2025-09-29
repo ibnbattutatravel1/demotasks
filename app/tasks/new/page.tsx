@@ -89,10 +89,11 @@ export default function NewTaskPage() {
       return
     }
 
-    if (description.trim().length < 10) {
-      setFormError("Description must be at least 10 characters long.")
-      return
-    }
+    // Description is optional or can be short
+    // if (description.trim().length < 10) {
+    //   setFormError("Description must be at least 10 characters long.")
+    //   return
+    // }
 
     setIsSubmitting(true)
     try {
@@ -155,7 +156,7 @@ export default function NewTaskPage() {
             <Button
               onClick={handleSave}
               className="bg-indigo-500 hover:bg-indigo-600"
-              disabled={!title.trim() || !projectId || !priority || description.trim().length < 10 || isSubmitting}
+              disabled={!title.trim() || !projectId || !priority || isSubmitting}
             >
               {isSubmitting ? "Creating..." : "Create Task"}
             </Button>
@@ -167,6 +168,11 @@ export default function NewTaskPage() {
       <div className="max-w-4xl mx-auto p-6">
         {formError && (
           <div className="mb-4 p-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm">{formError}</div>
+        )}
+        {(!title.trim() || !projectId || !priority) && (
+          <div className="mb-4 p-3 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-sm">
+            <strong>Required fields:</strong> Please fill in Title, Project, and Priority to create the task.
+          </div>
         )}
         {user?.role !== "admin" && (
           <Card className="mb-6 border-orange-200 bg-orange-50">
