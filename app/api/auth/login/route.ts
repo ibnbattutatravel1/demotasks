@@ -26,13 +26,17 @@ export async function POST(req: NextRequest) {
       .limit(1)
 
     const user = rows[0]
-    if (!user || !user.passwordHash) {
-      return NextResponse.json({ success: false, error: 'Invalid credentials' }, { status: 401 })
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'No account found with this email address. Please check your email or contact support.' }, { status: 401 })
+    }
+
+    if (!user.passwordHash) {
+      return NextResponse.json({ success: false, error: 'Account setup incomplete. Please contact support.' }, { status: 401 })
     }
 
     const ok = await compare(password, user.passwordHash)
     if (!ok) {
-      return NextResponse.json({ success: false, error: 'Invalid credentials' }, { status: 401 })
+      return NextResponse.json({ success: false, error: 'Incorrect password. Please try again or reset your password.' }, { status: 401 })
     }
 
     const token = await signAuthToken({ sub: user.id, role: user.role })
@@ -53,6 +57,6 @@ export async function POST(req: NextRequest) {
     return res
   } catch (err) {
     console.error('Auth login error', err)
-    return NextResponse.json({ success: false, error: 'Login failed' }, { status: 500 })
+    return NextResponse.json({ success: false, error: 'An error occurred during login. Please try again later or contact support.' }, { status: 500 })
   }
 }
