@@ -34,6 +34,7 @@ import {
   Settings,
   User,
   Inbox,
+  Clock,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -57,9 +58,26 @@ export function AdminDashboard() {
   const [activeFilter, setActiveFilter] = useState("all")
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({})
   const [query, setQuery] = useState("")
+  const [submittedTimesheetsCount, setSubmittedTimesheetsCount] = useState(0)
   const router = useRouter()
   const { toast } = useToast()
   const { user, logout } = useAuth()
+
+  // Load submitted timesheets count
+  useEffect(() => {
+    const loadTimesheetsCount = async () => {
+      try {
+        const res = await fetch('/api/admin/timesheets?status=submitted')
+        const json = await res.json()
+        if (res.ok && json?.success) {
+          setSubmittedTimesheetsCount(json.data?.length || 0)
+        }
+      } catch (e) {
+        console.error('Failed to load timesheets count', e)
+      }
+    }
+    loadTimesheetsCount()
+  }, [])
 
   // Load projects and compose tasks per project
   useEffect(() => {
@@ -522,7 +540,7 @@ export function AdminDashboard() {
           </div>
 
             {/* Quick Actions */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 px-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 px-6">
               <Card
                 className="hover:shadow-md transition-shadow cursor-pointer"
                 onClick={() => handleNavigation("/admin/pending")}
@@ -535,6 +553,23 @@ export function AdminDashboard() {
                     <div>
                       <h3 className="font-semibold text-slate-900">Review Pending Tasks</h3>
                       <p className="text-sm text-slate-600">{filteredPendingTasks.length} tasks awaiting approval</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card
+                className="hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => handleNavigation("/admin/timesheets")}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <Clock className="h-6 w-6 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-slate-900">Review Timesheets</h3>
+                      <p className="text-sm text-slate-600">{submittedTimesheetsCount} submitted timesheets</p>
                     </div>
                   </div>
                 </CardContent>

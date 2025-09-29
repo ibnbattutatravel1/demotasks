@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
+import { ArrowLeft } from "lucide-react"
 
 export default function TimesheetPage() {
   const sp = useSearchParams()
@@ -104,7 +105,18 @@ export default function TimesheetPage() {
     <div className="min-h-screen bg-slate-50">
       <div className="border-b bg-white border-slate-200 px-6 py-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-slate-900">Timesheet</h1>
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.back()}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <h1 className="text-xl font-semibold text-slate-900">Timesheet</h1>
+          </div>
           <div className="flex items-center gap-3">
             <Input
               type="month"
@@ -137,10 +149,11 @@ export default function TimesheetPage() {
             <div className="grid grid-cols-7 gap-3">
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const d = `${month}-${String(i + 1).padStart(2, "0")}`
+                const dayNumber = i + 1
                 const val = entries[d] || 0
                 return (
                   <div key={d} className="border rounded-md p-3 bg-white">
-                    <div className="text-xs text-slate-500 mb-2">{d}</div>
+                    <div className="text-xs font-medium text-slate-600 mb-2">Day {dayNumber}</div>
                     <Input
                       type="number"
                       min={0}

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { ArrowLeft } from "lucide-react"
 // Using a native <select> for status filter
 import { useToast } from "@/hooks/use-toast"
 
@@ -18,6 +20,7 @@ interface AdminRow {
 
 export default function AdminTimesheetsPage() {
   const { toast } = useToast()
+  const router = useRouter()
   const [status, setStatus] = useState<AdminRow["status"]>("submitted")
   const [rows, setRows] = useState<AdminRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -97,7 +100,18 @@ export default function AdminTimesheetsPage() {
     <div className="min-h-screen bg-slate-50">
       <div className="border-b bg-white border-slate-200 px-6 py-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-slate-900">Timesheets Review</h1>
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.back()}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <h1 className="text-xl font-semibold text-slate-900">Timesheets Review</h1>
+          </div>
           <div className="w-48">
             <select
               className="w-full h-10 border border-slate-300 rounded-md px-3 bg-white text-sm"
