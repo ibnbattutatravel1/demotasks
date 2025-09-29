@@ -91,6 +91,26 @@ export default function InboxPage() {
     try { await fetch(`/api/notifications/${encodeURIComponent(item.id)}`, { method: 'PATCH' }) } catch {}
   }
 
+  // Helper functions for date filtering
+  const isToday = (timestamp: string) => {
+    const date = new Date(timestamp)
+    const today = new Date()
+    return date.toDateString() === today.toDateString()
+  }
+
+  const isThisWeek = (timestamp: string) => {
+    const date = new Date(timestamp)
+    const today = new Date()
+    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+    return date >= weekAgo
+  }
+
+  const isThisMonth = (timestamp: string) => {
+    const date = new Date(timestamp)
+    const today = new Date()
+    return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear()
+  }
+
   const filteredItems = items.filter((item) => {
     const matchesSearch =
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -113,25 +133,6 @@ export default function InboxPage() {
     
     return matchesSearch && matchesFilter && matchesTypeFilter && matchesDateFilter
   })
-
-  const isToday = (timestamp: string) => {
-    const date = new Date(timestamp)
-    const today = new Date()
-    return date.toDateString() === today.toDateString()
-  }
-
-  const isThisWeek = (timestamp: string) => {
-    const date = new Date(timestamp)
-    const today = new Date()
-    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
-    return date >= weekAgo
-  }
-
-  const isThisMonth = (timestamp: string) => {
-    const date = new Date(timestamp)
-    const today = new Date()
-    return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear()
-  }
 
   const unreadCount = items.filter((item) => !item.isRead).length
 
