@@ -1,23 +1,42 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle2, X, Clock, Bell } from "lucide-react"
+import { CheckCircle2, X, Clock, Bell, ExternalLink } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
 
-type ApprovalType = "approved" | "rejected" | "pending"
+type ApprovalKind = "approved" | "rejected" | "pending"
 interface ApprovalNotification {
   id: string
-  type: ApprovalType
+  type: ApprovalKind
   taskTitle: string
   message: string
   timestamp: string
   read?: boolean
+  relatedId?: string
+  relatedType?: string
 }
 
 export function TaskApprovalNotifications() {
   const [notifications, setNotifications] = useState<ApprovalNotification[]>([])
+  const router = useRouter()
+  const { user } = useAuth()
+
+  const timeAgo = (iso?: string) => {
+    if (!iso) return ""
+    const d = new Date(iso)
+    const diff = Date.now() - d.getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return "just now"
+    if (mins < 60) return `${mins}m ago`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h ago`
+    const days = Math.floor(hrs / 24)
+    return `${days}d ago`
+  }
 
   useEffect(() => {
     let abort = false
@@ -33,6 +52,8 @@ export function TaskApprovalNotifications() {
           message: string;
           createdAt: string;
           read?: boolean;
+          relatedId?: string;
+          relatedType?: string;
         }>
         const mapped: ApprovalNotification[] = items
           .filter(n => (n.type?.includes('task_') || n.type?.includes('timesheet_')) && !n.read)
@@ -41,8 +62,10 @@ export function TaskApprovalNotifications() {
             type: n.type.endsWith('_approved') ? 'approved' : n.type.endsWith('_rejected') ? 'rejected' : 'pending',
             taskTitle: n.title || 'Task Update',
             message: n.message,
-            timestamp: new Date(n.createdAt).toLocaleString(),
+            timestamp: n.createdAt,
             read: !!n.read,
+            relatedId: n.relatedId,
+            relatedType: n.relatedType,
           }))
         if (!abort) setNotifications(mapped)
       } catch {}
@@ -73,12 +96,40 @@ export function TaskApprovalNotifications() {
     } catch {}
   }
 
+  const borderByType: Record<ApprovalKind, string> = {
+    approved: "border-l-emerald-500",
+    rejected: "border-l-rose-500",
+    pending: "border-l-amber-500",
+  }
+
+  const dotByType: Record<ApprovalKind, string> = {
+    approved: "bg-emerald-500",
+    rejected: "bg-rose-500",
+    pending: "bg-amber-500",
+  }
+
+  const badgeVariant = (t: ApprovalKind) =>
+    t === 'approved' ? 'default' : t === 'rejected' ? 'destructive' : 'secondary'
+
+  const openRelated = (n: ApprovalNotification) => {
+    if (!n.relatedId) return
+    if (n.relatedType === 'task') {
+      router.push(`/tasks/${n.relatedId}`)
+      return
+    }
+    if (n.relatedType === 'timesheet') {
+      if (user?.role === 'admin') router.push(`/admin/timesheets/${n.relatedId}`)
+      else router.push('/timesheet')
+      return
+    }
+  }
+
   if (notifications.length === 0) return null
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white/80 backdrop-blur px-3 py-2 shadow-sm">
+        <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
           <Bell className="h-4 w-4" />
           Task Notifications
         </div>
@@ -86,54 +137,60 @@ export function TaskApprovalNotifications() {
           Mark all as seen
         </Button>
       </div>
-      {notifications.map((notification) => (
-        <Card key={notification.id} className="border-l-4 border-l-indigo-500">
-          <CardContent className="p-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-2 flex-1">
-                {notification.type === "approved" && <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />}
-                {notification.type === "rejected" && <X className="h-4 w-4 text-red-500 mt-0.5" />}
-                {notification.type === "pending" && <Clock className="h-4 w-4 text-orange-500 mt-0.5" />}
+
+      <div className="max-h-[70vh] overflow-y-auto pr-1 space-y-2">
+        {notifications.map((n) => (
+          <Card
+            key={n.id}
+            className={`border-l-4 ${borderByType[n.type]} shadow-sm hover:shadow-md transition-shadow duration-150 rounded-xl`}
+          >
+            <CardContent className="p-3">
+              <div className="flex items-start gap-3">
+                <div className={`mt-0.5 h-2.5 w-2.5 rounded-full ${dotByType[n.type]}`} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">{notification.taskTitle}</p>
-                  <p className="text-xs text-slate-600">{notification.message}</p>
-                  <p className="text-xs text-slate-400 mt-1">{notification.timestamp}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-slate-900 truncate">{n.taskTitle}</p>
+                    <Badge variant={badgeVariant(n.type) as any} className="text-[10px] px-2 py-0.5 capitalize">
+                      {n.type}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-slate-600 line-clamp-2">{n.message}</p>
+                  <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-400">
+                    <Clock className="h-3 w-3" />
+                    <span>{timeAgo(n.timestamp)}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  {n.relatedId && (
+                    <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => openRelated(n)}>
+                      <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                      View
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7"
+                    onClick={() => markAsSeen(n.id)}
+                  >
+                    Mark as seen
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => dismissNotification(n.id)}
+                    className="h-6 w-6 p-0"
+                    aria-label="Dismiss"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant={
-                    notification.type === "approved"
-                      ? "default"
-                      : notification.type === "rejected"
-                        ? "destructive"
-                        : "secondary"
-                  }
-                  className="text-xs"
-                >
-                  {notification.type}
-                </Badge>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7"
-                  onClick={() => markAsSeen(notification.id)}
-                >
-                  Mark as seen
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => dismissNotification(notification.id)}
-                  className="h-6 w-6 p-0"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   )
 }
