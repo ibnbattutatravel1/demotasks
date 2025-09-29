@@ -81,13 +81,24 @@ export default function AdminTimesheetsPage() {
   }
 
   const handleReject = async (id: string) => {
-    if (!window.confirm("Are you sure you want to reject this timesheet?")) return
+    const reason = window.prompt("Please provide a rejection reason (required):")
+    if (!reason || !reason.trim()) {
+      toast({ title: "Rejection cancelled", description: "Rejection reason is required.", variant: "destructive" })
+      return
+    }
+    
+    if (!window.confirm(`Are you sure you want to reject this timesheet?\n\nReason: ${reason}`)) return
+    
     try {
       setActingId(id)
-      const res = await fetch(`/api/admin/timesheets/${encodeURIComponent(id)}/reject`, { method: "POST" })
+      const res = await fetch(`/api/admin/timesheets/${encodeURIComponent(id)}/reject`, { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: reason.trim() })
+      })
       const json = await res.json()
       if (!res.ok || !json?.success) throw new Error(json?.error || "Failed to reject")
-      toast({ title: "Rejected", description: "Timesheet rejected." })
+      toast({ title: "Rejected", description: "Timesheet rejected and user has been notified." })
       await load(status)
     } catch (e: any) {
       toast({ title: "Reject failed", description: e?.message || "Could not reject", variant: "destructive" })
@@ -112,17 +123,26 @@ export default function AdminTimesheetsPage() {
             </Button>
             <h1 className="text-xl font-semibold text-slate-900">Timesheets Review</h1>
           </div>
-          <div className="w-48">
-            <select
-              className="w-full h-10 border border-slate-300 rounded-md px-3 bg-white text-sm"
-              value={status}
-              onChange={(e) => setStatus(e.target.value as any)}
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push('/admin/timesheets/reports')}
             >
-              <option value="submitted">Submitted</option>
-              <option value="returned">Returned</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-            </select>
+              View Reports
+            </Button>
+            <div className="w-48">
+              <select
+                className="w-full h-10 border border-slate-300 rounded-md px-3 bg-white text-sm"
+                value={status}
+                onChange={(e) => setStatus(e.target.value as any)}
+              >
+                <option value="submitted">Submitted</option>
+                <option value="returned">Returned</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>

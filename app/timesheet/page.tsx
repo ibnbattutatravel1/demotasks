@@ -17,9 +17,16 @@ export default function TimesheetPage() {
   const [timesheetId, setTimesheetId] = useState<string>("")
   const [status, setStatus] = useState<"draft" | "submitted" | "approved" | "returned" | "rejected">("draft")
   const [returnComments, setReturnComments] = useState<string | null>(null)
+  const [rejectionReason, setRejectionReason] = useState<string | null>(null)
   const [entries, setEntries] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  
+  // Get current month for validation
+  const currentMonth = new Date().toISOString().slice(0, 7)
+  const selectedMonthDate = new Date(month + '-01')
+  const currentMonthDate = new Date(currentMonth + '-01')
+  const isFutureMonth = selectedMonthDate > currentMonthDate
 
   const daysInMonth = useMemo(() => {
     const [y, m] = month.split("-").map(Number)
@@ -38,6 +45,7 @@ export default function TimesheetPage() {
       setTimesheetId(ts.id)
       setStatus(ts.status)
       setReturnComments(ts.returnComments || null)
+      setRejectionReason(ts.rejectionReason || null)
       const map: Record<string, number> = {}
       for (const e of json.data.entries || []) map[e.date] = Number(e.hours) || 0
       setEntries(map)
@@ -60,6 +68,16 @@ export default function TimesheetPage() {
 
   const handleSave = async () => {
     if (!timesheetId) return
+    
+    if (isFutureMonth) {
+      toast({ 
+        title: "Cannot save", 
+        description: "You cannot save timesheets for future months. Please select current or past months only.", 
+        variant: "destructive" 
+      })
+      return
+    }
+    
     try {
       setSaving(true)
       const list = Array.from({ length: daysInMonth }).map((_, i) => {
@@ -85,6 +103,16 @@ export default function TimesheetPage() {
 
   const handleSubmit = async () => {
     if (!timesheetId) return
+    
+    if (isFutureMonth) {
+      toast({ 
+        title: "Cannot submit", 
+        description: "You cannot submit timesheets for future months. Please select current or past months only.", 
+        variant: "destructive" 
+      })
+      return
+    }
+    
     try {
       setSaving(true)
       const res = await fetch(`/api/timesheets/${encodeURIComponent(timesheetId)}/submit`, { method: "POST" })
@@ -99,7 +127,7 @@ export default function TimesheetPage() {
     }
   }
 
-  const isEditable = status === "draft" || status === "returned"
+  const isEditable = (status === "draft" || status === "returned" || status === "rejected") && !isFutureMonth
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -141,9 +169,26 @@ export default function TimesheetPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {isFutureMonth && (
+              <div className="mb-4 p-4 rounded-lg border border-red-200 bg-red-50 text-red-800">
+                <p className="font-semibold mb-1">⚠️ Future Month Selected</p>
+                <p className="text-sm">You cannot edit or submit timesheets for future months. Please select the current month or a past month.</p>
+              </div>
+            )}
+            
+            {rejectionReason && status === "rejected" && (
+              <div className="mb-4 p-4 rounded-lg border border-red-200 bg-red-50 text-red-800">
+                <p className="font-semibold mb-1">❌ Timesheet Rejected</p>
+                <p className="text-sm"><strong>Reason:</strong> {rejectionReason}</p>
+                <p className="text-xs mt-2 text-red-600">You can edit and resubmit this timesheet after making the necessary corrections.</p>
+              </div>
+            )}
+            
             {returnComments && status === "returned" && (
-              <div className="mb-4 p-3 rounded border border-amber-200 bg-amber-50 text-amber-800 text-sm">
-                Returned: {returnComments}
+              <div className="mb-4 p-4 rounded-lg border border-amber-200 bg-amber-50 text-amber-800">
+                <p className="font-semibold mb-1">↩️ Timesheet Returned</p>
+                <p className="text-sm"><strong>Comments:</strong> {returnComments}</p>
+                <p className="text-xs mt-2 text-amber-600">Please make the requested changes and resubmit.</p>
               </div>
             )}
             <div className="grid grid-cols-7 gap-3">

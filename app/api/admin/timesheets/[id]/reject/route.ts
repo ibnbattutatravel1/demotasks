@@ -7,6 +7,9 @@ import { randomUUID } from 'node:crypto'
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
+    const body = await req.json()
+    const reason = body.reason || 'No reason provided'
+    
     const token = req.cookies.get(AUTH_COOKIE)?.value
     if (!token) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     const payload = await verifyAuthToken(token).catch(() => null)
@@ -19,19 +22,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!ts) return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 })
 
     await db.update(dbSchema.timesheets)
-      .set({ status: 'rejected', rejectedAt: new Date().toISOString() })
+      .set({ 
+        status: 'rejected', 
+        rejectedAt: new Date().toISOString(),
+        rejectionReason: reason
+      })
       .where(eq(dbSchema.timesheets.id, id))
 
     await db.insert(dbSchema.notifications).values({
       id: randomUUID(),
       type: 'timesheet_rejected',
-      title: 'Timesheet rejected',
-      message: `Your ${ts.month} timesheet was rejected`,
+      title: '❌ Timesheet Rejected',
+      message: `Your ${ts.month} timesheet was rejected. Reason: ${reason}`,
       read: 0 as any,
       userId: ts.userId,
       relatedId: id,
       relatedType: 'timesheet' as any,
     })
+
+    console.log(`[TIMESHEET REJECTED] Month: ${ts.month}, User: ${ts.userId}, Reason: ${reason}`)
 
     return NextResponse.json({ success: true })
   } catch (error) {
