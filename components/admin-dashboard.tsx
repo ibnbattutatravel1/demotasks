@@ -59,9 +59,32 @@ export function AdminDashboard() {
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({})
   const [query, setQuery] = useState("")
   const [submittedTimesheetsCount, setSubmittedTimesheetsCount] = useState(0)
+  const [notifications, setNotifications] = useState<any[]>([])
   const router = useRouter()
   const { toast } = useToast()
   const { user, logout } = useAuth()
+
+  // Load notifications for admin inbox badge
+  useEffect(() => {
+    let ignore = false
+    const load = async () => {
+      try {
+        const res = await fetch('/api/notifications')
+        const json = await res.json()
+        if (!ignore && res.ok && json.success) {
+          setNotifications(json.data || [])
+        }
+      } catch (e) {
+        console.error('Failed to load notifications', e)
+      }
+    }
+    load()
+    const interval = window.setInterval(load, 30000)
+    return () => {
+      ignore = true
+      window.clearInterval(interval)
+    }
+  }, [])
 
   // Load submitted timesheets count
   useEffect(() => {
@@ -320,6 +343,12 @@ export function AdminDashboard() {
             >
               <Inbox className="h-4 w-4 text-slate-600" />
               <span className="text-sm font-medium text-slate-900">Inbox</span>
+              <Badge
+                variant={(notifications || []).some((n: any) => !n?.read) ? "default" : "outline"}
+                className="ml-auto text-xs"
+              >
+                {(notifications || []).filter((n: any) => !n?.read).length}
+              </Badge>
             </button>
             <button
               onClick={() => handleNavigation("/projects")}

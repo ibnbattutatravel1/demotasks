@@ -118,7 +118,7 @@ export function UserDashboard() {
     return () => { ignore = true }
   }, [user?.id])
 
-  // Load notifications for unread comment counts
+  // Load notifications for unread comment counts / inbox badge
   useEffect(() => {
     let ignore = false
     const load = async () => {
@@ -131,7 +131,11 @@ export function UserDashboard() {
       }
     }
     load()
-    return () => { ignore = true }
+    const interval = window.setInterval(load, 30000)
+    return () => {
+      ignore = true
+      window.clearInterval(interval)
+    }
   }, [])
 
   const handleTaskClick = (taskId: string) => {
@@ -307,6 +311,12 @@ export function UserDashboard() {
             >
               <Inbox className="h-4 w-4 text-slate-600" />
               <span className="text-sm font-medium text-slate-900">Inbox</span>
+              <Badge
+                variant={(notifications || []).some((n: any) => !n?.read) ? "default" : "outline"}
+                className="ml-auto text-xs"
+              >
+                {(notifications || []).filter((n: any) => !n?.read).length}
+              </Badge>
             </button>
             <button
               onClick={() => handleNavigation("/projects")}

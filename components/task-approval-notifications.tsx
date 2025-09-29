@@ -48,7 +48,11 @@ export function TaskApprovalNotifications() {
       } catch {}
     }
     load()
-    return () => { abort = true }
+    const interval = window.setInterval(load, 30000)
+    return () => {
+      abort = true
+      window.clearInterval(interval)
+    }
   }, [])
 
   const dismissNotification = async (id: string) => {
