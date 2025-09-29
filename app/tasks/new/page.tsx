@@ -31,7 +31,6 @@ export default function NewTaskPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
-  const [projectFilter, setProjectFilter] = useState("")
   const [assigneeFilter, setAssigneeFilter] = useState("")
 
   useEffect(() => {
@@ -64,11 +63,7 @@ export default function NewTaskPage() {
     return () => { abort = true }
   }, [])
 
-  const filteredProjects = useMemo(() => {
-    const q = projectFilter.trim().toLowerCase()
-    if (!q) return projects
-    return projects.filter(p => p.name.toLowerCase().includes(q))
-  }, [projects, projectFilter])
+  // No need for filtered projects anymore - using direct selection
 
   const filteredUsers = useMemo(() => {
     const q = assigneeFilter.trim().toLowerCase()
@@ -217,25 +212,23 @@ export default function NewTaskPage() {
               <CardContent className="space-y-4">
                 <div>
                   <label className="text-sm font-medium text-slate-700 mb-2 block">Project *</label>
-                  <Input
-                    value={projectFilter}
-                    onChange={(e) => setProjectFilter(e.target.value)}
-                    placeholder="Filter projects…"
-                    className="mb-2"
-                  />
                   <Select value={projectId} onValueChange={setProjectId}>
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder={loading ? 'Loading projects…' : 'Select a project'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {filteredProjects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          <div className="flex items-center gap-2">
-                            <FolderOpen className="h-4 w-4 text-slate-500" />
-                            {project.name}
-                          </div>
-                        </SelectItem>
-                      ))}
+                      {projects.length === 0 ? (
+                        <div className="py-6 text-center text-sm text-slate-500">No projects available</div>
+                      ) : (
+                        projects.map((project) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            <div className="flex items-center gap-2">
+                              <FolderOpen className="h-4 w-4 text-slate-500" />
+                              {project.name}
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -262,9 +255,9 @@ export default function NewTaskPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-slate-700 mb-2 block">Priority</label>
+                    <label className="text-sm font-medium text-slate-700 mb-2 block">Priority *</label>
                     <Select value={priority} onValueChange={setPriority}>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select priority" />
                       </SelectTrigger>
                       <SelectContent>
