@@ -54,10 +54,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Missing file, entityType, or entityId' }, { status: 400 })
     }
 
-    // Validate file size (10MB limit)
-    const maxSize = 10 * 1024 * 1024 // 10MB
+    // Validate file size (50MB limit)
+    const maxSize = 50 * 1024 * 1024 // 50MB
     if (file.size > maxSize) {
-      return NextResponse.json({ success: false, error: 'File too large. Maximum size is 10MB.' }, { status: 400 })
+      return NextResponse.json({ success: false, error: 'File too large. Maximum size is 50MB.' }, { status: 400 })
     }
 
     // For demo purposes, we'll store a placeholder URL since we don't have file storage configured

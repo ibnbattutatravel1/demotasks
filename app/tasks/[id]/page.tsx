@@ -565,6 +565,19 @@ export default function TaskDetailPage() {
   const handleFileUpload = async (files: FileList) => {
     if (!files || files.length === 0 || !taskId) return
 
+    // Validate file sizes (50MB limit)
+    const maxSize = 50 * 1024 * 1024 // 50MB
+    const invalidFiles = Array.from(files).filter(file => file.size > maxSize)
+    
+    if (invalidFiles.length > 0) {
+      toast({
+        title: "File too large",
+        description: `Some files exceed 50MB limit: ${invalidFiles.map(f => f.name).join(', ')}`,
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsUploading(true)
 
     try {
