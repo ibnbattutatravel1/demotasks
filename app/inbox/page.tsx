@@ -8,7 +8,15 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/contexts/auth-context"
-import { Search, ArrowLeft, Inbox, MessageSquare, Clock, User, CheckCircle2, AlertCircle, Filter } from "lucide-react"
+import { Search, ArrowLeft, Inbox, MessageSquare, Clock, User, CheckCircle2, AlertCircle, Filter, ChevronDown } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 type Priority = "high" | "medium" | "low"
 type InboxItem = {
   id: string
@@ -40,6 +48,8 @@ function mapPriorityByType(type: string): Priority {
 export default function InboxPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState("all")
+  const [typeFilter, setTypeFilter] = useState("all")
+  const [dateFilter, setDateFilter] = useState("all")
   const [items, setItems] = useState<InboxItem[]>([])
   const router = useRouter()
   const { user } = useAuth()
@@ -85,10 +95,43 @@ export default function InboxPage() {
     const matchesSearch =
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.message.toLowerCase().includes(searchQuery.toLowerCase())
+    
     const matchesFilter =
       filter === "all" || (filter === "unread" && !item.isRead) || (filter === "priority" && item.priority === "high")
-    return matchesSearch && matchesFilter
+    
+    const matchesTypeFilter = typeFilter === "all" || 
+      (typeFilter === "tasks" && (item.type.includes("task") || item.type.includes("mention"))) ||
+      (typeFilter === "comments" && item.type.includes("comment")) ||
+      (typeFilter === "projects" && item.type.includes("project")) ||
+      (typeFilter === "approvals" && (item.type.includes("approved") || item.type.includes("rejected") || item.type.includes("pending"))) ||
+      (typeFilter === "reminders" && item.type.includes("reminder"))
+    
+    const matchesDateFilter = dateFilter === "all" ||
+      (dateFilter === "today" && isToday(item.timestamp)) ||
+      (dateFilter === "week" && isThisWeek(item.timestamp)) ||
+      (dateFilter === "month" && isThisMonth(item.timestamp))
+    
+    return matchesSearch && matchesFilter && matchesTypeFilter && matchesDateFilter
   })
+
+  const isToday = (timestamp: string) => {
+    const date = new Date(timestamp)
+    const today = new Date()
+    return date.toDateString() === today.toDateString()
+  }
+
+  const isThisWeek = (timestamp: string) => {
+    const date = new Date(timestamp)
+    const today = new Date()
+    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+    return date >= weekAgo
+  }
+
+  const isThisMonth = (timestamp: string) => {
+    const date = new Date(timestamp)
+    const today = new Date()
+    return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear()
+  }
 
   const unreadCount = items.filter((item) => !item.isRead).length
 
@@ -169,10 +212,73 @@ export default function InboxPage() {
           <Button variant={filter === "priority" ? "default" : "ghost"} size="sm" onClick={() => setFilter("priority")}>
             High Priority
           </Button>
-          <Button variant="ghost" size="sm">
-            <Filter className="h-4 w-4 mr-2" />
-            More Filters
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant={typeFilter !== "all" || dateFilter !== "all" ? "default" : "ghost"} size="sm">
+                <Filter className="h-4 w-4 mr-2" />
+                More Filters
+                {(typeFilter !== "all" || dateFilter !== "all") && (
+                  <Badge variant="secondary" className="ml-2 h-4 px-1 text-xs">
+                    {[typeFilter !== "all" ? "Type" : null, dateFilter !== "all" ? "Date" : null].filter(Boolean).join(", ")}
+                  </Badge>
+                )}
+                <ChevronDown className="h-4 w-4 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel>Filter by Type</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setTypeFilter("all")}>
+                <span className={typeFilter === "all" ? "font-medium" : ""}>All Types</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTypeFilter("tasks")}>
+                <span className={typeFilter === "tasks" ? "font-medium" : ""}>Tasks & Mentions</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTypeFilter("comments")}>
+                <span className={typeFilter === "comments" ? "font-medium" : ""}>Comments</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTypeFilter("projects")}>
+                <span className={typeFilter === "projects" ? "font-medium" : ""}>Projects</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTypeFilter("approvals")}>
+                <span className={typeFilter === "approvals" ? "font-medium" : ""}>Approvals</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTypeFilter("reminders")}>
+                <span className={typeFilter === "reminders" ? "font-medium" : ""}>Reminders</span>
+              </DropdownMenuItem>
+              
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Filter by Date</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setDateFilter("all")}>
+                <span className={dateFilter === "all" ? "font-medium" : ""}>All Time</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDateFilter("today")}>
+                <span className={dateFilter === "today" ? "font-medium" : ""}>Today</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDateFilter("week")}>
+                <span className={dateFilter === "week" ? "font-medium" : ""}>This Week</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDateFilter("month")}>
+                <span className={dateFilter === "month" ? "font-medium" : ""}>This Month</span>
+              </DropdownMenuItem>
+              
+              {(typeFilter !== "all" || dateFilter !== "all") && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      setTypeFilter("all")
+                      setDateFilter("all")
+                    }}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    Clear All Filters
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
