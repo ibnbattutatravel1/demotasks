@@ -255,6 +255,35 @@ export async function POST(req: NextRequest) {
           topic: 'generic',
         })
       }
+
+      // Notify admins so they can act on pending approvals
+      if (approvalStatus === 'pending') {
+        const admins = await db
+          .select({ id: dbSchema.users.id })
+          .from(dbSchema.users)
+          .where(eq(dbSchema.users.role, 'admin'))
+
+        const adminRecipients = admins
+          .map((row: { id: string }) => row.id)
+          .filter((uid: string) => uid !== createdById)
+
+        if (adminRecipients.length) {
+          const adminMessage = `${title} is awaiting approval.`
+          await Promise.all(
+            adminRecipients.map((uid: string) =>
+              notifyUser({
+                userId: uid,
+                type: 'task_pending_review',
+                title,
+                message: adminMessage,
+                relatedId: id,
+                relatedType: 'task',
+                topic: 'projectUpdates',
+              }),
+            ),
+          )
+        }
+      }
     } catch (e) {
       console.warn('Failed to notify for task creation', e)
     }

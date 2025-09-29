@@ -72,10 +72,18 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       }
     }
 
-    // Notify owner and team about project updates
+    // Notify owner, team, and admins about project updates
     try {
       const teamRows = await db.select().from(dbSchema.projectTeam).where(eq(dbSchema.projectTeam.projectId, projectId))
       const userIds = new Set<string>([existing.ownerId, ...teamRows.map((t: any) => t.userId)])
+      
+      // Add all admins to recipients
+      const admins = await db
+        .select({ id: dbSchema.users.id })
+        .from(dbSchema.users)
+        .where(eq(dbSchema.users.role, 'admin'))
+      for (const admin of admins) userIds.add(admin.id)
+      
       await Promise.all(
         Array.from(userIds).map((uid) =>
           notifyUser({

@@ -91,6 +91,14 @@ export async function POST(req: NextRequest) {
           const recipients = new Set<string>([task.createdById, ...assignees.map((a: { userId: string }) => a.userId)])
           // Add mentions explicitly
           for (const m of (body.mentions || [])) recipients.add(m)
+          
+          // Add all admins to recipients (they'll get notified of all comments)
+          const admins = await db
+            .select({ id: dbSchema.users.id })
+            .from(dbSchema.users)
+            .where(eq(dbSchema.users.role, 'admin'))
+          for (const admin of admins) recipients.add(admin.id)
+          
           recipients.delete(userRow.id) // exclude author
           if (recipients.size) {
             const title = task.title
@@ -120,6 +128,14 @@ export async function POST(req: NextRequest) {
             .where(eq(dbSchema.taskAssignees.taskId, subt.taskId))
           const recipients = new Set<string>([task?.createdById, subt.assigneeId, ...assignees.map((a: { userId: string }) => a.userId)].filter(Boolean) as string[])
           for (const m of (body.mentions || [])) recipients.add(m)
+          
+          // Add all admins to recipients (they'll get notified of all subtask comments)
+          const admins = await db
+            .select({ id: dbSchema.users.id })
+            .from(dbSchema.users)
+            .where(eq(dbSchema.users.role, 'admin'))
+          for (const admin of admins) recipients.add(admin.id)
+          
           recipients.delete(userRow.id)
           if (recipients.size) {
             const title = task?.title || 'Subtask'

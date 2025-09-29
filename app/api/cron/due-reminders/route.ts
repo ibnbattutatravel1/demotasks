@@ -39,10 +39,22 @@ export async function GET(_req: NextRequest) {
     let sent = 0
     for (const task of dueTasks as any[]) {
       const users = assigneesByTask.get(task.id) || []
+      
+      // Add all admins to recipients for due reminders
+      const admins = await db
+        .select({ id: dbSchema.users.id })
+        .from(dbSchema.users)
+        .where(eq(dbSchema.users.role, 'admin'))
+      
+      const allRecipients = new Set<string>([
+        ...users.map((u: any) => u.userId),
+        ...admins.map((admin: any) => admin.id)
+      ])
+      
       await Promise.all(
-        users.map((u) =>
+        Array.from(allRecipients).map((uid) =>
           notifyUser({
-            userId: u.userId,
+            userId: uid,
             type: 'task_due_tomorrow',
             title: `Task due tomorrow: ${task.title}`,
             message: `The task "${task.title}" is due on ${task.dueDate}.`,
@@ -52,7 +64,7 @@ export async function GET(_req: NextRequest) {
           })
         )
       )
-      sent += users.length
+      sent += allRecipients.size
     }
 
     return NextResponse.json({ success: true, data: { sent, date: target } })

@@ -33,6 +33,7 @@ import {
   LogOut,
   Settings,
   User,
+  Inbox,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -295,6 +296,13 @@ export function AdminDashboard() {
         {/* Navigation Sections */}
         <div className="flex-1 p-4 space-y-6">
           <div>
+            <button
+              onClick={() => handleNavigation("/inbox")}
+              className="flex items-center gap-2 mb-3 w-full text-left hover:bg-slate-50 rounded-lg px-2 py-1.5 transition-colors"
+            >
+              <Inbox className="h-4 w-4 text-slate-600" />
+              <span className="text-sm font-medium text-slate-900">Inbox</span>
+            </button>
             <button
               onClick={() => handleNavigation("/projects")}
               className="flex items-center gap-2 mb-3 w-full text-left hover:bg-slate-50 rounded-lg px-2 py-1.5 transition-colors"

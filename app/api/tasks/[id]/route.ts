@@ -254,6 +254,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         else if (body.approvalStatus === 'pending') { notifType = 'task_pending'; message = 'Your task is pending approval.' }
         else if (body.approvalStatus === 'rejected') { notifType = 'task_rejected'; message = 'Your task has been rejected.' }
         if (notifType) {
+          // Notify task creator
           await db.insert(dbSchema.notifications).values({
             id: randomUUID(),
             type: notifType,
@@ -264,6 +265,39 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             relatedId: id,
             relatedType: 'task',
           })
+
+          // Notify all admins about approval status changes
+          const admins = await db
+            .select({ id: dbSchema.users.id })
+            .from(dbSchema.users)
+            .where(eq(dbSchema.users.role, 'admin'))
+
+          const adminRecipients = admins
+            .map((row: { id: string }) => row.id)
+            .filter((uid: string) => uid !== current.createdById)
+
+          if (adminRecipients.length) {
+            const adminMessage = body.approvalStatus === 'approved' 
+              ? `Task "${title}" has been approved.`
+              : body.approvalStatus === 'rejected'
+              ? `Task "${title}" has been rejected.`
+              : `Task "${title}" status changed to ${body.approvalStatus}.`
+            
+            await Promise.all(
+              adminRecipients.map((uid: string) =>
+                db.insert(dbSchema.notifications).values({
+                  id: randomUUID(),
+                  type: `admin_${notifType}`,
+                  title,
+                  message: adminMessage,
+                  read: 0 as any,
+                  userId: uid,
+                  relatedId: id,
+                  relatedType: 'task',
+                })
+              )
+            )
+          }
         }
       }
     } catch (e) {
