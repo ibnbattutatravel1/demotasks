@@ -127,63 +127,72 @@ export function TaskApprovalNotifications() {
   if (notifications.length === 0) return null
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white/80 backdrop-blur px-3 py-2 shadow-sm">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-          <Bell className="h-4 w-4" />
-          Task Notifications
+    <div className="space-y-2 w-full max-w-sm">
+      <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-800">
+          <Bell className="h-3.5 w-3.5" />
+          Notifications
         </div>
-        <Button variant="ghost" size="sm" className="h-7" onClick={markAllAsSeen}>
-          Mark all as seen
+        <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={markAllAsSeen}>
+          Mark all
         </Button>
       </div>
 
-      <div className="max-h-[70vh] overflow-y-auto pr-1 space-y-2">
+      <div className="max-h-[60vh] overflow-y-auto space-y-2 pr-1">
         {notifications.map((n) => (
           <Card
             key={n.id}
-            className={`border-l-4 ${borderByType[n.type]} shadow-sm hover:shadow-md transition-shadow duration-150 rounded-xl`}
+            className={`border-l-4 ${borderByType[n.type]} shadow-sm hover:shadow transition-shadow rounded-lg overflow-hidden`}
           >
-            <CardContent className="p-3">
-              <div className="flex items-start gap-3">
-                <div className={`mt-0.5 h-2.5 w-2.5 rounded-full ${dotByType[n.type]}`} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-slate-900 truncate">{n.taskTitle}</p>
-                    <Badge variant={badgeVariant(n.type) as any} className="text-[10px] px-2 py-0.5 capitalize">
-                      {n.type}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-slate-600 line-clamp-2">{n.message}</p>
-                  <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-400">
-                    <Clock className="h-3 w-3" />
-                    <span>{timeAgo(n.timestamp)}</span>
+            <CardContent className="p-2.5">
+              <div className="flex flex-col gap-2">
+                {/* Title row */}
+                <div className="flex items-start gap-2">
+                  <div className={`mt-1 h-2 w-2 rounded-full flex-shrink-0 ${dotByType[n.type]}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-2 mb-1">
+                      <p className="text-xs font-semibold text-slate-900 line-clamp-1 flex-1">{n.taskTitle}</p>
+                      <Badge variant={badgeVariant(n.type) as any} className="text-[9px] px-1.5 py-0 capitalize flex-shrink-0">
+                        {n.type}
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-slate-600 line-clamp-2 mb-1.5">{n.message}</p>
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                      <Clock className="h-2.5 w-2.5" />
+                      <span>{timeAgo(n.timestamp)}</span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1">
+                {/* Actions row */}
+                <div className="flex items-center gap-1.5 justify-end">
                   {n.relatedId && (
-                    <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => openRelated(n)}>
-                      <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-6 text-[10px] px-2" 
+                      onClick={(e) => { e.stopPropagation(); openRelated(n); }}
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
                       View
                     </Button>
                   )}
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7"
-                    onClick={() => markAsSeen(n.id)}
+                    className="h-6 text-[10px] px-2"
+                    onClick={(e) => { e.stopPropagation(); markAsSeen(n.id); }}
                   >
-                    Mark as seen
+                    Seen
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => dismissNotification(n.id)}
+                    onClick={(e) => { e.stopPropagation(); dismissNotification(n.id); }}
                     className="h-6 w-6 p-0"
                     aria-label="Dismiss"
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <X className="h-3 w-3" />
                   </Button>
                 </div>
               </div>

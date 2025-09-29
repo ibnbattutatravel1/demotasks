@@ -44,6 +44,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog"
 import { useAuth } from "@/contexts/auth-context"
 import { CreateProjectDialog } from "@/components/create-project-dialog"
 
@@ -63,6 +65,15 @@ export function AdminDashboard() {
   const router = useRouter()
   const { toast } = useToast()
   const { user, logout } = useAuth()
+
+  // Truncate description with 158-char preview
+  const DESCRIPTION_CHAR_LIMIT = 158
+  const getTruncatedDescription = (text: string, limit: number = DESCRIPTION_CHAR_LIMIT) => {
+    if (!text) return { display: "", truncated: false }
+    const trimmed = String(text).trim()
+    if (trimmed.length <= limit) return { display: trimmed, truncated: false }
+    return { display: trimmed.slice(0, limit) + "…", truncated: true }
+  }
 
   // Load notifications for admin inbox badge
   useEffect(() => {
@@ -777,7 +788,33 @@ export function AdminDashboard() {
                                   <Badge className="bg-orange-100 text-orange-800">Pending Approval</Badge>
                                 )}
                               </div>
-                              <p className="text-xs text-slate-600 mb-2">{task.description}</p>
+                              {/* Task description with 158-char preview and Read more dialog */}
+                              <div className="text-xs text-slate-600 mb-2">
+                                {(() => {
+                                  const { display, truncated } = getTruncatedDescription(task.description || "")
+                                  return (
+                                    <>
+                                      <p className="whitespace-pre-wrap break-words">{display}</p>
+                                      {truncated && (
+                                        <Dialog>
+                                          <DialogTrigger asChild>
+                                            <Button variant="link" size="sm" className="h-6 px-0 text-indigo-600">Read more</Button>
+                                          </DialogTrigger>
+                                          <DialogContent className="sm:max-w-lg">
+                                            <DialogHeader>
+                                              <DialogTitle className="text-base">{task.title}</DialogTitle>
+                                              <DialogDescription>Full task description</DialogDescription>
+                                            </DialogHeader>
+                                            <div className="max-h-[70vh] overflow-y-auto whitespace-pre-wrap break-words text-slate-700">
+                                              {task.description || "No description"}
+                                            </div>
+                                          </DialogContent>
+                                        </Dialog>
+                                      )}
+                                    </>
+                                  )
+                                })()}
+                              </div>
                               <div className="flex items-center gap-4 text-xs text-slate-500">
                                 <span>Due: {task.dueDate}</span>
                                 <span>Progress: {task.progress}%</span>
@@ -789,10 +826,22 @@ export function AdminDashboard() {
                             <div className="flex items-center gap-2">
                               <div className="flex -space-x-2 mr-2">
                                 {task.assignees.map((assignee, index) => (
-                                  <Avatar key={index} className="h-6 w-6 border-2 border-white">
-                                    <AvatarImage src={assignee.avatar || "/placeholder-user.jpg"} />
-                                    <AvatarFallback className="text-xs">{assignee.initials}</AvatarFallback>
-                                  </Avatar>
+                                  <Tooltip key={index}>
+                                    <TooltipTrigger asChild>
+                                      <Avatar className="h-6 w-6 border-2 border-white cursor-default">
+                                        <AvatarImage src={assignee.avatar || "/placeholder-user.jpg"} />
+                                        <AvatarFallback className="text-xs">
+                                          {assignee.initials || (assignee.name?.slice(0,2) || "U").toUpperCase()}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">
+                                      <div className="text-xs">
+                                        <div className="font-medium text-slate-900">{assignee.name || "User"}</div>
+                                        <div className="text-slate-500">Assignee</div>
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
                                 ))}
                               </div>
                               {task.approvalStatus === "pending" && (

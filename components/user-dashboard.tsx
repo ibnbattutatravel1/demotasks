@@ -44,6 +44,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useAuth } from "@/contexts/auth-context"
 
 // All data is fetched from APIs at runtime; removed all mock arrays
@@ -66,6 +68,15 @@ export function UserDashboard() {
   const router = useRouter()
   const { toast } = useToast()
   const { user, logout } = useAuth()
+
+  // Truncated description preview (158 chars) with dialog expansion
+  const DESCRIPTION_CHAR_LIMIT = 158
+  const getTruncatedDescription = (text: string, limit: number = DESCRIPTION_CHAR_LIMIT) => {
+    if (!text) return { display: "", truncated: false }
+    const trimmed = String(text).trim()
+    if (trimmed.length <= limit) return { display: trimmed, truncated: false }
+    return { display: trimmed.slice(0, limit) + "…", truncated: true }
+  }
 
   // Load projects from API
   useEffect(() => {
@@ -746,7 +757,33 @@ export function UserDashboard() {
                                       {task.status}
                                     </Badge>
                                   </div>
-                                  <p className="text-xs text-slate-600 mb-2">{task.description}</p>
+                                  {/* Description preview with Read more */}
+                                  <div className="text-xs text-slate-600 mb-2">
+                                    {(() => {
+                                      const { display, truncated } = getTruncatedDescription(task.description || "")
+                                      return (
+                                        <>
+                                          <p className="whitespace-pre-wrap break-words">{display}</p>
+                                          {truncated && (
+                                            <Dialog>
+                                              <DialogTrigger asChild>
+                                                <Button variant="link" size="sm" className="h-6 px-0 text-indigo-600">Read more</Button>
+                                              </DialogTrigger>
+                                              <DialogContent className="sm:max-w-lg">
+                                                <DialogHeader>
+                                                  <DialogTitle className="text-base">{task.title}</DialogTitle>
+                                                  <DialogDescription>Full task description</DialogDescription>
+                                                </DialogHeader>
+                                                <div className="max-h-[70vh] overflow-y-auto whitespace-pre-wrap break-words text-slate-700">
+                                                  {task.description || "No description"}
+                                                </div>
+                                              </DialogContent>
+                                            </Dialog>
+                                          )}
+                                        </>
+                                      )
+                                    })()}
+                                  </div>
                                   <div className="flex items-center gap-4 text-xs text-slate-500 mb-2">
                                     <span>Due: {task.dueDate}</span>
                                     <span>
@@ -785,6 +822,32 @@ export function UserDashboard() {
                                       <Progress value={task.progress} className="w-16 h-1" />
                                     </div>
                                   </div>
+                                  {/* Assignees with tooltips */}
+                                  {task.assignees && task.assignees.length > 0 && (
+                                    <div className="mt-2 flex items-center gap-2">
+                                      <span className="text-xs text-slate-500">Assigned to:</span>
+                                      <div className="flex -space-x-2">
+                                        {task.assignees.map((assignee: any, idx: number) => (
+                                          <Tooltip key={idx}>
+                                            <TooltipTrigger asChild>
+                                              <Avatar className="h-6 w-6 border-2 border-white cursor-default">
+                                                <AvatarImage src={assignee.avatar || "/placeholder-user.jpg"} />
+                                                <AvatarFallback className="text-xs">
+                                                  {assignee.initials || (assignee.name?.slice(0,2) || "U").toUpperCase()}
+                                                </AvatarFallback>
+                                              </Avatar>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top">
+                                              <div className="text-xs">
+                                                <div className="font-medium text-slate-900">{assignee.name || "User"}</div>
+                                                <div className="text-slate-500">Assignee</div>
+                                              </div>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </CardContent>
@@ -813,7 +876,33 @@ export function UserDashboard() {
                             {task.projectName}
                           </Badge>
                         </div>
-                        <p className="text-sm text-slate-600 mb-2">{task.description}</p>
+                        {/* Description preview with Read more */}
+                        <div className="text-sm text-slate-600 mb-2">
+                          {(() => {
+                            const { display, truncated } = getTruncatedDescription(task.description || "")
+                            return (
+                              <>
+                                <p className="whitespace-pre-wrap break-words">{display}</p>
+                                {truncated && (
+                                  <Dialog>
+                                    <DialogTrigger asChild>
+                                      <Button variant="link" size="sm" className="h-6 px-0 text-indigo-600">Read more</Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-lg">
+                                      <DialogHeader>
+                                        <DialogTitle className="text-base">{task.title}</DialogTitle>
+                                        <DialogDescription>Full task description</DialogDescription>
+                                      </DialogHeader>
+                                      <div className="max-h-[70vh] overflow-y-auto whitespace-pre-wrap break-words text-slate-700">
+                                        {task.description || "No description"}
+                                      </div>
+                                    </DialogContent>
+                                  </Dialog>
+                                )}
+                              </>
+                            )
+                          })()}
+                        </div>
                         <div className="flex items-center gap-4 text-xs text-slate-500">
                           <span>Created {task.createdAt}</span>
                           {task.approvedAt && <span>Approved {task.approvedAt}</span>}
