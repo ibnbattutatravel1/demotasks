@@ -86,6 +86,7 @@ export async function GET(req: NextRequest) {
     const assigneeId = searchParams.get('assigneeId')
     const createdById = searchParams.get('createdById')
     const approvalStatus = searchParams.get('approvalStatus')
+    const includeRejected = searchParams.get('includeRejected') === 'true' // For admin views
 
     let where = undefined as any
     if (projectId && assigneeId) {
@@ -115,11 +116,20 @@ export async function GET(req: NextRequest) {
       where = where ? and(where, statusCond) : statusCond
     }
 
+    // Hide rejected tasks by default (unless explicitly requested)
+    // Note: We filter out rejected tasks after fetching if not admin view
+    // This is a simpler approach than using SQL NOT condition
+
     const rows = where
       ? await db.select().from(dbSchema.tasks).where(where)
       : await db.select().from(dbSchema.tasks)
 
-    const data = await Promise.all(rows.map(composeTask))
+    // Filter out rejected tasks unless explicitly requested
+    const filteredRows = includeRejected 
+      ? rows 
+      : rows.filter((task: any) => task.approvalStatus !== 'rejected')
+
+    const data = await Promise.all(filteredRows.map(composeTask))
 
     return NextResponse.json({ success: true, data })
   } catch (error) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
 import { db, dbSchema } from '@/lib/db/client'
 import { and, eq, inArray, notInArray } from 'drizzle-orm'
+import { notifyUser } from '@/lib/notifications'
 
 async function recomputeTaskProgress(taskId: string) {
   const subtasks = await db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.taskId, taskId))
@@ -13,12 +14,31 @@ async function recomputeTaskProgress(taskId: string) {
   return pct
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const rows = await db.select().from(dbSchema.tasks).where(eq(dbSchema.tasks.id, id))
     if (!rows.length) return NextResponse.json({ success: false, error: 'Task not found' }, { status: 404 })
-    const data = await composeTask(rows[0])
+    
+    const task = rows[0]
+    
+    // Check if task is rejected - only allow admin and task creator to view rejected tasks
+    if (task.approvalStatus === 'rejected') {
+      const { searchParams } = new URL(req.url)
+      const userId = searchParams.get('userId')
+      const userRows = userId ? await db.select().from(dbSchema.users).where(eq(dbSchema.users.id, userId)) : []
+      const user = userRows[0]
+      
+      // Only admin or task creator can view rejected tasks
+      if (!user || (user.role !== 'admin' && task.createdById !== userId)) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'This task has been rejected and is no longer accessible.' 
+        }, { status: 403 })
+      }
+    }
+    
+    const data = await composeTask(task)
     return NextResponse.json({ success: true, data })
   } catch (error) {
     console.error('GET /api/tasks/[id] error', error)
@@ -123,6 +143,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ success: false, error: 'Task not found' }, { status: 404 })
     }
     const current = existing[0]
+
+    // Check if task is rejected - prevent non-admin users from editing rejected tasks
+    // (unless they're changing the approval status back to pending/approved)
+    if (current.approvalStatus === 'rejected' && body.approvalStatus !== 'pending' && body.approvalStatus !== 'approved') {
+      // Get userId from request headers or body
+      const userIdFromBody = (body as any).userId
+      if (userIdFromBody) {
+        const userRows = await db.select().from(dbSchema.users).where(eq(dbSchema.users.id, userIdFromBody))
+        const user = userRows[0]
+        
+        // Only admin or task creator can modify rejected tasks
+        if (user && user.role !== 'admin' && current.createdById !== userIdFromBody) {
+          return NextResponse.json({ 
+            success: false, 
+            error: 'This task has been rejected and cannot be modified. Contact an admin for assistance.' 
+          }, { status: 403 })
+        }
+      }
+    }
 
     const update: any = { updatedAt: new Date().toISOString() }
     for (const key of ['title','description','status','priority','startDate','dueDate','approvalStatus','approvedAt','approvedById','rejectionReason','progress'] as const) {
@@ -311,7 +350,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const existing = await db.select().from(dbSchema.tasks).where(eq(dbSchema.tasks.id, id))
@@ -320,6 +359,45 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     }
     const current = existing[0]
 
+    // Check if user is admin or task creator
+    const { searchParams } = new URL(req.url)
+    const userId = searchParams.get('userId')
+    const userRows = userId ? await db.select().from(dbSchema.users).where(eq(dbSchema.users.id, userId)) : []
+    const user = userRows[0]
+
+    // If user is not admin, notify admins about delete request
+    if (user && user.role !== 'admin') {
+      // Notify all admins about the delete request
+      const admins = await db
+        .select({ id: dbSchema.users.id })
+        .from(dbSchema.users)
+        .where(eq(dbSchema.users.role, 'admin'))
+
+      if (admins.length > 0) {
+        await Promise.all(
+          admins.map((admin: { id: string }) =>
+            notifyUser({
+              userId: admin.id,
+              type: 'task_delete_request',
+              title: `Delete request for: ${current.title}`,
+              message: `${user.name} has requested to delete the task "${current.title}".`,
+              relatedId: id,
+              relatedType: 'task',
+              topic: 'projectUpdates',
+            })
+          )
+        )
+      }
+
+      // Don't actually delete the task - just notify admins
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Delete request sent to admin for approval.',
+        pending: true 
+      })
+    }
+
+    // If admin, proceed with deletion
     // delete children and relations
     await db.delete(dbSchema.subtaskTags).where(inArray(
       dbSchema.subtaskTags.subtaskId,
