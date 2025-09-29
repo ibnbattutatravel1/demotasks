@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db, dbSchema } from '@/lib/db/client'
 import { eq, inArray } from 'drizzle-orm'
 import { notifyUser } from '@/lib/notifications'
+import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 
 // GET /api/projects/[id] - Get single project
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -39,6 +40,20 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 // PUT /api/projects/[id] - Update project
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    // Check if user is admin
+    const token = req.cookies.get(AUTH_COOKIE)?.value
+    if (!token) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const payload = await verifyAuthToken(token).catch(() => null)
+    if (!payload?.sub) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+
+    const userRows = await db.select({ id: dbSchema.users.id, role: dbSchema.users.role }).from(dbSchema.users).where(eq(dbSchema.users.id, payload.sub))
+    const user = userRows[0]
+    
+    if (!user || user.role !== 'admin') {
+      return NextResponse.json({ success: false, error: 'Only admins can edit projects' }, { status: 403 })
+    }
+    
     const projectId = params.id
     const body = await req.json()
     

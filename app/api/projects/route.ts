@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db, dbSchema } from '@/lib/db/client'
 import { eq, inArray } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
+import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 
 // Helper to ensure a user exists (since current auth uses local mock ids)
 async function ensureUsers(ids: string[]) {
@@ -95,6 +96,20 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    // Check if user is admin
+    const token = req.cookies.get(AUTH_COOKIE)?.value
+    if (!token) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const payload = await verifyAuthToken(token).catch(() => null)
+    if (!payload?.sub) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+
+    const userRows = await db.select({ id: dbSchema.users.id, role: dbSchema.users.role }).from(dbSchema.users).where(eq(dbSchema.users.id, payload.sub))
+    const user = userRows[0]
+    
+    if (!user || user.role !== 'admin') {
+      return NextResponse.json({ success: false, error: 'Only admins can create projects' }, { status: 403 })
+    }
+    
     const body = await req.json()
     const {
       name,

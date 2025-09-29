@@ -49,6 +49,11 @@ export function CreateProjectDialog({ onProjectCreated, children }: CreateProjec
 
   // Validation state
   const [errors, setErrors] = useState<Record<string, string>>({})
+  
+  // Only admins can create projects
+  if (user?.role !== 'admin') {
+    return null
+  }
 
   const resetForm = () => {
     setProjectName("")
