@@ -186,11 +186,12 @@ export default function AdminTimesheetDetailPage() {
               <div className="grid grid-cols-7 gap-3">
                 {Array.from({ length: daysInMonth }).map((_, i) => {
                   const d = `${timesheet?.month}-${String(i + 1).padStart(2, "0")}`
+                  const dayNumber = i + 1
                   const entry = entries.find((e) => e.date === d)
                   const val = entry ? Number(entry.hours) || 0 : 0
                   return (
                     <div key={d} className="border rounded-md p-3 bg-white">
-                      <div className="text-xs text-slate-500 mb-2">{d}</div>
+                      <div className="text-xs font-medium text-slate-600 mb-2">Day {dayNumber}</div>
                       <Input type="number" value={val} readOnly disabled />
                     </div>
                   )

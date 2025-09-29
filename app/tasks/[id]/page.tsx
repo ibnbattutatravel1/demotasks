@@ -795,7 +795,13 @@ export default function TaskDetailPage() {
         <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={() => router.back()}>
+              <Button variant="ghost" size="sm" onClick={() => {
+                if (window.history.length > 1) {
+                  router.back()
+                } else {
+                  router.push('/dashboard')
+                }
+              }}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back
               </Button>
