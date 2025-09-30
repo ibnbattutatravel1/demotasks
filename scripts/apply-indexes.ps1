@@ -6,8 +6,8 @@ param(
 )
 
 Write-Host ""
-Write-Host "🚀 Applying performance indexes to database: $DatabaseName" -ForegroundColor Cyan
-Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Gray
+Write-Host "==> Applying performance indexes to database: $DatabaseName" -ForegroundColor Cyan
+Write-Host "===============================================" -ForegroundColor Gray
 
 # Check if turso CLI is installed
 try {
@@ -43,8 +43,8 @@ try {
     turso db shell $DatabaseName $query
     
     Write-Host ""
-    Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Gray
-    Write-Host "🎉 Done! Your database is now optimized!" -ForegroundColor Green
+    Write-Host "===============================================" -ForegroundColor Gray
+    Write-Host "==> Done! Your database is now optimized!" -ForegroundColor Green
     Write-Host ""
     Write-Host "Expected performance gains:" -ForegroundColor Cyan
     Write-Host "  • Tasks queries: 50% faster ⚡" -ForegroundColor White
