@@ -67,6 +67,7 @@ export function TaskApprovalNotifications() {
             relatedId: n.relatedId,
             relatedType: n.relatedType,
           }))
+        // Fixed: Check abort flag before setState to prevent race conditions
         if (!abort) setNotifications(mapped)
       } catch {}
     }

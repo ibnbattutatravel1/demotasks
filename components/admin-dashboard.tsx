@@ -120,24 +120,35 @@ export function AdminDashboard() {
       setLoading(true)
       setError(null)
       try {
-        const projRes = await fetch("/api/projects")
+        // OPTIMIZED: Fetch both in parallel (was N+1 problem)
+        const [projRes, allTasksRes] = await Promise.all([
+          fetch("/api/projects"),
+          fetch("/api/tasks") // Fetch ALL tasks once instead of per-project
+        ])
+        
         const projJson = await projRes.json()
+        const allTasksJson = await allTasksRes.json()
+        
         if (!projRes.ok || !projJson?.success) throw new Error(projJson?.error || "Failed to fetch projects")
+        if (!allTasksRes.ok || !allTasksJson?.success) throw new Error(allTasksJson?.error || "Failed to fetch tasks")
+        
         const projs: Project[] = projJson.data || []
+        const allTasks: any[] = allTasksJson.data || []
 
-        // Fetch tasks per project in parallel
-        const taskLists = await Promise.all(
-          projs.map(async (p: Project) => {
-            const tRes = await fetch(`/api/tasks?projectId=${encodeURIComponent(p.id)}`)
-            const tJson = await tRes.json()
-            const tasks = tRes.ok && tJson?.success ? (tJson.data as any[]) : []
-            return { projectId: p.id, tasks }
-          })
-        )
+        // Group tasks by project in JavaScript (fast!)
+        const tasksByProject = new Map<string, any[]>()
+        for (const task of allTasks) {
+          const projectId = task.projectId || task.project?.id
+          if (!projectId) continue
+          if (!tasksByProject.has(projectId)) {
+            tasksByProject.set(projectId, [])
+          }
+          tasksByProject.get(projectId)!.push(task)
+        }
 
         // Compose projects with tasks and counts
         const withTasks: Project[] = projs.map((p) => {
-          const tlist = taskLists.find((t) => t.projectId === p.id)?.tasks || []
+          const tlist = tasksByProject.get(p.id) || []
           const tasksCompleted = tlist.filter((t: any) => t.status === "done").length
           const totalTasks = tlist.length
           return {
@@ -149,8 +160,7 @@ export function AdminDashboard() {
         })
         if (!abort) setProjects(withTasks)
 
-        // Build team stats across all tasks
-        const allTasks = taskLists.flatMap((t) => t.tasks as any[])
+        // Build team stats across all tasks (already have them!)
         const byUser = new Map<string, TeamStat>()
         for (const t of allTasks) {
           // createdBy
