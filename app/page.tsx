@@ -1,9 +1,18 @@
 "use client"
 
 import { useAuth } from "@/contexts/auth-context"
-import { TaskDashboard } from "@/components/task-dashboard"
-import { AdminDashboard } from "@/components/admin-dashboard"
-import { UserDashboard } from "@/components/user-dashboard"
+import dynamic from "next/dynamic"
+
+// Lazy load heavy dashboards for better performance
+const TaskDashboard = dynamic(() => import("@/components/task-dashboard").then(mod => ({ default: mod.TaskDashboard })), {
+  loading: () => <div className="h-screen bg-slate-50 flex items-center justify-center"><div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
+})
+const AdminDashboard = dynamic(() => import("@/components/admin-dashboard").then(mod => ({ default: mod.AdminDashboard })), {
+  loading: () => <div className="h-screen bg-slate-50 flex items-center justify-center"><div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
+})
+const UserDashboard = dynamic(() => import("@/components/user-dashboard").then(mod => ({ default: mod.UserDashboard })), {
+  loading: () => <div className="h-screen bg-slate-50 flex items-center justify-center"><div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
+})
 
 export default function Home() {
   const { user, isLoading } = useAuth()

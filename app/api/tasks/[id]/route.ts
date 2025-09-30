@@ -48,36 +48,39 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 async function recomputeProjectProgress(projectId: string) {
   const rows = await db.select({ progress: dbSchema.tasks.progress }).from(dbSchema.tasks).where(eq(dbSchema.tasks.projectId, projectId))
-  if (!rows.length) return null
   const avg = Math.round(rows.reduce((s: number, r: { progress?: number | null }) => s + (r.progress || 0), 0) / rows.length)
   await db.update(dbSchema.projects).set({ progress: avg, updatedAt: new Date().toISOString() }).where(eq(dbSchema.projects.id, projectId))
   return avg
 }
 
+// Optimized version - fetches subtasks first, then their comments
 async function composeTask(task: any) {
-  const [assignees, tags, subtasks, creatorRows] = await Promise.all([
+  // First, get subtasks to know their IDs
+  const subtasksData = await db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.taskId, task.id))
+  const subtaskIds = subtasksData.map((st: any) => st.id)
+  
+  // Now fetch everything else in parallel
+  const [assignees, tags, creatorRows, taskComments, subtaskComments] = await Promise.all([
     db.select().from(dbSchema.taskAssignees).where(eq(dbSchema.taskAssignees.taskId, task.id)).leftJoin(dbSchema.users, eq(dbSchema.taskAssignees.userId, dbSchema.users.id)),
     db.select().from(dbSchema.taskTags).where(eq(dbSchema.taskTags.taskId, task.id)),
-    db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.taskId, task.id)),
     db.select().from(dbSchema.users).where(eq(dbSchema.users.id, task.createdById)),
+    db.select().from(dbSchema.comments).where(and(eq(dbSchema.comments.entityType, 'task'), eq(dbSchema.comments.entityId, task.id))),
+    subtaskIds.length > 0 
+      ? db.select().from(dbSchema.comments).where(and(eq(dbSchema.comments.entityType, 'subtask'), inArray(dbSchema.comments.entityId, subtaskIds)))
+      : Promise.resolve([])
   ])
-  // Load comments for all subtasks in one query
-  const subtaskIds = subtasks.map((st: any) => st.id)
-  const subComments = subtaskIds.length
-    ? await db
-        .select()
-        .from(dbSchema.comments)
-        .where(and(eq(dbSchema.comments.entityType, 'subtask'), inArray(dbSchema.comments.entityId, subtaskIds)))
-    : []
+  
+  // Build comment lookup map for subtasks
   const commentsByEntity: Record<string, any[]> = {}
-  for (const c of subComments) {
+  for (const c of subtaskComments) {
     const key = c.entityId
     if (!commentsByEntity[key]) commentsByEntity[key] = []
     commentsByEntity[key].push(c)
   }
+  
   const assigneeUsers = assignees.map((row: any) => row.users).filter(Boolean)
   const tagList = tags.map((t: any) => t.tag)
-  const subtaskList = subtasks.map((st: any) => ({
+  const subtaskList = subtasksData.map((st: any) => ({
     id: st.id,
     taskId: st.taskId,
     title: st.title,
@@ -100,6 +103,7 @@ async function composeTask(task: any) {
       updatedAt: c.updatedAt,
     })),
   }))
+  
   const subtasksCompleted = subtaskList.filter((s: any) => s.completed).length
   const totalSubtasks = subtaskList.length
   const createdBy = (creatorRows && creatorRows[0])

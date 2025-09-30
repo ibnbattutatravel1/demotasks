@@ -24,59 +24,120 @@ async function ensureUsers(ids: string[]) {
   }
 }
 
-async function composeTask(task: any) {
-  const [assignees, tags, subtasks, commentRows, creatorRows] = await Promise.all([
-    db.select().from(dbSchema.taskAssignees).where(eq(dbSchema.taskAssignees.taskId, task.id))
+// Optimized batch loading to avoid N+1 queries
+async function composeTasksBatch(tasks: any[]) {
+  if (tasks.length === 0) return []
+  
+  const taskIds = tasks.map(t => t.id)
+  const creatorIds = [...new Set(tasks.map(t => t.createdById))]
+  
+  // Fetch all related data in parallel with single queries per type
+  const [assigneesData, tagsData, subtasksData, commentsData, creatorsData] = await Promise.all([
+    db.select()
+      .from(dbSchema.taskAssignees)
+      .where(inArray(dbSchema.taskAssignees.taskId, taskIds))
       .leftJoin(dbSchema.users, eq(dbSchema.taskAssignees.userId, dbSchema.users.id)),
-    db.select().from(dbSchema.taskTags).where(eq(dbSchema.taskTags.taskId, task.id)),
-    db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.taskId, task.id)),
-    db.select().from(dbSchema.comments).where(and(eq(dbSchema.comments.entityType, 'task'), eq(dbSchema.comments.entityId, task.id))),
-    db.select().from(dbSchema.users).where(eq(dbSchema.users.id, task.createdById)),
+    db.select()
+      .from(dbSchema.taskTags)
+      .where(inArray(dbSchema.taskTags.taskId, taskIds)),
+    db.select()
+      .from(dbSchema.subtasks)
+      .where(inArray(dbSchema.subtasks.taskId, taskIds)),
+    db.select()
+      .from(dbSchema.comments)
+      .where(and(
+        eq(dbSchema.comments.entityType, 'task'),
+        inArray(dbSchema.comments.entityId, taskIds)
+      )),
+    db.select()
+      .from(dbSchema.users)
+      .where(inArray(dbSchema.users.id, creatorIds)),
   ])
-
-  const assigneeUsers = assignees.map((row: any) => row.users).filter(Boolean)
-  const tagList = tags.map((t: any) => t.tag)
-  const subtaskList = subtasks.map((st: any) => ({
-    id: st.id,
-    taskId: st.taskId,
-    title: st.title,
-    description: st.description,
-    completed: !!st.completed,
-    startDate: st.startDate,
-    dueDate: st.dueDate,
-    createdAt: st.createdAt,
-    updatedAt: st.updatedAt,
-    assigneeId: st.assigneeId,
-    priority: st.priority,
-  }))
-
-  const subtasksCompleted = subtaskList.filter((s: any) => s.completed).length
-  const totalSubtasks = subtaskList.length
-  const commentsCount = commentRows.length
-  const createdBy = (creatorRows && creatorRows[0])
-    ? {
-        id: creatorRows[0].id,
-        name: creatorRows[0].name,
-        avatar: creatorRows[0].avatar,
-        initials: creatorRows[0].initials,
-      }
-    : {
-        id: task.createdById,
-        name: `User ${task.createdById}`,
-        avatar: null as unknown as string | null,
-        initials: (task.createdById?.[0] || 'U').toUpperCase(),
-      }
-
-  return {
-    ...task,
-    assignees: assigneeUsers,
-    tags: tagList,
-    subtasks: subtaskList,
-    subtasksCompleted,
-    totalSubtasks,
-    commentsCount,
-    createdBy,
-  }
+  
+  // Create lookup maps for O(1) access
+  const assigneesMap = new Map<string, any[]>()
+  assigneesData.forEach((row: any) => {
+    if (!assigneesMap.has(row.task_assignees.taskId)) {
+      assigneesMap.set(row.task_assignees.taskId, [])
+    }
+    if (row.users) {
+      assigneesMap.get(row.task_assignees.taskId)!.push(row.users)
+    }
+  })
+  
+  const tagsMap = new Map<string, string[]>()
+  tagsData.forEach((row: any) => {
+    if (!tagsMap.has(row.taskId)) {
+      tagsMap.set(row.taskId, [])
+    }
+    tagsMap.get(row.taskId)!.push(row.tag)
+  })
+  
+  const subtasksMap = new Map<string, any[]>()
+  subtasksData.forEach((st: any) => {
+    if (!subtasksMap.has(st.taskId)) {
+      subtasksMap.set(st.taskId, [])
+    }
+    subtasksMap.get(st.taskId)!.push({
+      id: st.id,
+      taskId: st.taskId,
+      title: st.title,
+      description: st.description,
+      completed: !!st.completed,
+      startDate: st.startDate,
+      dueDate: st.dueDate,
+      createdAt: st.createdAt,
+      updatedAt: st.updatedAt,
+      assigneeId: st.assigneeId,
+      priority: st.priority,
+    })
+  })
+  
+  const commentsCountMap = new Map<string, number>()
+  commentsData.forEach((comment: any) => {
+    const count = commentsCountMap.get(comment.entityId) || 0
+    commentsCountMap.set(comment.entityId, count + 1)
+  })
+  
+  const creatorsMap = new Map<string, any>()
+  creatorsData.forEach((user: any) => {
+    creatorsMap.set(user.id, user)
+  })
+  
+  // Compose all tasks using the maps
+  return tasks.map(task => {
+    const assignees = assigneesMap.get(task.id) || []
+    const tags = tagsMap.get(task.id) || []
+    const subtasks = subtasksMap.get(task.id) || []
+    const commentsCount = commentsCountMap.get(task.id) || 0
+    const subtasksCompleted = subtasks.filter((s: any) => s.completed).length
+    
+    const creator = creatorsMap.get(task.createdById)
+    const createdBy = creator
+      ? {
+          id: creator.id,
+          name: creator.name,
+          avatar: creator.avatar,
+          initials: creator.initials,
+        }
+      : {
+          id: task.createdById,
+          name: `User ${task.createdById}`,
+          avatar: null as unknown as string | null,
+          initials: (task.createdById?.[0] || 'U').toUpperCase(),
+        }
+    
+    return {
+      ...task,
+      assignees,
+      tags,
+      subtasks,
+      subtasksCompleted,
+      totalSubtasks: subtasks.length,
+      commentsCount,
+      createdBy,
+    }
+  })
 }
 
 export async function GET(req: NextRequest) {
@@ -129,7 +190,8 @@ export async function GET(req: NextRequest) {
       ? rows 
       : rows.filter((task: any) => task.approvalStatus !== 'rejected')
 
-    const data = await Promise.all(filteredRows.map(composeTask))
+    // Use optimized batch loading instead of N+1 queries
+    const data = await composeTasksBatch(filteredRows)
 
     return NextResponse.json({ success: true, data })
   } catch (error) {
@@ -238,7 +300,7 @@ export async function POST(req: NextRequest) {
 
     const created = await db.select().from(dbSchema.tasks).where(eq(dbSchema.tasks.id, id))
     const task = created[0]
-    const data = await composeTask(task)
+    const data = (await composeTasksBatch([task]))[0]
 
     // Create a notification for the creator based on approval status
     try {

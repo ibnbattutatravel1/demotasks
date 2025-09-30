@@ -13,12 +13,18 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
     }
 
-    // Load owner, team, tags
-    const owner = (await db.select().from(dbSchema.users).where(eq(dbSchema.users.id, project.ownerId)))[0]
-    const teamRows = await db.select().from(dbSchema.projectTeam).where(eq(dbSchema.projectTeam.projectId, projectId))
+    // Optimized: Load all related data in parallel
+    const [ownerRows, teamRows, tagRows] = await Promise.all([
+      db.select().from(dbSchema.users).where(eq(dbSchema.users.id, project.ownerId)),
+      db.select().from(dbSchema.projectTeam).where(eq(dbSchema.projectTeam.projectId, projectId)),
+      db.select().from(dbSchema.projectTags).where(eq(dbSchema.projectTags.projectId, projectId))
+    ])
+    
+    const owner = ownerRows[0]
     const teamUserIds = teamRows.map(t => t.userId)
-    const teamUsers = teamUserIds.length ? await db.select().from(dbSchema.users).where(inArray(dbSchema.users.id, teamUserIds)) : []
-    const tagRows = await db.select().from(dbSchema.projectTags).where(eq(dbSchema.projectTags.projectId, projectId))
+    const teamUsers = teamUserIds.length > 0 
+      ? await db.select().from(dbSchema.users).where(inArray(dbSchema.users.id, teamUserIds)) 
+      : []
 
     const response = {
       ...project,

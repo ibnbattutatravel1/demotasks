@@ -27,26 +27,24 @@ async function ensureUsers(ids: string[]) {
 export async function GET() {
   try {
     const rows = await db.select().from(dbSchema.projects)
+    if (rows.length === 0) {
+      return NextResponse.json({ success: true, data: [] }, { status: 200 })
+    }
 
-    // Load owner, team, and tags for each project
+    // Optimized: Load all related data in parallel with single queries
     const projectIds = rows.map((p) => p.id)
+    const ownerIds = [...new Set(rows.map((r) => r.ownerId))]
 
-    const owners = await db
-      .select()
-      .from(dbSchema.users)
-      .where(inArray(dbSchema.users.id, rows.map((r) => r.ownerId)))
+    const [owners, teamRows, tagRows] = await Promise.all([
+      db.select().from(dbSchema.users).where(inArray(dbSchema.users.id, ownerIds)),
+      db.select().from(dbSchema.projectTeam).where(inArray(dbSchema.projectTeam.projectId, projectIds)),
+      db.select().from(dbSchema.projectTags).where(inArray(dbSchema.projectTags.projectId, projectIds))
+    ])
 
-    const teamRows = projectIds.length
-      ? await db.select().from(dbSchema.projectTeam).where(inArray(dbSchema.projectTeam.projectId, projectIds))
-      : []
-
+    // Get unique team user IDs and fetch them
     const teamUserIds = [...new Set(teamRows.map((t) => t.userId))]
-    const teamUsers = teamUserIds.length
+    const teamUsers = teamUserIds.length > 0
       ? await db.select().from(dbSchema.users).where(inArray(dbSchema.users.id, teamUserIds))
-      : []
-
-    const tagRows = projectIds.length
-      ? await db.select().from(dbSchema.projectTags).where(inArray(dbSchema.projectTags.projectId, projectIds))
       : []
 
     const data = rows.map((p) => {

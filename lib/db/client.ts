@@ -21,8 +21,11 @@ function makeDb() {
     const client = createClient({
       url: process.env.LIBSQL_URL!,
       authToken: process.env.LIBSQL_AUTH_TOKEN,
+      // Performance optimizations
+      intMode: 'number',
+      concurrency: 20, // Allow more concurrent requests
     })
-    return drizzleLibsql(client, { schema })
+    return drizzleLibsql(client, { schema, logger: false }) // Disable logging in production
   }
   const DB_FILE = process.env.SQLITE_PATH ?? path.join(process.cwd(), 'sqlite', 'data.db')
   const dbDir = path.dirname(DB_FILE)

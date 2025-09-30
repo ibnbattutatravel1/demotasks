@@ -6,20 +6,36 @@ import { db, dbSchema } from '@/lib/db/client'
 import { notifyUser } from '@/lib/notifications'
 import { and, eq } from 'drizzle-orm'
 
-// GET /api/comments?entityType=task|subtask&entityId=...
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const entityType = searchParams.get('entityType') as 'task' | 'subtask' | null
     const entityId = searchParams.get('entityId')
+
     if (!entityType || !entityId) {
-      return NextResponse.json({ success: false, error: 'Missing entityType or entityId' }, { status: 400 })
+      return NextResponse.json({ success: false, error: 'entityType and entityId are required' }, { status: 400 })
     }
 
+    // Optimized: Select only needed columns
     const rows = await db
-      .select()
+      .select({
+        id: dbSchema.comments.id,
+        entityType: dbSchema.comments.entityType,
+        entityId: dbSchema.comments.entityId,
+        userId: dbSchema.comments.userId,
+        userName: dbSchema.comments.userName,
+        avatar: dbSchema.comments.avatar,
+        content: dbSchema.comments.content,
+        createdAt: dbSchema.comments.createdAt,
+        updatedAt: dbSchema.comments.updatedAt,
+      })
       .from(dbSchema.comments)
-      .where(and(eq(dbSchema.comments.entityType, entityType), eq(dbSchema.comments.entityId, entityId)))
+      .where(
+        and(
+          eq(dbSchema.comments.entityType, entityType),
+          eq(dbSchema.comments.entityId, entityId)
+        )
+      )
 
     // Sort by createdAt ascending for conversation feel
     rows.sort((a: { createdAt?: string }, b: { createdAt?: string }) => (a.createdAt || '').localeCompare(b.createdAt || ''))
@@ -27,7 +43,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, data: rows })
   } catch (error) {
     console.error('GET /api/comments error', error)
-    return NextResponse.json({ success: false, error: 'Failed to fetch comments' }, { status: 500 })
   }
 }
 
