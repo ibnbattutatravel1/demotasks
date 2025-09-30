@@ -20,15 +20,12 @@ export function middleware(request: NextRequest) {
     response.headers.set('Cache-Control', 'public, max-age=31536000, immutable')
   }
 
-  // Cache API responses briefly (30 seconds)
+  // IMPORTANT: Disable caching for API responses
+  // Real-time data is critical for tasks, notifications, etc.
   if (request.nextUrl.pathname.startsWith('/api/')) {
-    // Don't cache auth or mutation endpoints
-    if (
-      !request.nextUrl.pathname.includes('/auth') &&
-      request.method === 'GET'
-    ) {
-      response.headers.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60')
-    }
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    response.headers.set('Pragma', 'no-cache')
+    response.headers.set('Expires', '0')
   }
 
   return response
