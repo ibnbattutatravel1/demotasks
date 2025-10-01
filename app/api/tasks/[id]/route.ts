@@ -88,10 +88,10 @@ async function composeTask(task: any) {
     description: st.description,
     status: st.status,
     completed: !!st.completed,
-    startDate: st.startDate,
-    dueDate: st.dueDate,
-    createdAt: st.createdAt,
-    updatedAt: st.updatedAt,
+    startDate: toISOStringOrUndefined(st.startDate),
+    dueDate: toISOStringOrUndefined(st.dueDate),
+    createdAt: toISOString(st.createdAt),
+    updatedAt: toISOStringOrUndefined(st.updatedAt),
     assigneeId: st.assigneeId,
     priority: st.priority,
     comments: (commentsByEntity[st.id] || []).map((c: any) => ({
@@ -100,8 +100,8 @@ async function composeTask(task: any) {
       user: c.userName,
       avatar: c.avatar || undefined,
       content: c.content,
-      createdAt: c.createdAt,
-      updatedAt: c.updatedAt,
+      createdAt: toISOString(c.createdAt),
+      updatedAt: toISOStringOrUndefined(c.updatedAt),
     })),
   }))
   
@@ -121,7 +121,22 @@ async function composeTask(task: any) {
         initials: (task.createdById?.[0] || 'U').toUpperCase(),
       }
 
-  return { ...task, assignees: assigneeUsers, tags: tagList, subtasks: subtaskList, subtasksCompleted, totalSubtasks, createdBy }
+  // تحويل تواريخ الـ task الرئيسي
+  return { 
+    ...task, 
+    startDate: toISOStringOrUndefined(task.startDate),
+    dueDate: toISOStringOrUndefined(task.dueDate),
+    createdAt: toISOString(task.createdAt),
+    updatedAt: toISOStringOrUndefined(task.updatedAt),
+    completedAt: toISOStringOrUndefined(task.completedAt),
+    approvedAt: toISOStringOrUndefined(task.approvedAt),
+    assignees: assigneeUsers, 
+    tags: tagList, 
+    subtasks: subtaskList, 
+    subtasksCompleted, 
+    totalSubtasks, 
+    createdBy 
+  }
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -169,8 +184,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const update: any = { updatedAt: new Date() }
-    for (const key of ['title','description','status','priority','startDate','dueDate','approvalStatus','approvedAt','approvedById','rejectionReason','progress'] as const) {
+    for (const key of ['title','description','status','priority','approvalStatus','approvedById','rejectionReason','progress'] as const) {
       if (key in body && body[key] !== undefined) (update as any)[key] = body[key as keyof typeof body]
+    }
+    
+    // تحويل التواريخ من strings إلى Date objects
+    if ('startDate' in body && body.startDate !== undefined) {
+      update.startDate = body.startDate ? new Date(body.startDate) : null
+    }
+    if ('dueDate' in body && body.dueDate !== undefined) {
+      update.dueDate = body.dueDate ? new Date(body.dueDate) : null
+    }
+    if ('approvedAt' in body && body.approvedAt !== undefined) {
+      update.approvedAt = body.approvedAt ? new Date(body.approvedAt) : null
     }
 
     // Handle status transition side-effects for reports and progress
@@ -210,36 +236,36 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       await db.delete(dbSchema.taskAssignees).where(eq(dbSchema.taskAssignees.taskId, id))
       if (body.assigneeIds.length) {
         try {
-          // Ensure all users exist
-          await Promise.all(
-            body.assigneeIds.map((userId) =>
-              db
-                .insert(dbSchema.users)
-                .values({
-                  id: userId,
-                  name: `User ${userId}`,
-                  email: `${userId}@example.com`,
-                  initials: (userId[0] || 'U').toUpperCase(),
-                  role: 'user',
-                })
-                .onConflictDoNothing()
-            )
-          )
+          // التحقق من أن جميع المستخدمين موجودين
+          const existingUsers = await db
+            .select({ id: dbSchema.users.id })
+            .from(dbSchema.users)
+            .where(inArray(dbSchema.users.id, body.assigneeIds))
           
-          // Insert new assignees (schema has composite PK: taskId + userId)
-          await db.insert(dbSchema.taskAssignees).values(
-            body.assigneeIds.map((userId) => ({
-              taskId: id,
-              userId,
-            }))
-          )
+          const existingUserIds = new Set(existingUsers.map((u: any) => u.id))
+          const validAssigneeIds = body.assigneeIds.filter(id => existingUserIds.has(id))
+          
+          if (validAssigneeIds.length === 0) {
+            console.warn('No valid users found for assignment')
+            // لا نرمي خطأ - فقط نتخطى الإضافة
+          } else {
+            // Insert only valid assignees
+            await db.insert(dbSchema.taskAssignees).values(
+              validAssigneeIds.map((userId) => ({
+                taskId: id,
+                userId,
+              }))
+            )
+          }
+          
+          // Update prevSet to only include valid users for notifications
+          const validNewAssignees = validAssigneeIds.filter(uid => !prevSet.has(uid))
 
           // Notify new assignees
           try {
-            const newAssignees = body.assigneeIds.filter(uid => !prevSet.has(uid))
-            if (newAssignees.length) {
+            if (validNewAssignees.length) {
               const title = current.title
-              await Promise.all(newAssignees.map(uid =>
+              await Promise.all(validNewAssignees.map(uid =>
                 db.insert(dbSchema.notifications).values({
                   id: randomUUID(),
                   type: 'task_assigned',

@@ -5,24 +5,19 @@ import { notifyUser } from '@/lib/notifications'
 import { and, eq, inArray } from 'drizzle-orm'
 import { toISOString, toISOStringOrUndefined } from '@/lib/date-utils'
 
-// Ensure user records exist for provided IDs
-async function ensureUsers(ids: string[]) {
-  if (!ids.length) return
-  const existing = await db.select().from(dbSchema.users).where(inArray(dbSchema.users.id, ids))
+// Validate that user records exist for provided IDs
+async function validateUsers(ids: string[]): Promise<string[]> {
+  if (!ids.length) return []
+  const existing = await db.select({ id: dbSchema.users.id }).from(dbSchema.users).where(inArray(dbSchema.users.id, ids))
   const existingIds = new Set(existing.map((u: any) => u.id))
-  const toInsert = ids
-    .filter(id => !existingIds.has(id))
-    .map((id) => ({
-      id,
-      name: `User ${id.slice(0, 4)}`,
-      email: `${id.slice(0, 4)}@example.com`,
-      initials: id.slice(0, 2).toUpperCase(),
-      role: 'user' as const,
-      avatar: null as unknown as string | null,
-    }))
-  if (toInsert.length) {
-    await db.insert(dbSchema.users).values(toInsert)
+  const validIds = ids.filter(id => existingIds.has(id))
+  
+  const invalidIds = ids.filter(id => !existingIds.has(id))
+  if (invalidIds.length > 0) {
+    console.warn(`Warning: Invalid user IDs ignored: ${invalidIds.join(', ')}`)
   }
+  
+  return validIds
 }
 
 // Optimized batch loading to avoid N+1 queries
@@ -252,7 +247,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 })
     }
 
-    await ensureUsers([createdById, ...assigneeIds])
+    // التحقق من صحة المستخدمين
+    const validAssigneeIds = await validateUsers(assigneeIds)
+    const allUserIds = await validateUsers([createdById, ...assigneeIds])
+    
+    if (!allUserIds.includes(createdById)) {
+      return NextResponse.json({ success: false, error: 'Invalid creator user ID' }, { status: 400 })
+    }
 
     const id = (globalThis.crypto?.randomUUID?.() ?? randomUUID()) as string
     const now = new Date()
@@ -277,9 +278,9 @@ export async function POST(req: NextRequest) {
       progress,
     })
 
-    if (assigneeIds.length) {
+    if (validAssigneeIds.length) {
       await db.insert(dbSchema.taskAssignees).values(
-        assigneeIds.map((userId: string) => ({ taskId: id, userId }))
+        validAssigneeIds.map((userId: string) => ({ taskId: id, userId }))
       )
     }
     if (tags.length) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, dbSchema } from '@/lib/db/client'
 import { eq } from 'drizzle-orm'
-import { toISOString } from '@/lib/date-utils'
+import { toISOString, toISOStringOrUndefined } from '@/lib/date-utils'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -14,7 +14,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await db.update(dbSchema.comments).set({ content: body.content.trim(), updatedAt: now }).where(eq(dbSchema.comments.id, id))
     const fresh = (await db.select().from(dbSchema.comments).where(eq(dbSchema.comments.id, id)))[0]
     if (!fresh) return NextResponse.json({ success: false, error: 'Comment not found' }, { status: 404 })
-    return NextResponse.json({ success: true, data: fresh })
+    return NextResponse.json({ 
+      success: true, 
+      data: {
+        ...fresh,
+        createdAt: toISOString(fresh.createdAt),
+        updatedAt: toISOStringOrUndefined(fresh.updatedAt),
+      }
+    })
   } catch (error) {
     console.error('PATCH /api/comments/[id] error', error)
     return NextResponse.json({ success: false, error: 'Failed to update comment' }, { status: 500 })
