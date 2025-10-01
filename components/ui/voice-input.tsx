@@ -1,6 +1,6 @@
 "use client"
 
-import { Mic, MicOff, Loader2 } from "lucide-react"
+import { Mic, MicOff } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { Button } from "./button"
 import { useToast } from "./use-toast"
@@ -8,13 +8,31 @@ import { useToast } from "./use-toast"
 interface VoiceInputProps {
   onTranscript: (text: string) => void
   className?: string
+  lang?: string // BCP-47 speech recognition locale e.g. "en-US", "ar-SA"
 }
 
-export function VoiceInput({ onTranscript, className }: VoiceInputProps) {
+export function VoiceInput({ onTranscript, className, lang }: VoiceInputProps) {
   const [isListening, setIsListening] = useState(false)
   const [isSupported, setIsSupported] = useState(false)
   const recognitionRef = useRef<any>(null)
   const { toast } = useToast()
+  const selectedLang = (lang && typeof lang === 'string' ? lang : (typeof navigator !== 'undefined' ? navigator.language : 'en-US')) || 'en-US'
+
+  // Simple i18n messages based on selected language (ar vs default en)
+  const isArabic = selectedLang?.toLowerCase().startsWith('ar')
+  const t = {
+    listeningTitle: isArabic ? "🎤 جاري الاستماع..." : "🎤 Listening...",
+    listeningDesc: isArabic ? "تحدث الآن، سيتم تحويل كلامك إلى نص" : "Speak now, your speech will be transcribed",
+    startErrorTitle: isArabic ? "خطأ" : "Error",
+    startErrorDesc: isArabic ? "فشل في بدء التعرف على الصوت" : "Failed to start voice recognition",
+    errTitle: isArabic ? "خطأ في الإدخال الصوتي" : "Voice input error",
+    errNoSpeech: isArabic ? "لم يتم اكتشاف صوت. حاول مرة أخرى." : "No speech detected. Please try again.",
+    errNoMic: isArabic ? "لم يتم العثور على ميكروفون." : "No microphone was found.",
+    errDenied: isArabic ? "تم رفض إذن الميكروفون." : "Microphone permission was denied.",
+    errGeneric: (code: string) => isArabic ? `خطأ: ${code}` : `Error: ${code}`,
+    btnTitleStart: isArabic ? "ابدأ التسجيل الصوتي" : "Start voice input",
+    btnTitleStop: isArabic ? "إيقاف التسجيل" : "Stop voice input",
+  }
 
   useEffect(() => {
     // Check if browser supports Web Speech API
@@ -26,7 +44,7 @@ export function VoiceInput({ onTranscript, className }: VoiceInputProps) {
         const recognition = new SpeechRecognition()
         recognition.continuous = false
         recognition.interimResults = false
-        recognition.lang = 'ar-SA' // Arabic (Saudi Arabia) - يمكن تغييره
+        recognition.lang = selectedLang
 
         recognition.onresult = (event: any) => {
           const transcript = event.results[0][0].transcript
@@ -38,23 +56,23 @@ export function VoiceInput({ onTranscript, className }: VoiceInputProps) {
           console.error('Speech recognition error:', event.error)
           setIsListening(false)
           
-          let errorMessage = 'حدث خطأ في التعرف على الصوت'
+          let errorMessage = t.errGeneric(event.error)
           switch (event.error) {
             case 'no-speech':
-              errorMessage = 'لم يتم اكتشاف صوت. حاول مرة أخرى.'
+              errorMessage = t.errNoSpeech
               break
             case 'audio-capture':
-              errorMessage = 'لم يتم العثور على ميكروفون.'
+              errorMessage = t.errNoMic
               break
             case 'not-allowed':
-              errorMessage = 'تم رفض إذن الميكروفون.'
+              errorMessage = t.errDenied
               break
             default:
-              errorMessage = `خطأ: ${event.error}`
+              errorMessage = t.errGeneric(event.error)
           }
           
           toast({
-            title: "خطأ في الإدخال الصوتي",
+            title: t.errTitle,
             description: errorMessage,
             variant: "destructive",
           })
@@ -86,14 +104,14 @@ export function VoiceInput({ onTranscript, className }: VoiceInputProps) {
         recognitionRef.current.start()
         setIsListening(true)
         toast({
-          title: "🎤 جاري الاستماع...",
-          description: "تحدث الآن، سيتم تحويل كلامك إلى نص",
+          title: t.listeningTitle,
+          description: t.listeningDesc,
         })
       } catch (error) {
         console.error('Error starting recognition:', error)
         toast({
-          title: "خطأ",
-          description: "فشل في بدء التعرف على الصوت",
+          title: t.startErrorTitle,
+          description: t.startErrorDesc,
           variant: "destructive",
         })
       }
@@ -111,7 +129,7 @@ export function VoiceInput({ onTranscript, className }: VoiceInputProps) {
       size="sm"
       onClick={toggleListening}
       className={`${className} ${isListening ? 'text-red-500 hover:text-red-600 animate-pulse' : 'text-slate-500 hover:text-slate-700'}`}
-      title={isListening ? "إيقاف التسجيل" : "ابدأ التسجيل الصوتي"}
+      title={isListening ? t.btnTitleStop : t.btnTitleStart}
     >
       {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
     </Button>
