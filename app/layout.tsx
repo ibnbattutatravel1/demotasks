@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
 import { RoleBasedLayout } from "@/components/role-based-layout"
+import { Toaster } from "@/components/ui/toaster"
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -34,6 +35,8 @@ export default function RootLayout({
         <AuthProvider>
           <RoleBasedLayout>{children}</RoleBasedLayout>
         </AuthProvider>
+        {/* Global toaster so it works on /login and everywhere */}
+        <Toaster />
       </body>
     </html>
   )

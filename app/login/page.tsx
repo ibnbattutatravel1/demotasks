@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/contexts/auth-context"
 import { Eye, EyeOff } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -18,14 +19,7 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const { login } = useAuth()
   const router = useRouter()
-
-  // Debug: Monitor error state changes
-  useEffect(() => {
-    console.log("🔍 Error state changed:", { error, hasError: !!error })
-    if (error) {
-      console.log("✅ Error should be visible now!")
-    }
-  }, [error])
+  const { toast } = useToast()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,17 +30,15 @@ export default function LoginPage() {
       await login(email, password)
       router.push("/")
     } catch (error: any) {
-      console.error("Login failed:", error)
-      console.error("Error message:", error?.message)
       // Display the specific error message from the API
-      const errorMessage = error?.message || "Login failed. Please check your credentials and try again."
-      console.log("Setting error state to:", errorMessage)
+      const errorMessage = error?.message || "فشل تسجيل الدخول. تحقق من بياناتك وحاول مرة أخرى."
       setError(errorMessage)
-      
-      // Force UI update
-      setTimeout(() => {
-        console.log("Error state after timeout:", errorMessage)
-      }, 100)
+      // Show a toast for clearer UX
+      toast({
+        title: "فشل تسجيل الدخول",
+        description: errorMessage,
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
@@ -121,31 +113,17 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Debug: Visual error state indicator */}
-              <div className="p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-                <strong>Debug Info:</strong> Error state = "{error}" | Has error: {error ? "YES" : "NO"}
-              </div>
-              
-              {/* Primary error display */}
-              {error && error.length > 0 && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg" data-testid="error-message">
+              {error && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
                   <div className="flex items-start gap-3">
                     <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                     </svg>
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-red-800 mb-1">Login Failed</p>
+                      <p className="text-sm font-medium text-red-800 mb-1">فشل تسجيل الدخول</p>
                       <p className="text-sm text-red-600">{error}</p>
                     </div>
                   </div>
-                </div>
-              )}
-              
-              {/* Alternative simple error display */}
-              {error && (
-                <div className="p-3 bg-red-100 border-l-4 border-red-500 text-red-700">
-                  <p className="font-bold">Error:</p>
-                  <p>{error}</p>
                 </div>
               )}
 

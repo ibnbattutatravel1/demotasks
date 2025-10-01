@@ -3,7 +3,6 @@
 import type React from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { TaskApprovalNotifications } from "@/components/task-approval-notifications"
-import { Toaster } from "@/components/ui/toaster"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
 
@@ -57,8 +56,6 @@ export function RoleBasedLayout({ children }: RoleBasedLayoutProps) {
       )}
 
       {children}
-
-      <Toaster />
     </div>
   )
 }

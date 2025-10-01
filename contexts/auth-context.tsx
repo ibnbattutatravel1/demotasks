@@ -52,12 +52,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ email, password }),
       })
       const json = await res.json()
-      console.log("Login API response:", json)
-      console.log("Response status:", res.status, "OK:", res.ok)
       
       if (!res.ok || !json?.success) {
-        console.error("Login failed - throwing error:", json?.error)
-        throw new Error(json?.error || "Login failed")
+        throw new Error(json?.error || "فشل تسجيل الدخول")
       }
       setUser(json.data)
     } finally {

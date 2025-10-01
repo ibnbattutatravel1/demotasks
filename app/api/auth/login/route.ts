@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json()
     if (!email || !password) {
-      return NextResponse.json({ success: false, error: 'Email and password are required' }, { status: 400 })
+      return NextResponse.json({ success: false, error: 'البريد الإلكتروني وكلمة المرور مطلوبان' }, { status: 400 })
     }
 
     const rows = await db
@@ -27,19 +27,16 @@ export async function POST(req: NextRequest) {
 
     const user = rows[0]
     if (!user) {
-      console.log('❌ Login failed: User not found for email:', email)
-      return NextResponse.json({ success: false, error: 'No account found with this email address. Please check your email or contact support.' }, { status: 401 })
+      return NextResponse.json({ success: false, error: 'البريد الإلكتروني غير مسجل. تحقق من البريد أو تواصل مع الدعم الفني.' }, { status: 401 })
     }
 
     if (!user.passwordHash) {
-      console.log('❌ Login failed: No password hash for user:', email)
-      return NextResponse.json({ success: false, error: 'Account setup incomplete. Please contact support.' }, { status: 401 })
+      return NextResponse.json({ success: false, error: 'الحساب غير مكتمل. تواصل مع الدعم الفني.' }, { status: 401 })
     }
 
     const ok = await compare(password, user.passwordHash)
     if (!ok) {
-      console.log('❌ Login failed: Incorrect password for user:', email)
-      return NextResponse.json({ success: false, error: 'Incorrect password. Please try again or reset your password.' }, { status: 401 })
+      return NextResponse.json({ success: false, error: 'كلمة المرور غير صحيحة. حاول مرة أخرى.' }, { status: 401 })
     }
 
     const token = await signAuthToken({ sub: user.id, role: user.role })
@@ -60,6 +57,6 @@ export async function POST(req: NextRequest) {
     return res
   } catch (err) {
     console.error('Auth login error', err)
-    return NextResponse.json({ success: false, error: 'An error occurred during login. Please try again later or contact support.' }, { status: 500 })
+    return NextResponse.json({ success: false, error: 'حدث خطأ أثناء تسجيل الدخول. حاول مرة أخرى لاحقاً.' }, { status: 500 })
   }
 }
