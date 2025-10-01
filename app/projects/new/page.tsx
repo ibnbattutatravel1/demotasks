@@ -24,6 +24,8 @@ export default function NewProjectPage() {
   const [projectOwner, setProjectOwner] = useState("")
   const [tags, setTags] = useState("")
   const [color, setColor] = useState("#6366f1") // Default indigo
+  const [budget, setBudget] = useState("")
+  const [estimatedHours, setEstimatedHours] = useState("")
   const [isCreating, setIsCreating] = useState(false)
   const [users, setUsers] = useState<Array<{ id: string; name: string; email: string; avatar?: string; initials?: string }>>([])
   const [loading, setLoading] = useState(true)
@@ -78,6 +80,8 @@ export default function NewProjectPage() {
         teamIds: selectedTeamMembers,
         tags: tags.split(',').map(t => t.trim()).filter(Boolean),
         color,
+        budget: budget ? Number(budget) : undefined,
+        estimatedHours: estimatedHours ? Number(estimatedHours) : undefined,
       }
       const res = await fetch('/api/projects', {
         method: 'POST',
@@ -219,6 +223,29 @@ export default function NewProjectPage() {
               </div>
 
               {/* Project Settings */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Budget (Optional)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={budget}
+                    onChange={(e) => setBudget(e.target.value)}
+                    placeholder="e.g., 10000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Estimated Hours (Optional)</label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={estimatedHours}
+                    onChange={(e) => setEstimatedHours(e.target.value)}
+                    placeholder="e.g., 120"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Tags (Optional)</label>
                 <Input
