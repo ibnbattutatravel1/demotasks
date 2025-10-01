@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,6 +19,14 @@ export default function LoginPage() {
   const { login } = useAuth()
   const router = useRouter()
 
+  // Debug: Monitor error state changes
+  useEffect(() => {
+    console.log("🔍 Error state changed:", { error, hasError: !!error })
+    if (error) {
+      console.log("✅ Error should be visible now!")
+    }
+  }, [error])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -29,9 +37,16 @@ export default function LoginPage() {
       router.push("/")
     } catch (error: any) {
       console.error("Login failed:", error)
+      console.error("Error message:", error?.message)
       // Display the specific error message from the API
       const errorMessage = error?.message || "Login failed. Please check your credentials and try again."
+      console.log("Setting error state to:", errorMessage)
       setError(errorMessage)
+      
+      // Force UI update
+      setTimeout(() => {
+        console.log("Error state after timeout:", errorMessage)
+      }, 100)
     } finally {
       setIsLoading(false)
     }
@@ -106,8 +121,14 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {error && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              {/* Debug: Visual error state indicator */}
+              <div className="p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                <strong>Debug Info:</strong> Error state = "{error}" | Has error: {error ? "YES" : "NO"}
+              </div>
+              
+              {/* Primary error display */}
+              {error && error.length > 0 && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg" data-testid="error-message">
                   <div className="flex items-start gap-3">
                     <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -117,6 +138,14 @@ export default function LoginPage() {
                       <p className="text-sm text-red-600">{error}</p>
                     </div>
                   </div>
+                </div>
+              )}
+              
+              {/* Alternative simple error display */}
+              {error && (
+                <div className="p-3 bg-red-100 border-l-4 border-red-500 text-red-700">
+                  <p className="font-bold">Error:</p>
+                  <p>{error}</p>
                 </div>
               )}
 

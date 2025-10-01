@@ -27,15 +27,18 @@ export async function POST(req: NextRequest) {
 
     const user = rows[0]
     if (!user) {
+      console.log('❌ Login failed: User not found for email:', email)
       return NextResponse.json({ success: false, error: 'No account found with this email address. Please check your email or contact support.' }, { status: 401 })
     }
 
     if (!user.passwordHash) {
+      console.log('❌ Login failed: No password hash for user:', email)
       return NextResponse.json({ success: false, error: 'Account setup incomplete. Please contact support.' }, { status: 401 })
     }
 
     const ok = await compare(password, user.passwordHash)
     if (!ok) {
+      console.log('❌ Login failed: Incorrect password for user:', email)
       return NextResponse.json({ success: false, error: 'Incorrect password. Please try again or reset your password.' }, { status: 401 })
     }
 
