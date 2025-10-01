@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
 import { db, dbSchema } from '@/lib/db/client'
-import { and, eq, inArray, notInArray } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { notifyUser } from '@/lib/notifications'
+import { toISOString, toISOStringOrUndefined } from '@/lib/date-utils'
 
 async function recomputeTaskProgress(taskId: string) {
   const subtasks = await db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.taskId, taskId))
@@ -10,7 +11,7 @@ async function recomputeTaskProgress(taskId: string) {
   const completed = subtasks.filter((s: any) => !!s.completed).length
   const total = subtasks.length
   const pct = Math.round((completed / total) * 100)
-  await db.update(dbSchema.tasks).set({ progress: pct, updatedAt: new Date().toISOString() }).where(eq(dbSchema.tasks.id, taskId))
+  await db.update(dbSchema.tasks).set({ progress: pct, updatedAt: new Date() }).where(eq(dbSchema.tasks.id, taskId))
   return pct
 }
 
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 async function recomputeProjectProgress(projectId: string) {
   const rows = await db.select({ progress: dbSchema.tasks.progress }).from(dbSchema.tasks).where(eq(dbSchema.tasks.projectId, projectId))
   const avg = Math.round(rows.reduce((s: number, r: { progress?: number | null }) => s + (r.progress || 0), 0) / rows.length)
-  await db.update(dbSchema.projects).set({ progress: avg, updatedAt: new Date().toISOString() }).where(eq(dbSchema.projects.id, projectId))
+  await db.update(dbSchema.projects).set({ progress: avg, updatedAt: new Date() }).where(eq(dbSchema.projects.id, projectId))
   return avg
 }
 
@@ -167,13 +168,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
-    const update: any = { updatedAt: new Date().toISOString() }
+    const update: any = { updatedAt: new Date() }
     for (const key of ['title','description','status','priority','startDate','dueDate','approvalStatus','approvedAt','approvedById','rejectionReason','progress'] as const) {
       if (key in body && body[key] !== undefined) (update as any)[key] = body[key as keyof typeof body]
     }
 
     // Handle status transition side-effects for reports and progress
-    const nowIso = new Date().toISOString()
+    const nowIso = new Date()
     const statusChanging = typeof body.status !== 'undefined' && body.status !== current.status
     if (statusChanging) {
       // When marking as done: set completedAt and progress=100 if not provided
@@ -270,7 +271,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
               id: randomUUID(),
               taskId: id,
               tag,
-              createdAt: new Date().toISOString(),
+              createdAt: new Date(),
             }))
           )
         }

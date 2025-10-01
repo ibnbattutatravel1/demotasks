@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, dbSchema } from '@/lib/db/client'
-import { eq, and } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
+import { and, eq } from 'drizzle-orm'
+import { toISOString } from '@/lib/date-utils'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 
 // GET /api/attachments?entityType=task|project|subtask&entityId=...
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
     const dataUrl = `data:${file.type};base64,${base64Data}`
 
     const id = randomUUID()
-    const now = new Date().toISOString()
+    const now = new Date()
 
     const attachment = {
       id,

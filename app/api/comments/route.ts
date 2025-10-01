@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
-import { randomUUID } from 'node:crypto'
 import { db, dbSchema } from '@/lib/db/client'
-import { notifyUser } from '@/lib/notifications'
+import { randomUUID } from 'node:crypto'
 import { and, eq } from 'drizzle-orm'
+import { toISOString } from '@/lib/date-utils'
+import { notifyUser } from '@/lib/notifications'
 
 export async function GET(req: NextRequest) {
   try {
@@ -38,11 +39,23 @@ export async function GET(req: NextRequest) {
       )
 
     // Sort by createdAt ascending for conversation feel
-    rows.sort((a: { createdAt?: string }, b: { createdAt?: string }) => (a.createdAt || '').localeCompare(b.createdAt || ''))
+    rows.sort((a: any, b: any) => {
+      const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime()
+      const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime()
+      return dateA - dateB
+    })
 
-    return NextResponse.json({ success: true, data: rows })
+    // Convert dates to ISO strings for response
+    const response = rows.map((row: any) => ({
+      ...row,
+      createdAt: toISOString(row.createdAt),
+      updatedAt: row.updatedAt ? toISOString(row.updatedAt) : undefined,
+    }))
+
+    return NextResponse.json({ success: true, data: response })
   } catch (error) {
     console.error('GET /api/comments error', error)
+    return NextResponse.json({ success: false, error: 'Failed to fetch comments' }, { status: 500 })
   }
 }
 
@@ -79,7 +92,7 @@ export async function POST(req: NextRequest) {
     )[0]
     if (!userRow) return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 })
 
-    const now = new Date().toISOString()
+    const now = new Date()
     const id = randomUUID()
 
     await db.insert(dbSchema.comments).values({
@@ -176,7 +189,14 @@ export async function POST(req: NextRequest) {
     }
 
     const created = (await db.select().from(dbSchema.comments).where(eq(dbSchema.comments.id, id)))[0]
-    return NextResponse.json({ success: true, data: created }, { status: 201 })
+    return NextResponse.json({ 
+      success: true, 
+      data: {
+        ...created,
+        createdAt: toISOString(created.createdAt),
+        updatedAt: created.updatedAt ? toISOString(created.updatedAt) : undefined,
+      }
+    }, { status: 201 })
   } catch (error) {
     console.error('POST /api/comments error', error)
     return NextResponse.json({ success: false, error: 'Failed to create comment' }, { status: 500 })

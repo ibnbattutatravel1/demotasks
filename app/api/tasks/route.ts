@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { db, dbSchema } from '@/lib/db/client'
 import { notifyUser } from '@/lib/notifications'
 import { and, eq, inArray } from 'drizzle-orm'
+import { toISOString, toISOStringOrUndefined } from '@/lib/date-utils'
 
 // Ensure user records exist for provided IDs
 async function ensureUsers(ids: string[]) {
@@ -84,10 +85,10 @@ async function composeTasksBatch(tasks: any[]) {
       title: st.title,
       description: st.description,
       completed: !!st.completed,
-      startDate: st.startDate,
-      dueDate: st.dueDate,
-      createdAt: st.createdAt,
-      updatedAt: st.updatedAt,
+      startDate: toISOStringOrUndefined(st.startDate),
+      dueDate: toISOStringOrUndefined(st.dueDate),
+      createdAt: toISOString(st.createdAt),
+      updatedAt: toISOStringOrUndefined(st.updatedAt),
       assigneeId: st.assigneeId,
       priority: st.priority,
     })
@@ -129,6 +130,12 @@ async function composeTasksBatch(tasks: any[]) {
     
     return {
       ...task,
+      startDate: toISOString(task.startDate),
+      dueDate: toISOString(task.dueDate),
+      createdAt: toISOString(task.createdAt),
+      updatedAt: toISOStringOrUndefined(task.updatedAt),
+      completedAt: toISOStringOrUndefined(task.completedAt),
+      approvedAt: toISOStringOrUndefined(task.approvedAt),
       assignees,
       tags,
       subtasks,
@@ -248,7 +255,7 @@ export async function POST(req: NextRequest) {
     await ensureUsers([createdById, ...assigneeIds])
 
     const id = (globalThis.crypto?.randomUUID?.() ?? randomUUID()) as string
-    const now = new Date().toISOString()
+    const now = new Date()
 
     await db.insert(dbSchema.tasks).values({
       id,
@@ -257,16 +264,16 @@ export async function POST(req: NextRequest) {
       description,
       status,
       priority,
-      startDate: startDate ?? now.split('T')[0],
-      dueDate: dueDate ?? now.split('T')[0],
+      startDate: startDate ? new Date(startDate) : now,
+      dueDate: dueDate ? new Date(dueDate) : now,
       createdAt: now,
       updatedAt: now,
-      completedAt: null as unknown as string | null,
+      completedAt: null,
       createdById,
       approvalStatus,
-      approvedAt: null as unknown as string | null,
-      approvedById: null as unknown as string | null,
-      rejectionReason: null as unknown as string | null,
+      approvedAt: null,
+      approvedById: null,
+      rejectionReason: null,
       progress,
     })
 
@@ -288,12 +295,12 @@ export async function POST(req: NextRequest) {
         title: st.title,
         description: st.description ?? '',
         completed: false,
-        startDate: st.startDate ?? null as unknown as string | null,
-        dueDate: st.dueDate ?? null as unknown as string | null,
+        startDate: st.startDate ? new Date(st.startDate) : null,
+        dueDate: st.dueDate ? new Date(st.dueDate) : null,
         createdAt: now,
         updatedAt: now,
-        assigneeId: st.assigneeId ?? null as unknown as string | null,
-        priority: st.priority ?? null as unknown as string | null,
+        assigneeId: st.assigneeId ?? null,
+        priority: st.priority ?? null,
       }))
       await db.insert(dbSchema.subtasks).values(subRows)
     }

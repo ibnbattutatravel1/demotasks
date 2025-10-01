@@ -1,0 +1,5 @@
+# تجاهل مجلد البيانات المصدرة
+exported-data/
+
+# لكن احتفظ بالمجلد نفسه
+!exported-data/.gitkeep

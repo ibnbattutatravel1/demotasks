@@ -9,12 +9,13 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // Allow cross-origin requests from network addresses
+  allowedDevOrigins: ['http://192.168.1.13:3000'],
   // Performance optimizations
   compress: true, // Enable gzip compression
   poweredByHeader: false, // Remove X-Powered-By header
-  // Allow larger file uploads (50MB)
+  // Optimize package imports
   experimental: {
-    bodySizeLimit: '50mb',
     optimizePackageImports: ['lucide-react', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
   },
   // Optimize production builds

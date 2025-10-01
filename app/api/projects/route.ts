@@ -3,6 +3,7 @@ import { db, dbSchema } from '@/lib/db/client'
 import { eq, inArray } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
+import { toISOString, toISOStringOrUndefined } from '@/lib/date-utils'
 
 // Helper to ensure a user exists (since current auth uses local mock ids)
 async function ensureUsers(ids: string[]) {
@@ -63,11 +64,11 @@ export async function GET() {
         description: p.description,
         status: p.status as any,
         priority: p.priority as any,
-        startDate: p.startDate,
-        dueDate: p.dueDate,
-        createdAt: p.createdAt,
-        updatedAt: p.updatedAt || undefined,
-        completedAt: p.completedAt || undefined,
+        startDate: toISOString(p.startDate),
+        dueDate: toISOString(p.dueDate),
+        createdAt: toISOString(p.createdAt),
+        updatedAt: toISOStringOrUndefined(p.updatedAt),
+        completedAt: toISOStringOrUndefined(p.completedAt),
         progress: p.progress,
         tasks: [],
         tasksCompleted: 0,
@@ -143,7 +144,7 @@ export async function POST(req: NextRequest) {
     await ensureUsers([ownerId, ...teamIds])
 
     const id = (globalThis.crypto?.randomUUID?.() ?? randomUUID()) as string
-    const now = new Date().toISOString()
+    const now = new Date()
 
     await db.insert(dbSchema.projects).values({
       id,
@@ -151,8 +152,8 @@ export async function POST(req: NextRequest) {
       description: description ?? '',
       status: 'planning',
       priority,
-      startDate: startDate ?? now.split('T')[0],
-      dueDate: dueDate ?? now.split('T')[0],
+      startDate: startDate ? new Date(startDate) : now,
+      dueDate: dueDate ? new Date(dueDate) : now,
       createdAt: now,
       updatedAt: now,
       progress: 0,
@@ -185,11 +186,11 @@ export async function POST(req: NextRequest) {
       description: projectRow.description,
       status: projectRow.status as any,
       priority: projectRow.priority as any,
-      startDate: projectRow.startDate,
-      dueDate: projectRow.dueDate,
-      createdAt: projectRow.createdAt,
-      updatedAt: projectRow.updatedAt || undefined,
-      completedAt: projectRow.completedAt || undefined,
+      startDate: toISOString(projectRow.startDate),
+      dueDate: toISOString(projectRow.dueDate),
+      createdAt: toISOString(projectRow.createdAt),
+      updatedAt: toISOStringOrUndefined(projectRow.updatedAt),
+      completedAt: toISOStringOrUndefined(projectRow.completedAt),
       progress: projectRow.progress,
       tasks: [],
       tasksCompleted: 0,

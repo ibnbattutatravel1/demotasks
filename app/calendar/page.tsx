@@ -172,12 +172,15 @@ export default function CalendarPage() {
     const allItems: any[] = []
 
     events.forEach((evt: CalendarEvent) => {
-      if (evt.date === dateString) {
+      // تحويل التاريخ إلى YYYY-MM-DD للمقارنة
+      const evtDate = evt.date ? evt.date.split("T")[0] : null
+      if (evtDate === dateString) {
         allItems.push({ ...evt, isSubtask: false })
       }
       if (evt.subtasks && evt.subtasks.length) {
         evt.subtasks.forEach((sub: { id: string; title: string; date: string; time?: string; completed?: boolean }) => {
-          if (sub.date === dateString) {
+          const subDate = sub.date ? sub.date.split("T")[0] : null
+          if (subDate === dateString) {
             allItems.push({
               ...sub,
               parentTitle: evt.title,

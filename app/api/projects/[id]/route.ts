@@ -5,9 +5,9 @@ import { notifyUser } from '@/lib/notifications'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 
 // GET /api/projects/[id] - Get single project
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const projectId = params.id
+    const { id: projectId } = await params
     const project = (await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, projectId)))[0]
     if (!project) {
       return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
@@ -44,8 +44,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // PUT /api/projects/[id] - Update project
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id: projectId } = await params
     // Check if user is admin
     const token = req.cookies.get(AUTH_COOKIE)?.value
     if (!token) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
@@ -60,7 +61,6 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ success: false, error: 'Only admins can edit projects' }, { status: 403 })
     }
     
-    const projectId = params.id
     const body = await req.json()
     
     // Check if project exists
@@ -69,10 +69,21 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
     }
 
-    const now = new Date().toISOString()
+    const now = new Date()
     const updateData = { ...body, updatedAt: now }
     delete updateData.teamIds
     delete updateData.tags
+    
+    // تحويل التواريخ إلى Date objects
+    if (updateData.startDate && typeof updateData.startDate === 'string') {
+      updateData.startDate = new Date(updateData.startDate)
+    }
+    if (updateData.dueDate && typeof updateData.dueDate === 'string') {
+      updateData.dueDate = new Date(updateData.dueDate)
+    }
+    if (updateData.completedAt && typeof updateData.completedAt === 'string') {
+      updateData.completedAt = new Date(updateData.completedAt)
+    }
 
     // Update project
     await db.update(dbSchema.projects).set(updateData).where(eq(dbSchema.projects.id, projectId))
@@ -130,9 +141,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 // DELETE /api/projects/[id] - Delete project
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const projectId = params.id
+    const { id: projectId } = await params
     
     // Check if project exists
     const existing = (await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, projectId)))[0]
