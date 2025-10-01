@@ -49,6 +49,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useToast } from "@/hooks/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { VoiceInput } from "@/components/ui/voice-input"
 
 // Data will be loaded from API
 
@@ -1180,18 +1181,26 @@ export default function TaskDetailPage() {
                     <AvatarFallback className="text-xs">{(user?.name || 'U').split(' ').map((n) => n[0]).join('').toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 space-y-2 relative">
-                    <Textarea
-                      placeholder="Write a comment..."
-                      value={newTaskComment}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setNewTaskComment(val)
-                        const q = detectMentionQuery(val)
-                        setTaskMentionQuery(q)
-                        setTaskMentionOpen(!!q)
-                      }}
-                      className="min-h-[60px]"
-                    />
+                    <div className="relative">
+                      <Textarea
+                        placeholder="Write a comment..."
+                        value={newTaskComment}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          setNewTaskComment(val)
+                          const q = detectMentionQuery(val)
+                          setTaskMentionQuery(q)
+                          setTaskMentionOpen(!!q)
+                        }}
+                        className="min-h-[60px] pr-12"
+                      />
+                      <div className="absolute right-2 top-2">
+                        <VoiceInput onTranscript={(text) => {
+                          const newText = newTaskComment ? `${newTaskComment} ${text}` : text
+                          setNewTaskComment(newText)
+                        }} />
+                      </div>
+                    </div>
                     {taskMentionOpen && taskMentionQuery && (
                       <div className="absolute z-10 left-0 right-0 bottom-full mb-2 bg-white border border-slate-200 rounded-md shadow-md max-h-56 overflow-auto">
                         <div className="p-2 text-xs text-slate-500">Mention someone</div>
@@ -1460,18 +1469,27 @@ export default function TaskDetailPage() {
                               <AvatarFallback className="text-xs">CU</AvatarFallback>
                             </Avatar>
                             <div className="flex-1 space-y-2 relative">
-                              <Textarea
-                                placeholder="Add a comment to this subtask..."
-                                value={subtaskComments[subtask.id] || ""}
-                                onChange={(e) => {
-                                  const val = e.target.value
-                                  setSubtaskComments((prev) => ({ ...prev, [subtask.id]: val }))
-                                  const q = detectMentionQuery(val)
-                                  setSubtaskMentionQuery((prev) => ({ ...prev, [subtask.id]: q }))
-                                  setSubtaskMentionOpen((prev) => ({ ...prev, [subtask.id]: !!q }))
-                                }}
-                                className="min-h-[60px] bg-white text-sm"
-                              />
+                              <div className="relative">
+                                <Textarea
+                                  placeholder="Add a comment to this subtask..."
+                                  value={subtaskComments[subtask.id] || ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value
+                                    setSubtaskComments((prev) => ({ ...prev, [subtask.id]: val }))
+                                    const q = detectMentionQuery(val)
+                                    setSubtaskMentionQuery((prev) => ({ ...prev, [subtask.id]: q }))
+                                    setSubtaskMentionOpen((prev) => ({ ...prev, [subtask.id]: !!q }))
+                                  }}
+                                  className="min-h-[60px] bg-white text-sm pr-12"
+                                />
+                                <div className="absolute right-2 top-2">
+                                  <VoiceInput onTranscript={(text) => {
+                                    const currentText = subtaskComments[subtask.id] || ""
+                                    const newText = currentText ? `${currentText} ${text}` : text
+                                    setSubtaskComments((prev) => ({ ...prev, [subtask.id]: newText }))
+                                  }} />
+                                </div>
+                              </div>
                               {subtaskMentionOpen[subtask.id] && subtaskMentionQuery[subtask.id] && (
                                 <div className="absolute z-10 left-0 right-0 bottom-full mb-2 bg-white border border-slate-200 rounded-md shadow-md max-h-56 overflow-auto">
                                   <div className="p-2 text-xs text-slate-500">Mention someone</div>
