@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db, dbSchema } from '@/lib/db/client'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 import { and, eq, inArray } from 'drizzle-orm'
+import { toISOStringOrUndefined } from '@/lib/date-utils'
 
 // GET /api/admin/timesheets?status=submitted|returned|approved|rejected (default: submitted)
 export async function GET(req: NextRequest) {
@@ -36,7 +37,11 @@ export async function GET(req: NextRequest) {
       .where(inArray(dbSchema.users.id, userIds as any))
     const byId = new Map(users.map(u => [u.id, u]))
 
-    const data = rows.map(r => ({ ...r, user: byId.get(r.userId) }))
+    const data = rows.map((r: any) => ({ 
+      ...r, 
+      user: byId.get(r.userId),
+      submittedAt: toISOStringOrUndefined(r.submittedAt),
+    }))
     return NextResponse.json({ success: true, data })
   } catch (error) {
     console.error('GET /api/admin/timesheets error', error)

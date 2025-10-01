@@ -17,7 +17,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (ts.userId !== payload.sub) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
     if (ts.status !== 'draft' && ts.status !== 'returned') return NextResponse.json({ success: false, error: 'Already submitted' }, { status: 400 })
 
-    await db.update(dbSchema.timesheets).set({ status: 'submitted', submittedAt: new Date().toISOString() }).where(eq(dbSchema.timesheets.id, id))
+    await db.update(dbSchema.timesheets).set({ status: 'submitted', submittedAt: new Date() }).where(eq(dbSchema.timesheets.id, id))
 
     // Notify admins
     const admins = await db.select({ id: dbSchema.users.id }).from(dbSchema.users).where(eq(dbSchema.users.role, 'admin'))

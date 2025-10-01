@@ -29,3 +29,7 @@ next-env.d.ts
 # local sqlite databases (use LibSQL on Vercel)
 sqlite/*.db
 sqlite/*.sqlite
+
+# uploaded files (don't commit user uploads)
+/public/uploads/*
+!/public/uploads/.gitkeep

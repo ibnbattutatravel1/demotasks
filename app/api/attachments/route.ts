@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { and, eq } from 'drizzle-orm'
 import { toISOString } from '@/lib/date-utils'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
+import { saveFile } from '@/lib/file-storage'
 
 // GET /api/attachments?entityType=task|project|subtask&entityId=...
 export async function GET(req: NextRequest) {
@@ -61,11 +62,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'File too large. Maximum size is 50MB.' }, { status: 400 })
     }
 
-    // For demo purposes, we'll store a placeholder URL since we don't have file storage configured
-    // In production, you would upload to cloud storage (AWS S3, Cloudinary, etc.)
-    const fileBuffer = await file.arrayBuffer()
-    const base64Data = Buffer.from(fileBuffer).toString('base64')
-    const dataUrl = `data:${file.type};base64,${base64Data}`
+    // حفظ الملف في file system والحصول على الرابط
+    const fileUrl = await saveFile(file, 'attachment')
 
     const id = randomUUID()
     const now = new Date()
@@ -74,7 +72,7 @@ export async function POST(req: NextRequest) {
       id,
       name: file.name,
       size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-      url: dataUrl, // In production, this would be the cloud storage URL
+      url: fileUrl, // ✅ رابط الملف في file system
       type: file.type,
       uploadedAt: now,
       uploadedById: user.id,

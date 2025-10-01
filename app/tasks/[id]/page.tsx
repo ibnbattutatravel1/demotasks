@@ -550,16 +550,42 @@ export default function TaskDetailPage() {
     }
   }
 
-  const handleDuplicateSubtask = (subtask: Subtask) => {
-    const duplicatedSubtask: Subtask = {
-      ...subtask,
-      id: `subtask-${Date.now()}`,
-      title: `${subtask.title} (Copy)`,
-      completed: false,
-      createdAt: new Date().toISOString(),
-      comments: [],
+  const handleDuplicateSubtask = async (subtask: Subtask) => {
+    try {
+      if (!taskId) return
+      
+      const res = await fetch('/api/subtasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: taskId,
+          title: `${subtask.title} (Copy)`,
+          description: subtask.description,
+          assigneeId: subtask.assigneeId,
+          startDate: subtask.startDate,
+          dueDate: subtask.dueDate,
+          priority: subtask.priority,
+          status: 'todo',
+        }),
+      })
+      
+      const json = await res.json()
+      if (json.success && json.data) {
+        setSubtasks([...subtasks, json.data])
+        toast({
+          title: "Subtask duplicated",
+          description: "A copy of this subtask has been created.",
+        })
+      } else {
+        throw new Error(json.error || 'Failed to duplicate subtask')
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to duplicate subtask",
+        variant: "destructive",
+      })
     }
-    setSubtasks([...subtasks, duplicatedSubtask])
   }
 
   const handleFileUpload = async (files: FileList) => {
@@ -728,11 +754,45 @@ export default function TaskDetailPage() {
     }
   }
 
-  const handleDuplicateTask = () => {
-    toast({
-      title: "Task duplicated",
-      description: "A copy of this task has been created.",
-    })
+  const handleDuplicateTask = async () => {
+    try {
+      if (!task || !user?.id) return
+      
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: task.projectId,
+          title: `${task.title} (Copy)`,
+          description: task.description,
+          assigneeIds: task.assignees?.map((a: any) => a.id) || [],
+          startDate: task.startDate,
+          dueDate: task.dueDate,
+          priority: task.priority,
+          status: 'todo',
+          tags: task.tags || [],
+          createdById: user.id,
+        }),
+      })
+      
+      const json = await res.json()
+      if (json.success && json.data) {
+        toast({
+          title: "Task duplicated",
+          description: "A copy of this task has been created.",
+        })
+        // Redirect to the new task
+        router.push(`/tasks/${json.data.id}`)
+      } else {
+        throw new Error(json.error || 'Failed to duplicate task')
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to duplicate task",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleDeleteTask = async () => {

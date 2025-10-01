@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const body = await req.json().catch(() => ({})) as { comments?: string }
 
     await db.update(dbSchema.timesheets)
-      .set({ status: 'returned', returnedAt: new Date().toISOString(), returnComments: body.comments || null })
+      .set({ status: 'returned', returnedAt: new Date(), returnComments: body.comments || null })
       .where(eq(dbSchema.timesheets.id, id))
 
     await db.insert(dbSchema.notifications).values({

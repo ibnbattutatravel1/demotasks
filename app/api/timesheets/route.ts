@@ -3,6 +3,7 @@ import { db, dbSchema } from '@/lib/db/client'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 import { and, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
+import { toISOString, toISOStringOrUndefined } from '@/lib/date-utils'
 
 // GET /api/timesheets?month=YYYY-MM -> returns current user's timesheet with entries
 export async function GET(req: NextRequest) {
@@ -20,12 +21,27 @@ export async function GET(req: NextRequest) {
     if (!timesheet) {
       // Create draft if not exists
       const id = randomUUID()
-      const now = new Date().toISOString()
+      const now = new Date()
       await db.insert(dbSchema.timesheets).values({ id, userId: payload.sub, month, status: 'draft', createdAt: now })
-      timesheet = { id, userId: payload.sub, month, status: 'draft', createdAt: now } as any
+      timesheet = { id, userId: payload.sub, month, status: 'draft', createdAt: now.toISOString() } as any
+    } else {
+      // تحويل التواريخ من DB
+      timesheet = {
+        ...timesheet,
+        createdAt: toISOString(timesheet.createdAt),
+        submittedAt: toISOStringOrUndefined(timesheet.submittedAt),
+        approvedAt: toISOStringOrUndefined(timesheet.approvedAt),
+        rejectedAt: toISOStringOrUndefined(timesheet.rejectedAt),
+      } as any
     }
 
-    const entries = await db.select().from(dbSchema.timesheetEntries).where(eq(dbSchema.timesheetEntries.timesheetId, timesheet.id))
+    const entriesRaw = await db.select().from(dbSchema.timesheetEntries).where(eq(dbSchema.timesheetEntries.timesheetId, timesheet.id))
+    // تحويل تواريخ entries
+    const entries = entriesRaw.map((e: any) => ({
+      ...e,
+      date: toISOString(e.date),
+      createdAt: toISOString(e.createdAt),
+    }))
 
     return NextResponse.json({ success: true, data: { timesheet, entries } })
   } catch (error) {
@@ -49,9 +65,17 @@ export async function POST(req: NextRequest) {
     let timesheet = tsRows[0]
     if (!timesheet) {
       const id = randomUUID()
-      const now = new Date().toISOString()
+      const now = new Date()
       await db.insert(dbSchema.timesheets).values({ id, userId: payload.sub, month, status: 'draft', createdAt: now })
-      timesheet = { id, userId: payload.sub, month, status: 'draft', createdAt: now } as any
+      timesheet = { id, userId: payload.sub, month, status: 'draft', createdAt: now.toISOString() } as any
+    } else {
+      timesheet = {
+        ...timesheet,
+        createdAt: toISOString(timesheet.createdAt),
+        submittedAt: toISOStringOrUndefined(timesheet.submittedAt),
+        approvedAt: toISOStringOrUndefined(timesheet.approvedAt),
+        rejectedAt: toISOStringOrUndefined(timesheet.rejectedAt),
+      } as any
     }
 
     return NextResponse.json({ success: true, data: { timesheet } })

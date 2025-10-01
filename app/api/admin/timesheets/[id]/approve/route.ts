@@ -22,7 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     await db.update(dbSchema.timesheets)
-      .set({ status: 'approved', approvedAt: new Date().toISOString(), approvedById: me.id })
+      .set({ status: 'approved', approvedAt: new Date(), approvedById: me.id })
       .where(eq(dbSchema.timesheets.id, id))
 
     // Notify submitter

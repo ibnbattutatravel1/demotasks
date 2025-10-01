@@ -24,7 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await db.update(dbSchema.timesheets)
       .set({ 
         status: 'rejected', 
-        rejectedAt: new Date().toISOString(),
+        rejectedAt: new Date(),
         rejectionReason: reason
       })
       .where(eq(dbSchema.timesheets.id, id))

@@ -2,21 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db, dbSchema } from '@/lib/db/client'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 import { eq } from 'drizzle-orm'
-
-async function fileToDataUrl(file: File): Promise<string> {
-  const buf = await file.arrayBuffer()
-  const base64 = Buffer.from(buf).toString('base64')
-  const mime = file.type || 'image/jpeg'
-  return `data:${mime};base64,${base64}`
-}
-
-async function fetchImageToDataUrl(url: string): Promise<string> {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error('Failed to fetch image URL')
-  const contentType = res.headers.get('content-type') || 'image/jpeg'
-  const buf = Buffer.from(await res.arrayBuffer())
-  return `data:${contentType};base64,${buf.toString('base64')}`
-}
+import { saveFile, saveImageFromUrl } from '@/lib/file-storage'
 
 export async function PUT(req: NextRequest) {
   try {
@@ -35,24 +21,26 @@ export async function PUT(req: NextRequest) {
       const providedName = form.get('name') as string | null
       if (providedName) name = providedName
       if (file) {
-        // Limit ~10MB similar to attachments route
+        // Limit 10MB for avatars
         if (file.size > 10 * 1024 * 1024) {
           return NextResponse.json({ success: false, error: 'File too large (max 10MB)' }, { status: 400 })
         }
-        avatarDataUrl = await fileToDataUrl(file)
+        // ✅ حفظ الصورة في file system
+        avatarDataUrl = await saveFile(file, 'avatar')
       }
     } else if (contentType.includes('application/json')) {
       const body = (await req.json()) as { name?: string; avatarUrl?: string | null }
       if (typeof body.name === 'string' && body.name.trim()) name = body.name.trim()
       if (typeof body.avatarUrl === 'string' && body.avatarUrl.trim()) {
-        // Convert external URL to data URL and store
+        // حفظ الصورة من URL خارجي
         const url = body.avatarUrl.trim()
         try {
           new URL(url)
         } catch {
           return NextResponse.json({ success: false, error: 'Invalid avatar URL' }, { status: 400 })
         }
-        avatarDataUrl = await fetchImageToDataUrl(url)
+        // ✅ حفظ الصورة من URL في file system
+        avatarDataUrl = await saveImageFromUrl(url)
       } else if (body.avatarUrl === null) {
         avatarDataUrl = null as unknown as string | undefined
       }

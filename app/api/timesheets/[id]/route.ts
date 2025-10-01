@@ -78,7 +78,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     }
 
-    await db.update(dbSchema.timesheets).set({ updatedAt: new Date().toISOString() }).where(eq(dbSchema.timesheets.id, id))
+    await db.update(dbSchema.timesheets).set({ updatedAt: new Date() }).where(eq(dbSchema.timesheets.id, id))
 
     return NextResponse.json({ success: true })
   } catch (error) {
