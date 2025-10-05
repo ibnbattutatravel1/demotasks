@@ -30,20 +30,57 @@ function topicEnabled(settings: Awaited<ReturnType<typeof getUserSettings>>, top
 }
 
 async function sendEmail(userId: string, subject: string, text: string) {
-  if (!nodemailer) return
+  if (!nodemailer) {
+    console.warn('[EMAIL] nodemailer is not installed')
+    return
+  }
+  
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env as Record<string, string>
-  if (!SMTP_HOST || !SMTP_PORT || !SMTP_FROM) return
+  
+  if (!SMTP_HOST || !SMTP_PORT || !SMTP_FROM) {
+    console.warn('[EMAIL] Missing SMTP configuration:', { 
+      hasHost: !!SMTP_HOST, 
+      hasPort: !!SMTP_PORT, 
+      hasFrom: !!SMTP_FROM,
+      hasUser: !!SMTP_USER,
+      hasPass: !!SMTP_PASS
+    })
+    return
+  }
+  
   const users = await db.select().from(dbSchema.users).where(eq(dbSchema.users.id, userId))
   const user = users[0]
-  if (!user?.email) return
+  
+  if (!user?.email) {
+    console.warn(`[EMAIL] User ${userId} has no email address`)
+    return
+  }
 
-  const transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: Number(SMTP_PORT),
-    secure: Number(SMTP_PORT) === 465,
-    auth: SMTP_USER && SMTP_PASS ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
-  })
-  await transporter.sendMail({ from: SMTP_FROM, to: user.email, subject, text })
+  try {
+    console.log(`[EMAIL] Attempting to send email to ${user.email}`)
+    console.log(`[EMAIL] SMTP Config: ${SMTP_HOST}:${SMTP_PORT}, From: ${SMTP_FROM}`)
+    
+    const transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: Number(SMTP_PORT),
+      secure: Number(SMTP_PORT) === 465,
+      auth: SMTP_USER && SMTP_PASS ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
+      tls: {
+        rejectUnauthorized: false  // For development/testing - remove in production if possible
+      },
+    })
+    
+    const info = await transporter.sendMail({ 
+      from: SMTP_FROM, 
+      to: user.email, 
+      subject, 
+      text 
+    })
+    
+    console.log(`[EMAIL] ✅ Email sent successfully to ${user.email}`, info.messageId)
+  } catch (error) {
+    console.error(`[EMAIL] ❌ Failed to send email to ${user.email}:`, error)
+  }
 }
 
 async function sendPush(userId: string, payload: any) {
