@@ -44,7 +44,7 @@ export async function saveFile(file: File, type: 'avatar' | 'attachment'): Promi
   
   // إرجاع رابط الملف
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-  return `${baseUrl}/uploads/${subdir}/${filename}`
+  return `${baseUrl}/api/uploads/${subdir}/${filename}`
 }
 
 /**
@@ -68,7 +68,7 @@ export async function saveImageFromUrl(imageUrl: string): Promise<string> {
   await writeFile(filepath, buffer)
   
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-  return `${baseUrl}/uploads/avatars/${filename}`
+  return `${baseUrl}/api/uploads/avatars/${filename}`
 }
 
 /**

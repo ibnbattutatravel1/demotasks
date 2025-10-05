@@ -1,0 +1,28 @@
+services:
+  web:
+    build: .
+    container_name: taskara-web
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+      - HOSTNAME=0.0.0.0
+      - PORT=3000
+      # ربط مع nginx-proxy + SSL
+      - VIRTUAL_HOST=taskara.compumacy.com
+      - VIRTUAL_PORT=3000
+      - LETSENCRYPT_HOST=taskara.compumacy.com
+    restart: unless-stopped
+    expose:
+      - "3000"
+    networks:
+      - app
+      - proxy
+    volumes:
+      - /opt/uploads:/app/public/uploads
+
+networks:
+  app:
+    external: true
+  proxy:
+    external: true
