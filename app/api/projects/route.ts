@@ -36,10 +36,11 @@ export async function GET() {
     const projectIds = rows.map((p) => p.id)
     const ownerIds = [...new Set(rows.map((r) => r.ownerId))]
 
-    const [owners, teamRows, tagRows] = await Promise.all([
+    const [owners, teamRows, tagRows, taskRows] = await Promise.all([
       db.select().from(dbSchema.users).where(inArray(dbSchema.users.id, ownerIds)),
       db.select().from(dbSchema.projectTeam).where(inArray(dbSchema.projectTeam.projectId, projectIds)),
-      db.select().from(dbSchema.projectTags).where(inArray(dbSchema.projectTags.projectId, projectIds))
+      db.select().from(dbSchema.projectTags).where(inArray(dbSchema.projectTags.projectId, projectIds)),
+      db.select({ projectId: dbSchema.tasks.projectId, status: dbSchema.tasks.status }).from(dbSchema.tasks).where(inArray(dbSchema.tasks.projectId, projectIds))
     ])
 
     // Get unique team user IDs and fetch them
@@ -57,6 +58,11 @@ export async function GET() {
         .map((u) => ({ id: u!.id, name: u!.name, initials: u!.initials, avatar: u!.avatar || undefined }))
 
       const tags = tagRows.filter((t) => t.projectId === p.id).map((t) => t.tag)
+      
+      // Count tasks for this project
+      const projectTaskRows = taskRows.filter((t) => t.projectId === p.id)
+      const totalTasks = projectTaskRows.length
+      const tasksCompleted = projectTaskRows.filter((t) => t.status === 'done').length
 
       return {
         id: p.id,
@@ -71,8 +77,8 @@ export async function GET() {
         completedAt: toISOStringOrUndefined(p.completedAt),
         progress: p.progress,
         tasks: [],
-        tasksCompleted: 0,
-        totalTasks: 0,
+        tasksCompleted,
+        totalTasks,
         ownerId: p.ownerId,
         owner: owner
           ? { id: owner.id, name: owner.name, initials: owner.initials, avatar: owner.avatar || undefined }

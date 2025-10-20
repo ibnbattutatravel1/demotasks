@@ -415,7 +415,8 @@ export default function ProjectsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProjects.map((project) => {
               const projectTasks = getTasksForProject(project.id)
-              const completedTasks = projectTasks.filter((t) => t.status === "done").length
+              const completedTasks = project.tasksCompleted
+              const totalTasksCount = project.totalTasks
               const isExpanded = expandedProjects.has(project.id)
 
               return (
@@ -482,7 +483,7 @@ export default function ProjectsPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-slate-600">
-                          {completedTasks}/{projectTasks.length} tasks completed
+                          {completedTasks}/{totalTasksCount} tasks completed
                         </span>
                         <span className="text-slate-900 font-medium">{project.progress}%</span>
                       </div>
@@ -537,7 +538,7 @@ export default function ProjectsPage() {
 
                     {isExpanded && (
                       <div className="mt-4 pt-4 border-t border-slate-200">
-                        <h4 className="text-sm font-medium text-slate-900 mb-2">Tasks ({projectTasks.length})</h4>
+                        <h4 className="text-sm font-medium text-slate-900 mb-2">Tasks ({totalTasksCount})</h4>
                         {loadingProjectTasks[project.id] ? (
                           <div className="text-sm text-slate-500">Loading tasks...</div>
                         ) : projectTasks.length === 0 ? (
@@ -577,7 +578,8 @@ export default function ProjectsPage() {
               <div className="divide-y divide-slate-200">
                 {filteredProjects.map((project) => {
                   const projectTasks = getTasksForProject(project.id)
-                  const completedTasks = projectTasks.filter((t) => t.status === "done").length
+                  const completedTasks = project.tasksCompleted
+                  const totalTasksCount = project.totalTasks
                   return (
                     <div key={project.id} className="p-4 hover:bg-slate-50">
                       <div className="flex items-center justify-between">
@@ -611,7 +613,7 @@ export default function ProjectsPage() {
                         <div className="flex items-center gap-6">
                           <div className="text-sm text-slate-600">
                             <span className="font-medium">
-                              {completedTasks}/{projectTasks.length}
+                              {completedTasks}/{totalTasksCount}
                             </span>
                             <span className="ml-1">tasks</span>
                           </div>
