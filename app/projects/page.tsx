@@ -399,7 +399,7 @@ export default function ProjectsPage() {
                 <div>
                   <p className="text-sm text-slate-600">Total Tasks</p>
                   <p className="text-2xl font-bold text-slate-900">
-                    {filteredProjects.reduce((acc, project) => acc + getTasksForProject(project.id).length, 0)}
+                    {filteredProjects.reduce((acc, project) => acc + (project.totalTasks || 0), 0)}
                   </p>
                 </div>
                 <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
