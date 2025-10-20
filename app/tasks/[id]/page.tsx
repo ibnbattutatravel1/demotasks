@@ -234,10 +234,12 @@ export default function TaskDetailPage() {
     status: "planning" | "todo" | "in-progress" | "review" | "done"
   ) => {
     try {
+      // Sync completed checkbox: true if status is 'done', false otherwise
+      const completed = status === 'done'
       const res = await fetch(`/api/subtasks/${subtaskId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, completed }),
       })
       const json = await res.json()
       if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to update subtask status')
@@ -425,10 +427,13 @@ export default function TaskDetailPage() {
 
   const toggleSubtaskCompletion = async (subtaskId: string, completed: boolean) => {
     try {
+      // When marking as completed, set status to 'done'
+      // When unchecking, set status back to 'todo'
+      const status = completed ? 'done' : 'todo'
       await fetch(`/api/subtasks/${subtaskId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed }),
+        body: JSON.stringify({ completed, status }),
       })
       await refreshTask()
     } catch (e) {
