@@ -141,8 +141,9 @@ export default function UpcomingPage() {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   }
 
-  const isOverdue = (dueDate: string) => {
-    return getDaysUntilDue(dueDate) < 0
+  const isOverdue = (task: any) => {
+    if (task.status === 'done') return false
+    return getDaysUntilDue(task.dueDate) < 0
   }
 
   const filteredTasks = tasks.filter((task) => {
@@ -153,14 +154,23 @@ export default function UpcomingPage() {
     const daysUntilDue = getDaysUntilDue(task.dueDate)
     const matchesTime =
       timeFilter === "all" ||
-      (timeFilter === "overdue" && isOverdue(task.dueDate)) ||
+      (timeFilter === "overdue" && isOverdue(task)) ||
       (timeFilter === "this_week" && daysUntilDue <= 7 && daysUntilDue >= 0) ||
       (timeFilter === "urgent" && daysUntilDue <= 3 && daysUntilDue >= 0)
     return matchesSearch && matchesPriority && matchesTime
   })
 
-  const getDueDateDisplay = (dueDate: string) => {
-    const daysUntilDue = getDaysUntilDue(dueDate)
+  const getDueDateDisplay = (task: any) => {
+    const daysUntilDue = getDaysUntilDue(task.dueDate)
+    
+    // Don't show overdue for completed tasks
+    if (task.status === 'done') {
+      return {
+        text: `Completed`,
+        className: "text-green-600",
+        badge: "outline",
+      }
+    }
 
     if (daysUntilDue < 0) {
       return {
@@ -188,19 +198,21 @@ export default function UpcomingPage() {
       }
     } else {
       return {
-        text: `Due ${dueDate}`,
+        text: `Due ${task.dueDate}`,
         className: "text-slate-600",
         badge: "outline",
       }
     }
   }
 
-  const overdueTasks = tasks.filter((task) => isOverdue(task.dueDate)).length
+  const overdueTasks = tasks.filter((task) => isOverdue(task)).length
   const urgentTasks = tasks.filter((task) => {
+    if (task.status === 'done') return false
     const days = getDaysUntilDue(task.dueDate)
     return days <= 3 && days >= 0
   }).length
   const thisWeekTasks = tasks.filter((task) => {
+    if (task.status === 'done') return false
     const days = getDaysUntilDue(task.dueDate)
     return days <= 7 && days >= 0
   }).length
@@ -338,11 +350,11 @@ export default function UpcomingPage() {
               {filteredTasks
                 .sort((a, b) => getDaysUntilDue(a.dueDate) - getDaysUntilDue(b.dueDate))
                 .map((task) => {
-                  const dueDateInfo = getDueDateDisplay(task.dueDate)
+                  const dueDateInfo = getDueDateDisplay(task)
                   const project = getProjectForTask(task.id)
                   const subtasks = getSubtasksForTask(task.id)
                   const completedSubtasks = subtasks.filter((s: any) => !!s.completed).length
-                  const taskIsOverdue = isOverdue(task.dueDate)
+                  const taskIsOverdue = isOverdue(task)
 
                   return (
                     <Card
