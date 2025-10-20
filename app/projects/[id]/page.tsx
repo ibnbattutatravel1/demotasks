@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   ArrowLeft,
   Calendar,
@@ -347,12 +348,32 @@ export default function ProjectDetailPage() {
                   </div>
                   <div className="flex -space-x-2">
                     {project.team && project.team.length > 0 ? (
-                      project.team.slice(0, 6).map((member) => (
-                        <Avatar key={member.id} className="h-8 w-8 border-2 border-white">
-                          <AvatarImage src={member.avatar || "/placeholder-user.jpg"} />
-                          <AvatarFallback className="text-xs">{member.initials || (member.name?.[0] || 'U')}</AvatarFallback>
-                        </Avatar>
-                      ))
+                      <TooltipProvider>
+                        {project.team.slice(0, 6).map((member) => (
+                          <Tooltip key={member.id}>
+                            <TooltipTrigger asChild>
+                              <Avatar className="h-8 w-8 border-2 border-white cursor-pointer hover:z-10 hover:scale-110 transition-transform">
+                                <AvatarImage src={member.avatar || "/placeholder-user.jpg"} />
+                                <AvatarFallback className="text-xs">{member.initials || (member.name?.[0] || 'U')}</AvatarFallback>
+                              </Avatar>
+                            </TooltipTrigger>
+                            <TooltipContent className="p-0 border-0 shadow-lg">
+                              <div className="bg-white rounded-lg p-3 min-w-[200px]">
+                                <div className="flex items-center gap-3">
+                                  <Avatar className="h-12 w-12">
+                                    <AvatarImage src={member.avatar || "/placeholder-user.jpg"} />
+                                    <AvatarFallback>{member.initials || (member.name?.[0] || 'U')}</AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-sm text-slate-900 truncate">{member.name}</p>
+                                    <p className="text-xs text-slate-500 truncate">{member.email || 'No email'}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        ))}
+                      </TooltipProvider>
                     ) : (
                       <span className="text-sm text-slate-500">No team members assigned</span>
                     )}

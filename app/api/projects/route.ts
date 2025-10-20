@@ -55,7 +55,7 @@ export async function GET() {
       const team = teamIds
         .map((uid) => teamUsers.find((u) => u.id === uid))
         .filter(Boolean)
-        .map((u) => ({ id: u!.id, name: u!.name, initials: u!.initials, avatar: u!.avatar || undefined }))
+        .map((u) => ({ id: u!.id, name: u!.name, email: u!.email, initials: u!.initials, avatar: u!.avatar || undefined }))
 
       const tags = tagRows.filter((t) => t.projectId === p.id).map((t) => t.tag)
       
@@ -81,8 +81,8 @@ export async function GET() {
         totalTasks,
         ownerId: p.ownerId,
         owner: owner
-          ? { id: owner.id, name: owner.name, initials: owner.initials, avatar: owner.avatar || undefined }
-          : { id: p.ownerId, name: `User ${p.ownerId}`, initials: (p.ownerId[0] || 'U').toUpperCase() },
+          ? { id: owner.id, name: owner.name, email: owner.email, initials: owner.initials, avatar: owner.avatar || undefined }
+          : { id: p.ownerId, name: `User ${p.ownerId}`, email: `${p.ownerId}@example.com`, initials: (p.ownerId[0] || 'U').toUpperCase() },
         team,
         tags,
         color: p.color,
