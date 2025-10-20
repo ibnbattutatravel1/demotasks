@@ -61,6 +61,10 @@ export async function GET(_req: NextRequest) {
             relatedId: task.id,
             relatedType: 'task',
             topic: 'taskReminders',
+            metadata: {
+              taskTitle: task.title,
+              dueDate: task.dueDate,
+            },
           })
         )
       )

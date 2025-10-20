@@ -2,6 +2,7 @@ import { db, dbSchema } from '@/lib/db/client'
 import { randomUUID } from 'node:crypto'
 import { and, eq } from 'drizzle-orm'
 import { createRequire } from 'module'
+import * as emailTemplates from '@/lib/email/templates'
 const require = createRequire(import.meta.url)
 
 // Optional deps: nodemailer and web-push
@@ -11,6 +12,17 @@ try { nodemailer = require('nodemailer') } catch (_) {}
 try { webPush = require('web-push') } catch (_) {}
 
 export type NotificationTopic = 'taskReminders' | 'projectUpdates' | 'generic'
+
+// Extended notification metadata for email templates
+export interface NotificationMetadata {
+  taskTitle?: string
+  projectName?: string
+  dueDate?: string
+  reason?: string
+  commenterName?: string
+  comment?: string
+  [key: string]: any
+}
 
 export async function getUserSettings(userId: string) {
   const rows = await db.select().from(dbSchema.userSettings).where(eq(dbSchema.userSettings.userId, userId))
@@ -29,7 +41,7 @@ function topicEnabled(settings: Awaited<ReturnType<typeof getUserSettings>>, top
   return true
 }
 
-async function sendEmail(userId: string, subject: string, text: string) {
+async function sendEmail(userId: string, subject: string, htmlContent: string, textFallback: string) {
   if (!nodemailer) {
     console.warn('[EMAIL] nodemailer is not installed')
     return
@@ -74,7 +86,8 @@ async function sendEmail(userId: string, subject: string, text: string) {
       from: SMTP_FROM, 
       to: user.email, 
       subject, 
-      text 
+      html: htmlContent,
+      text: textFallback
     })
     
     console.log(`[EMAIL] ✅ Email sent successfully to ${user.email}`, info.messageId)
@@ -115,9 +128,10 @@ export async function notifyUser(args: {
   relatedId?: string
   relatedType?: 'task' | 'project' | 'subtask'
   topic?: NotificationTopic
+  metadata?: Record<string, any>
 }) {
   const id = (globalThis.crypto?.randomUUID?.() ?? randomUUID()) as string
-  const { userId, type, title, message, relatedId, relatedType } = args
+  const { userId, type, title, message, relatedId, relatedType, metadata } = args
   const topic: NotificationTopic = args.topic || 'generic'
 
   console.log(`[NOTIFICATION] Creating notification for user ${userId}:`, { type, title, topic })
@@ -140,9 +154,9 @@ export async function notifyUser(args: {
   const settings = await getUserSettings(userId)
   const topicOk = topicEnabled(settings, topic)
 
-  // Email
+  // Email with HTML template
   if (settings.email && topicOk) {
-    await sendEmail(userId, title, message)
+    await sendEmailWithTemplate(userId, type, title, message, relatedId, relatedType, metadata)
   }
 
   // Push
@@ -151,4 +165,102 @@ export async function notifyUser(args: {
   }
 
   return { id }
+}
+
+async function sendEmailWithTemplate(
+  userId: string,
+  type: string,
+  title: string,
+  message: string,
+  relatedId?: string,
+  relatedType?: 'task' | 'project' | 'subtask',
+  metadata?: Record<string, any>
+) {
+  // Get user info
+  const users = await db.select().from(dbSchema.users).where(eq(dbSchema.users.id, userId))
+  const user = users[0]
+  if (!user) return
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  let htmlContent: string
+  let subject: string
+
+  // Generate HTML based on notification type
+  switch (type) {
+    case 'task_assigned':
+      subject = `New Task Assigned: ${metadata?.taskTitle || title}`
+      htmlContent = emailTemplates.taskAssignedEmail(
+        user.name,
+        metadata?.taskTitle || title,
+        relatedId || '',
+        metadata?.projectName
+      )
+      break
+
+    case 'task_due_tomorrow':
+      subject = `Task Due Tomorrow: ${metadata?.taskTitle || title}`
+      htmlContent = emailTemplates.taskDueTomorrowEmail(
+        user.name,
+        metadata?.taskTitle || title,
+        relatedId || '',
+        metadata?.dueDate || 'tomorrow'
+      )
+      break
+
+    case 'task_approved':
+      subject = `Task Approved: ${metadata?.taskTitle || title}`
+      htmlContent = emailTemplates.taskApprovedEmail(
+        user.name,
+        metadata?.taskTitle || title,
+        relatedId || ''
+      )
+      break
+
+    case 'task_rejected':
+      subject = `Task Requires Revision: ${metadata?.taskTitle || title}`
+      htmlContent = emailTemplates.taskRejectedEmail(
+        user.name,
+        metadata?.taskTitle || title,
+        relatedId || '',
+        metadata?.reason
+      )
+      break
+
+    case 'project_updated':
+      subject = `Project Updated: ${metadata?.projectName || title}`
+      htmlContent = emailTemplates.projectUpdatedEmail(
+        user.name,
+        metadata?.projectName || title,
+        relatedId || ''
+      )
+      break
+
+    case 'comment_added':
+      subject = `New Comment on: ${metadata?.taskTitle || title}`
+      htmlContent = emailTemplates.commentAddedEmail(
+        user.name,
+        metadata?.taskTitle || title,
+        relatedId || '',
+        metadata?.commenterName || 'Someone',
+        metadata?.comment || message
+      )
+      break
+
+    default:
+      // Generic notification
+      subject = title
+      const actionUrl = relatedId && relatedType
+        ? `${appUrl}/${relatedType === 'task' ? 'tasks' : relatedType === 'project' ? 'projects' : 'tasks'}/${relatedId}`
+        : undefined
+      htmlContent = emailTemplates.genericNotificationEmail(
+        user.name,
+        title,
+        message,
+        actionUrl,
+        actionUrl ? 'View Details' : undefined
+      )
+  }
+
+  // Send email with HTML and text fallback
+  await sendEmail(userId, subject, htmlContent, message)
 }
