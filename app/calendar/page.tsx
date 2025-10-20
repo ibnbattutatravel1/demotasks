@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ChevronLeft, ChevronRight, Plus, Filter, CalendarIcon, Clock, ArrowLeft, Check } from "lucide-react"
 import { TaskTooltip } from "@/components/task-tooltip"
+import { formatDate } from "@/lib/format-date"
 import {
   DropdownMenu,
   DropdownMenuContent,

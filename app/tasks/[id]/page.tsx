@@ -16,6 +16,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Task, Project, Subtask, User as AppUser } from "@/lib/types"
+import { formatDate, formatDateTime, isOverdue as checkOverdue, getDaysUntil } from "@/lib/format-date"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import {
   ArrowLeft,
@@ -55,16 +56,11 @@ import { VoiceInput } from "@/components/ui/voice-input"
 
 const isOverdue = (dueDate: string, completed: boolean) => {
   if (completed) return false
-  const today = new Date()
-  const due = new Date(dueDate)
-  return due < today
+  return checkOverdue(dueDate)
 }
 
 const formatDueDate = (dueDate: string) => {
-  const date = new Date(dueDate)
-  const today = new Date()
-  const diffTime = date.getTime() - today.getTime()
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  const diffDays = getDaysUntil(dueDate)
 
   if (diffDays === 0) return "Due today"
   if (diffDays === 1) return "Due tomorrow"
@@ -72,7 +68,7 @@ const formatDueDate = (dueDate: string) => {
   if (diffDays < 0) return `${Math.abs(diffDays)} days overdue`
   if (diffDays <= 7) return `Due in ${diffDays} days`
 
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  return formatDate(dueDate, 'short')
 }
 
 const formatTimeAgo = (dateString: string) => {
@@ -1483,7 +1479,7 @@ export default function TaskDetailPage() {
                         className="mt-1 h-8 text-sm"
                       />
                     ) : (
-                      <p className="text-sm text-slate-600">{task?.dueDate || '—'}</p>
+                      <p className="text-sm text-slate-600">{task?.dueDate ? formatDate(task.dueDate) : '—'}</p>
                     )}
                   </div>
                 </div>

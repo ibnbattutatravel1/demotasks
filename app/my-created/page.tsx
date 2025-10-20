@@ -21,6 +21,7 @@ import {
   FolderOpen,
 } from "lucide-react"
 import type { Project, Task } from "@/lib/types"
+import { formatDate } from "@/lib/format-date"
 
 // Data loads from backend
 
@@ -288,7 +289,7 @@ export default function MyCreatedPage() {
                         <div className="flex items-center gap-4">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
-                            <span>Created {task.createdAt}</span>
+                            <span>Created {formatDate(task.createdAt, 'short')}</span>
                           </div>
                         </div>
                         <Badge variant={task.priority === "high" ? "destructive" : "secondary"} className="text-xs">

@@ -30,6 +30,7 @@ import {
   Trash2,
 } from "lucide-react"
 import type { Project, Task, TeamMember } from "@/lib/types"
+import { formatDate } from "@/lib/format-date"
 
 export default function ProjectDetailPage() {
   const router = useRouter()
@@ -345,7 +346,7 @@ export default function ProjectDetailPage() {
                     <Calendar className="h-4 w-4" />
                     <span>Due Date</span>
                   </div>
-                  <p className="font-medium text-slate-900">{project.dueDate || "Not set"}</p>
+                  <p className="font-medium text-slate-900">{formatDate(project.dueDate)}</p>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm text-slate-600">

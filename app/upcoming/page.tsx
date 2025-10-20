@@ -11,6 +11,7 @@ import { Progress } from "@/components/ui/progress"
 import { useAuth } from "@/contexts/auth-context"
 import { Search, ArrowLeft, Calendar, Clock, AlertTriangle, ChevronRight, FolderOpen } from "lucide-react"
 import type { Project } from "@/lib/types"
+import { formatDate } from "@/lib/format-date"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -198,7 +199,7 @@ export default function UpcomingPage() {
       }
     } else {
       return {
-        text: `Due ${task.dueDate}`,
+        text: `Due ${formatDate(task.dueDate, 'short')}`,
         className: "text-slate-600",
         badge: "outline",
       }

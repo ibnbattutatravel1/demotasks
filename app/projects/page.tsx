@@ -29,6 +29,7 @@ import {
   Trash2,
 } from "lucide-react"
 import type { Project, Task } from "@/lib/types"
+import { formatDate } from "@/lib/format-date"
 
 export default function ProjectsPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
@@ -510,7 +511,7 @@ export default function ProjectsPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-sm text-slate-600">
                         <Calendar className="h-4 w-4" />
-                        <span>Due {project.dueDate}</span>
+                        <span>Due {formatDate(project.dueDate, 'short')}</span>
                       </div>
                       <div className="flex -space-x-2">
                         {(project.team || []).slice(0, 3).map((member, index) => (

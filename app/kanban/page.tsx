@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { CalendarDays, Plus, MoreHorizontal, ArrowLeft, FolderOpen } from "lucide-react"
 import type { Project } from "@/lib/types"
+import { formatDate } from "@/lib/format-date"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -191,16 +192,8 @@ export default function KanbanPage() {
     }
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    const today = new Date()
-    const diffTime = date.getTime() - today.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
-    if (diffDays === 0) return "Due today"
-    if (diffDays === 1) return "Due tomorrow"
-    if (diffDays < 0) return `${Math.abs(diffDays)} days overdue`
-    return `${diffDays} days left`
+  const formatTaskDate = (dateString: string) => {
+    return formatDate(dateString, 'short')
   }
 
   return (
@@ -318,7 +311,7 @@ export default function KanbanPage() {
                         <div className="flex items-center gap-2 text-xs text-gray-600">
                           <CalendarDays className="w-3 h-3" />
                           <span className={task.dueDate < new Date().toISOString().split("T")[0] ? "text-red-600" : ""}>
-                            {formatDate(task.dueDate)}
+                            {formatTaskDate(task.dueDate)}
                           </span>
                         </div>
 
