@@ -28,9 +28,6 @@ export const projects = mysqlTable('projects', {
   progress: int('progress').notNull().default(0), // 0-100
   ownerId: varchar('owner_id', { length: 191 }).notNull().references(() => users.id),
   color: varchar('color', { length: 50 }).notNull(),
-  budget: decimal('budget', { precision: 10, scale: 2 }),
-  estimatedHours: decimal('estimated_hours', { precision: 10, scale: 2 }),
-  actualHours: decimal('actual_hours', { precision: 10, scale: 2 }),
 })
 
 // Project team (many-to-many)

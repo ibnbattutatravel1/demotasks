@@ -78,9 +78,6 @@ export default function ProjectDetailPage() {
           team: p.team || [],
           tags: p.tags || [],
           color: p.color || '#6366f1',
-          budget: p.budget,
-          estimatedHours: p.estimatedHours,
-          actualHours: p.actualHours,
         }
 
         const tasks: Task[] = (tasksJson.data || []).map((t: any) => ({

@@ -110,9 +110,6 @@ export interface Project {
   // Metadata
   tags: string[]
   color: string // For UI theming
-  budget?: number
-  estimatedHours?: number
-  actualHours?: number
 }
 
 // Attachment Type
@@ -216,8 +213,6 @@ export interface CreateProjectForm {
   teamIds: string[]
   tags: string[]
   color: string
-  budget?: number
-  estimatedHours?: number
 }
 
 export interface CreateTaskForm {

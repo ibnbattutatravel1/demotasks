@@ -80,9 +80,6 @@ export async function GET() {
         team,
         tags,
         color: p.color,
-        budget: p.budget ?? undefined,
-        estimatedHours: p.estimatedHours ?? undefined,
-        actualHours: p.actualHours ?? undefined,
       }
     })
 
@@ -120,8 +117,6 @@ export async function POST(req: NextRequest) {
       teamIds = [],
       tags = [],
       color = '#6366f1',
-      budget,
-      estimatedHours,
     } = body as {
       name: string
       description: string
@@ -132,8 +127,6 @@ export async function POST(req: NextRequest) {
       teamIds?: string[]
       tags?: string[]
       color?: string
-      budget?: number
-      estimatedHours?: number
     }
 
     if (!name || !priority || !ownerId) {
@@ -159,9 +152,6 @@ export async function POST(req: NextRequest) {
       progress: 0,
       ownerId,
       color,
-      budget: budget ?? null,
-      estimatedHours: estimatedHours ?? null,
-      actualHours: null,
     })
 
     if (teamIds.length) {
@@ -202,9 +192,6 @@ export async function POST(req: NextRequest) {
       team: team.map((u) => ({ id: u.id, name: u.name, initials: u.initials, avatar: u.avatar || undefined })),
       tags: tagRows.map((t) => t.tag),
       color: projectRow.color,
-      budget: projectRow.budget ?? undefined,
-      estimatedHours: projectRow.estimatedHours ?? undefined,
-      actualHours: projectRow.actualHours ?? undefined,
     }
 
     return NextResponse.json({ success: true, data: response }, { status: 201 })

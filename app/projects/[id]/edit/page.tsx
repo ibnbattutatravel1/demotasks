@@ -45,8 +45,6 @@ export default function EditProjectPage() {
   const [users, setUsers] = useState<Array<{ id: string; name: string }>>([])
   const [ownerId, setOwnerId] = useState("")
   const [teamIds, setTeamIds] = useState<string[]>([])
-  const [budget, setBudget] = useState<string>("")
-  const [estimatedHours, setEstimatedHours] = useState<string>("")
 
   // Load project data
   useEffect(() => {
@@ -79,8 +77,6 @@ export default function EditProjectPage() {
           setColor(p.color || "#6366f1")
           setOwnerId(p.ownerId || "")
           setTeamIds(Array.isArray(p.team) ? p.team.map((m: any) => m.id) : [])
-          setBudget(p.budget != null ? String(p.budget) : "")
-          setEstimatedHours(p.estimatedHours != null ? String(p.estimatedHours) : "")
         } else {
           toast({ title: "Error", description: (jsonProject && jsonProject.error) || "Failed to load project", variant: "destructive" })
         }
@@ -111,8 +107,6 @@ export default function EditProjectPage() {
         color,
         ownerId: ownerId || project.ownerId,
         teamIds,
-        budget: budget === "" ? undefined : Number(budget),
-        estimatedHours: estimatedHours === "" ? undefined : Number(estimatedHours),
       }
 
       const res = await fetch(`/api/projects/${projectId}`, {
@@ -250,29 +244,6 @@ export default function EditProjectPage() {
                     value={tags}
                     onChange={(e) => setTags(e.target.value)}
                     placeholder="Enter tags separated by commas"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Budget</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={budget}
-                    onChange={(e) => setBudget(e.target.value)}
-                    placeholder="e.g. 10000"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Estimated Hours</label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={estimatedHours}
-                    onChange={(e) => setEstimatedHours(e.target.value)}
-                    placeholder="e.g. 120"
                   />
                 </div>
               </div>
