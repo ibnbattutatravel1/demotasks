@@ -563,7 +563,7 @@ export default function ProjectDetailPage() {
                             </Avatar>
                           ))}
                         </div>
-                        <span className="text-xs text-slate-500">{task.dueDate}</span>
+                        <span className="text-xs text-slate-500">{formatDate(task.dueDate, 'short')}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -638,7 +638,7 @@ export default function ProjectDetailPage() {
                             <Badge variant={task.priority === "high" ? "destructive" : "secondary"} className="text-xs">
                               {task.priority}
                             </Badge>
-                            <span className="text-xs text-slate-500 min-w-0">{task.dueDate}</span>
+                            <span className="text-xs text-slate-500 min-w-0">{formatDate(task.dueDate, 'short')}</span>
                           </div>
                         </div>
                       </div>
