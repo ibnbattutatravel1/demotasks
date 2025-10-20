@@ -11,6 +11,7 @@ import { Progress } from "@/components/ui/progress"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useToast } from "@/hooks/use-toast"
 import {
   ArrowLeft,
   Calendar,
@@ -35,6 +36,7 @@ export default function ProjectDetailPage() {
   const pathname = usePathname()
   const projectId = (pathname?.split('/')?.[2] as string) || ""
   const { user } = useAuth()
+  const { toast } = useToast()
 
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
@@ -128,6 +130,26 @@ export default function ProjectDetailPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("list")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [priorityFilter, setPriorityFilter] = useState<string>("all")
+
+  // Handler for inline status change
+  const handleChangeProjectStatus = async (status: "planning" | "active" | "on-hold" | "completed" | "archived") => {
+    if (!project) return
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to update status')
+      
+      // Update local state
+      setProject({ ...project, status })
+      toast({ title: 'Status updated', description: `Project marked as ${status}.` })
+    } catch (e: any) {
+      toast({ title: 'Update failed', description: e?.message || 'Could not update status', variant: 'destructive' })
+    }
+  }
 
   if (loading) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center">Loading...</div>
@@ -330,9 +352,23 @@ export default function ProjectDetailPage() {
                     <Clock className="h-4 w-4" />
                     <span>Status</span>
                   </div>
-                  <Badge variant="outline" className={getStatusColor(project.status)}>
-                    {project.status}
-                  </Badge>
+                  {user?.role === 'admin' ? (
+                    <select
+                      className="h-9 text-sm border border-slate-300 rounded-md px-2 bg-white font-medium"
+                      value={project.status}
+                      onChange={(e) => handleChangeProjectStatus(e.target.value as any)}
+                    >
+                      <option value="planning">Planning</option>
+                      <option value="active">Active</option>
+                      <option value="on-hold">On Hold</option>
+                      <option value="completed">Completed</option>
+                      <option value="archived">Archived</option>
+                    </select>
+                  ) : (
+                    <Badge variant="outline" className={getStatusColor(project.status)}>
+                      {project.status}
+                    </Badge>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm text-slate-600">

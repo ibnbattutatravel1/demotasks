@@ -43,6 +43,46 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 
+// PATCH /api/projects/[id] - Quick update (e.g., status change)
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id: projectId } = await params
+    const token = req.cookies.get(AUTH_COOKIE)?.value
+    if (!token) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const payload = await verifyAuthToken(token).catch(() => null)
+    if (!payload?.sub) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+
+    const userRows = await db.select({ id: dbSchema.users.id, role: dbSchema.users.role }).from(dbSchema.users).where(eq(dbSchema.users.id, payload.sub))
+    const user = userRows[0]
+    
+    if (!user || user.role !== 'admin') {
+      return NextResponse.json({ success: false, error: 'Only admins can edit projects' }, { status: 403 })
+    }
+
+    const body = await req.json()
+    const existing = (await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, projectId)))[0]
+    if (!existing) {
+      return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
+    }
+
+    const now = new Date()
+    const updateData: any = { updatedAt: now }
+    
+    // Only update provided fields
+    if (body.status !== undefined) updateData.status = body.status
+    if (body.priority !== undefined) updateData.priority = body.priority
+    if (body.progress !== undefined) updateData.progress = body.progress
+
+    await db.update(dbSchema.projects).set(updateData).where(eq(dbSchema.projects.id, projectId))
+
+    return NextResponse.json({ success: true, message: 'Project updated successfully' })
+  } catch (err) {
+    console.error('PATCH /api/projects/[id] error', err)
+    return NextResponse.json({ success: false, error: 'Failed to update project' }, { status: 500 })
+  }
+}
+
 // PUT /api/projects/[id] - Update project
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
