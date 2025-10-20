@@ -28,14 +28,11 @@ async function composeTasksBatch(tasks: any[]) {
   const creatorIds = [...new Set(tasks.map(t => t.createdById))]
   
   // Fetch all related data in parallel with single queries per type
-  const [assigneesData, tagsData, subtasksData, commentsData, creatorsData] = await Promise.all([
+  const [assigneesData, subtasksData, commentsData, creatorsData] = await Promise.all([
     db.select()
       .from(dbSchema.taskAssignees)
       .where(inArray(dbSchema.taskAssignees.taskId, taskIds))
       .leftJoin(dbSchema.users, eq(dbSchema.taskAssignees.userId, dbSchema.users.id)),
-    db.select()
-      .from(dbSchema.taskTags)
-      .where(inArray(dbSchema.taskTags.taskId, taskIds)),
     db.select()
       .from(dbSchema.subtasks)
       .where(inArray(dbSchema.subtasks.taskId, taskIds)),
@@ -59,14 +56,6 @@ async function composeTasksBatch(tasks: any[]) {
     if (row.users) {
       assigneesMap.get(row.task_assignees.taskId)!.push(row.users)
     }
-  })
-  
-  const tagsMap = new Map<string, string[]>()
-  tagsData.forEach((row: any) => {
-    if (!tagsMap.has(row.taskId)) {
-      tagsMap.set(row.taskId, [])
-    }
-    tagsMap.get(row.taskId)!.push(row.tag)
   })
   
   const subtasksMap = new Map<string, any[]>()
@@ -103,7 +92,6 @@ async function composeTasksBatch(tasks: any[]) {
   // Compose all tasks using the maps
   return tasks.map(task => {
     const assignees = assigneesMap.get(task.id) || []
-    const tags = tagsMap.get(task.id) || []
     const subtasks = subtasksMap.get(task.id) || []
     const commentsCount = commentsCountMap.get(task.id) || 0
     const subtasksCompleted = subtasks.filter((s: any) => s.completed).length
@@ -132,7 +120,6 @@ async function composeTasksBatch(tasks: any[]) {
       completedAt: toISOStringOrUndefined(task.completedAt),
       approvedAt: toISOStringOrUndefined(task.approvedAt),
       assignees,
-      tags,
       subtasks,
       subtasksCompleted,
       totalSubtasks: subtasks.length,
@@ -215,7 +202,6 @@ export async function POST(req: NextRequest) {
       createdById: string
       approvalStatus?: 'pending' | 'approved' | 'rejected'
       assigneeIds?: string[]
-      tags?: string[]
       progress?: number
       subtasks?: Array<{
         title: string
@@ -238,7 +224,6 @@ export async function POST(req: NextRequest) {
       createdById,
       approvalStatus = 'pending',
       assigneeIds = [],
-      tags = [],
       progress = 0,
       subtasks = [],
     } = body
@@ -281,11 +266,6 @@ export async function POST(req: NextRequest) {
     if (validAssigneeIds.length) {
       await db.insert(dbSchema.taskAssignees).values(
         validAssigneeIds.map((userId: string) => ({ taskId: id, userId }))
-      )
-    }
-    if (tags.length) {
-      await db.insert(dbSchema.taskTags).values(
-        tags.map((tag: string) => ({ taskId: id, tag }))
       )
     }
 

@@ -674,7 +674,6 @@ export function UserDashboard() {
                 const queryOk =
                   !q ||
                   task.title.toLowerCase().includes(q) ||
-                  (task.tags || []).some((tag) => String(tag).toLowerCase().includes(q)) ||
                   (project.name || "").toLowerCase().includes(q)
                 return statusOk && queryOk
               })
@@ -809,14 +808,7 @@ export function UserDashboard() {
                                       View comments
                                     </Button>
                                   </div>
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex gap-1">
-                                      {task.tags.map((tag, index) => (
-                                        <Badge key={index} variant="secondary" className="text-xs">
-                                          {tag}
-                                        </Badge>
-                                      ))}
-                                    </div>
+                                  <div className="flex items-center justify-end">
                                     <div className="flex items-center gap-2">
                                       <span className="text-xs text-slate-600">{task.progress}%</span>
                                       <Progress value={task.progress} className="w-16 h-1" />
@@ -919,13 +911,6 @@ export function UserDashboard() {
                         >
                           {task.approvalStatus === "approved" ? "Approved" : "Pending Approval"}
                         </Badge>
-                        <div className="flex gap-1">
-                          {task.tags.map((tag, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
                       </div>
                     </div>
                   </CardContent>

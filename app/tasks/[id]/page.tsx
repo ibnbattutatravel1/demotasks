@@ -130,15 +130,12 @@ export default function TaskDetailPage() {
   const [loadingAttachments, setLoadingAttachments] = useState(true)
   const [editingTask, setEditingTask] = useState(false)
   const [editingAssignees, setEditingAssignees] = useState(false)
-  const [editingTags, setEditingTags] = useState(false)
   const [availableUsers, setAvailableUsers] = useState<AppUser[]>([])
   const [editTaskTitle, setEditTaskTitle] = useState("")
   const [editTaskDescription, setEditTaskDescription] = useState("")
   const [editTaskDueDate, setEditTaskDueDate] = useState("")
   const [editTaskPriority, setEditTaskPriority] = useState<"low" | "medium" | "high">("medium")
   const [editTaskAssignees, setEditTaskAssignees] = useState<string[]>([])
-  const [editTaskTags, setEditTaskTags] = useState<string[]>([])
-  const [newTag, setNewTag] = useState("")
   const { toast } = useToast()
   // Task-level comments
   const [taskComments, setTaskComments] = useState<Array<{ id: string; userId: string; userName: string; avatar?: string | null; content: string; createdAt: string }>>([])
@@ -181,7 +178,6 @@ export default function TaskDetailPage() {
           setEditTaskDueDate(t.dueDate || "")
           setEditTaskPriority(t.priority)
           setEditTaskAssignees(t.assignees?.map(a => a.id) || [])
-          setEditTaskTags(t.tags || [])
           // Load project context lazily from projects list
           try {
             const pres = await fetch('/api/projects')
@@ -267,7 +263,6 @@ export default function TaskDetailPage() {
         setEditTaskDueDate(t.dueDate || "")
         setEditTaskPriority(t.priority)
         setEditTaskAssignees(t.assignees?.map(a => a.id) || [])
-        setEditTaskTags(t.tags || [])
       }
     } catch (e) {
       console.error('Failed to load task', e)
@@ -413,7 +408,7 @@ export default function TaskDetailPage() {
         const res = await fetch('/api/subtasks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ taskId: task.id, title: newSubtaskTitle.trim(), dueDate: newSubtaskDueDate, status: newSubtaskStatus, tags: [] }),
+          body: JSON.stringify({ taskId: task.id, title: newSubtaskTitle.trim(), dueDate: newSubtaskDueDate, status: newSubtaskStatus }),
         })
         if (res.ok) {
           await refreshTask()
@@ -714,7 +709,6 @@ export default function TaskDetailPage() {
           dueDate: editTaskDueDate || null,
           priority: editTaskPriority,
           assigneeIds: editTaskAssignees,
-          tags: editTaskTags
         }
         
         const res = await fetch(`/api/tasks/${task.id}`, {
@@ -726,7 +720,6 @@ export default function TaskDetailPage() {
         if (res.ok) {
           setEditingTask(false)
           setEditingAssignees(false)
-          setEditingTags(false)
           toast({ title: 'Task updated', description: 'Task has been successfully updated.' })
           await refreshTask()
         }
@@ -744,14 +737,12 @@ export default function TaskDetailPage() {
   const handleCancelTaskEdit = () => {
     setEditingTask(false)
     setEditingAssignees(false)
-    setEditingTags(false)
     if (task) {
       setEditTaskTitle(task.title)
       setEditTaskDescription(task.description)
       setEditTaskDueDate(task.dueDate || "")
       setEditTaskPriority(task.priority)
       setEditTaskAssignees(task.assignees?.map(a => a.id) || [])
-      setEditTaskTags(task.tags || [])
     }
   }
 
@@ -771,7 +762,6 @@ export default function TaskDetailPage() {
           dueDate: task.dueDate,
           priority: task.priority,
           status: 'todo',
-          tags: task.tags || [],
           createdById: user.id,
         }),
       })
@@ -1047,89 +1037,6 @@ export default function TaskDetailPage() {
                       )
                     })()}
                   </Dialog>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Tags */}
-          <Card className="md:col-span-2 lg:col-span-1">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">Tags</CardTitle>
-                {editingTask && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-6 px-2 text-xs"
-                    onClick={() => setEditingTags(!editingTags)}
-                  >
-                    {editingTags ? 'Done' : 'Edit'}
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {editingTags ? (
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Add a tag..."
-                      value={newTag}
-                      onChange={(e) => setNewTag(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && newTag.trim()) {
-                          if (!editTaskTags.includes(newTag.trim())) {
-                            setEditTaskTags([...editTaskTags, newTag.trim()])
-                          }
-                          setNewTag('')
-                          e.preventDefault()
-                        }
-                      }}
-                    />
-                    <Button 
-                      size="sm" 
-                      onClick={() => {
-                        if (newTag.trim() && !editTaskTags.includes(newTag.trim())) {
-                          setEditTaskTags([...editTaskTags, newTag.trim()])
-                          setNewTag('')
-                        }
-                      }}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 min-h-[32px]">
-                    {editTaskTags.map((tag, index) => (
-                      <Badge 
-                        key={index} 
-                        variant="secondary"
-                        className="pr-1 pl-2 py-1"
-                      >
-                        {tag}
-                        <button
-                          onClick={() => setEditTaskTags(editTaskTags.filter((_, i) => i !== index))}
-                          className="ml-1 rounded-full hover:bg-slate-300 p-0.5"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                    {!editTaskTags.length && (
-                      <p className="text-sm text-slate-400">No tags yet. Add some above.</p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {(task?.tags || []).map((tag, index) => (
-                    <Badge key={index} variant="secondary">
-                      {tag}
-                    </Badge>
-                  ))}
-                  {!task?.tags?.length && (
-                    <p className="text-sm text-slate-400">No tags</p>
-                  )}
                 </div>
               )}
             </CardContent>

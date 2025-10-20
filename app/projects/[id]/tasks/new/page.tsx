@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/auth-context"
-import { ArrowLeft, Calendar, Users, Flag, Tag, Plus, X } from "lucide-react"
+import { ArrowLeft, Calendar, Users, Flag } from "lucide-react"
 
 
 export default function NewTaskPage() {
@@ -31,10 +31,7 @@ export default function NewTaskPage() {
     startDate: "",
     dueDate: "",
     assignees: [] as string[], // user IDs
-    tags: [] as string[],
   })
-
-  const [newTag, setNewTag] = useState("")
   const [team, setTeam] = useState<Array<{ id: string; name: string; avatar?: string; initials?: string }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -71,23 +68,6 @@ export default function NewTaskPage() {
     }))
   }
 
-  const handleAddTag = () => {
-    if (newTag.trim() && !taskData.tags.includes(newTag.trim())) {
-      setTaskData((prev) => ({
-        ...prev,
-        tags: [...prev.tags, newTag.trim()],
-      }))
-      setNewTag("")
-    }
-  }
-
-  const handleRemoveTag = (tagToRemove: string) => {
-    setTaskData((prev) => ({
-      ...prev,
-      tags: prev.tags.filter((tag) => tag !== tagToRemove),
-    }))
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!taskData.title.trim()) {
@@ -109,7 +89,6 @@ export default function NewTaskPage() {
         assigneeIds: taskData.assignees,
         startDate: taskData.startDate || undefined,
         dueDate: taskData.dueDate || undefined,
-        tags: taskData.tags,
         approvalStatus: user.role === 'admin' ? 'approved' as const : 'pending' as const,
         createdById: user.id,
         progress: 0,
@@ -312,47 +291,6 @@ export default function NewTaskPage() {
             </CardContent>
           </Card>
 
-          {/* Tags */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Tag className="h-5 w-5" />
-                Tags
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  placeholder="Add a tag..."
-                  onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), handleAddTag())}
-                  className="flex-1"
-                />
-                <Button type="button" onClick={handleAddTag} variant="outline">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {taskData.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {taskData.tags.map((tag) => (
-                    <Badge key={tag} variant="secondary" className="flex items-center gap-1">
-                      {tag}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTag(tag)}
-                        className="ml-1 hover:bg-slate-300 rounded-full p-0.5"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Summary */}
           <Card>
             <CardHeader>
@@ -380,12 +318,6 @@ export default function NewTaskPage() {
                     {taskData.assignees.length} team member{taskData.assignees.length !== 1 ? "s" : ""} assigned
                   </p>
                 </div>
-              </div>
-              <div>
-                <p className="text-sm text-slate-600">Tags</p>
-                <p className="font-medium text-slate-900">
-                  {taskData.tags.length} tag{taskData.tags.length !== 1 ? "s" : ""} added
-                </p>
               </div>
             </CardContent>
           </Card>

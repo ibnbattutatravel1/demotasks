@@ -79,7 +79,6 @@ export interface Task {
   totalSubtasks: number
 
   // Metadata
-  tags: string[]
   comments: Comment[]
   attachments: Attachment[]
 }
@@ -145,7 +144,6 @@ export interface TaskFilters {
   priority?: Task["priority"][]
   assignee?: string[]
   project?: string[]
-  tags?: string[]
   approvalStatus?: Task["approvalStatus"][]
   dateRange?: {
     start: string
@@ -230,7 +228,6 @@ export interface CreateTaskForm {
   startDate: string
   dueDate: string
   assigneeIds: string[]
-  tags: string[]
 }
 
 export interface CreateSubtaskForm {

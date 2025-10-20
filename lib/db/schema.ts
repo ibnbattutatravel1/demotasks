@@ -86,16 +86,6 @@ export const taskAssignees = sqliteTable(
   (t) => ({ pk: primaryKey({ columns: [t.taskId, t.userId] }) })
 )
 
-// Task tags
-export const taskTags = sqliteTable(
-  'task_tags',
-  {
-    taskId: text('task_id').notNull().references(() => tasks.id),
-    tag: text('tag').notNull(),
-  },
-  (t) => ({ pk: primaryKey({ columns: [t.taskId, t.tag] }) })
-)
-
 // Subtasks
 export const subtasks = sqliteTable('subtasks', {
   id: text('id').primaryKey(),

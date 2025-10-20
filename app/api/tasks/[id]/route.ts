@@ -61,9 +61,8 @@ async function composeTask(task: any) {
   const subtaskIds = subtasksData.map((st: any) => st.id)
   
   // Now fetch everything else in parallel
-  const [assignees, tags, creatorRows, taskComments, subtaskComments] = await Promise.all([
+  const [assignees, creatorRows, taskComments, subtaskComments] = await Promise.all([
     db.select().from(dbSchema.taskAssignees).where(eq(dbSchema.taskAssignees.taskId, task.id)).leftJoin(dbSchema.users, eq(dbSchema.taskAssignees.userId, dbSchema.users.id)),
-    db.select().from(dbSchema.taskTags).where(eq(dbSchema.taskTags.taskId, task.id)),
     db.select().from(dbSchema.users).where(eq(dbSchema.users.id, task.createdById)),
     db.select().from(dbSchema.comments).where(and(eq(dbSchema.comments.entityType, 'task'), eq(dbSchema.comments.entityId, task.id))),
     subtaskIds.length > 0 
@@ -80,7 +79,6 @@ async function composeTask(task: any) {
   }
   
   const assigneeUsers = assignees.map((row: any) => row.users).filter(Boolean)
-  const tagList = tags.map((t: any) => t.tag)
   const subtaskList = subtasksData.map((st: any) => ({
     id: st.id,
     taskId: st.taskId,
@@ -131,7 +129,6 @@ async function composeTask(task: any) {
     completedAt: toISOStringOrUndefined(task.completedAt),
     approvedAt: toISOStringOrUndefined(task.approvedAt),
     assignees: assigneeUsers, 
-    tags: tagList, 
     subtasks: subtaskList, 
     subtasksCompleted, 
     totalSubtasks, 
@@ -155,7 +152,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       rejectionReason: string | null
       progress: number
       assigneeIds: string[]
-      tags: string[]
     }>
 
     const existing = await db.select().from(dbSchema.tasks).where(eq(dbSchema.tasks.id, id))
@@ -285,25 +281,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           console.error('Error updating assignees:', error)
           throw error
         }
-      }
-    }
-
-    if (body.tags) {
-      try {
-        await db.delete(dbSchema.taskTags).where(eq(dbSchema.taskTags.taskId, id))
-        if (body.tags.length) {
-          await db.insert(dbSchema.taskTags).values(
-            body.tags.map((tag) => ({
-              id: randomUUID(),
-              taskId: id,
-              tag,
-              createdAt: new Date(),
-            }))
-          )
-        }
-      } catch (error) {
-        console.error('Error updating tags:', error)
-        throw error
       }
     }
 

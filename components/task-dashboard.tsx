@@ -411,21 +411,14 @@ export function TaskDashboard() {
                     </div>
                   </div>
 
-                  {/* Assignees and Tags */}
-                  <div className="flex items-center justify-between">
+                  {/* Assignees */}
+                  <div className="flex items-center">
                     <div className="flex -space-x-2">
                       {task.assignees.map((assignee, index) => (
                         <Avatar key={index} className="h-6 w-6 border-2 border-white">
                           <AvatarImage src={assignee.avatar || "/placeholder-user.jpg"} />
                           <AvatarFallback className="text-xs">{assignee.name[0]}</AvatarFallback>
                         </Avatar>
-                      ))}
-                    </div>
-                    <div className="flex gap-1">
-                      {task.tags.map((tag, index) => (
-                        <Badge key={index} variant="secondary" className="text-xs">
-                          {tag}
-                        </Badge>
                       ))}
                     </div>
                   </div>

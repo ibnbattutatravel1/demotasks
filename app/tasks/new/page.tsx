@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, User, Flag, Clock, Plus, X, AlertCircle, CheckCircle2, FolderOpen } from "lucide-react"
+import { ArrowLeft, User, Flag, Clock, AlertCircle, CheckCircle2, FolderOpen } from "lucide-react"
 type ProjectOption = { id: string; name: string; color?: string }
 type UserOption = { id: string; name: string; avatar?: string }
 
@@ -23,8 +23,6 @@ export default function NewTaskPage() {
   const [priority, setPriority] = useState("")
   const [dueDate, setDueDate] = useState("")
   const [assignees, setAssignees] = useState<string[]>([])
-  const [tags, setTags] = useState<string[]>([])
-  const [newTag, setNewTag] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [projects, setProjects] = useState<ProjectOption[]>([])
   const [users, setUsers] = useState<UserOption[]>([])
@@ -101,7 +99,6 @@ export default function NewTaskPage() {
         createdById: user.id,
         approvalStatus: user.role === 'admin' ? 'approved' : 'pending',
         assigneeIds: assignees,
-        tags,
       }
       const res = await fetch('/api/tasks', {
         method: 'POST',
@@ -119,17 +116,6 @@ export default function NewTaskPage() {
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  const addTag = () => {
-    if (newTag.trim() && !tags.includes(newTag.trim())) {
-      setTags([...tags, newTag.trim()])
-      setNewTag("")
-    }
-  }
-
-  const removeTag = (tagToRemove: string) => {
-    setTags(tags.filter((tag) => tag !== tagToRemove))
   }
 
   return (
@@ -289,30 +275,6 @@ export default function NewTaskPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-sm font-medium text-slate-700 mb-2 block">Tags</label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {tags.map((tag) => (
-                      <Badge key={tag} variant="secondary" className="flex items-center gap-1">
-                        {tag}
-                        <button onClick={() => removeTag(tag)} className="hover:bg-slate-300 rounded-full p-0.5">
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={newTag}
-                      onChange={(e) => setNewTag(e.target.value)}
-                      placeholder="Add a tag..."
-                      onKeyPress={(e) => e.key === "Enter" && addTag()}
-                    />
-                    <Button onClick={addTag} variant="outline" size="sm">
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           </div>
