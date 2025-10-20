@@ -959,10 +959,10 @@ export default function TaskDetailPage() {
       </div>
 
       <div className="max-w-7xl mx-auto p-6">
-        {/* Top Row - 3 Columns on Desktop */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-          {/* Project Context Card */}
-          <Card className="md:col-span-1">
+        {/* Top Row - Project Context (40%) and Description (60%) */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
+          {/* Project Context Card - 40% */}
+          <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <FolderOpen className="h-5 w-5 text-slate-600" />
@@ -991,18 +991,18 @@ export default function TaskDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Task Description */}
-          <Card className="md:col-span-1">
+          {/* Task Description - 60% */}
+          <Card className="lg:col-span-3">
             <CardHeader>
               <CardTitle className="text-lg">Description</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="h-full">
               {editingTask ? (
                 <Textarea
                   value={editTaskDescription}
                   onChange={(e) => setEditTaskDescription(e.target.value)}
                   placeholder="Task description..."
-                  className="min-h-[100px]"
+                  className="min-h-[150px] resize-none"
                 />
               ) : (
                 <div className="text-slate-700 leading-relaxed">
