@@ -439,10 +439,10 @@ export default function CalendarPage() {
 
         <div className="max-w-7xl mx-auto p-6">
           {viewMode === "month" && (
-            <Card>
-              <CardContent className="p-6">
+            <Card className="overflow-visible">
+              <CardContent className="p-6 overflow-visible">
                 {/* Calendar Grid */}
-                <div className="grid grid-cols-7 gap-px bg-slate-200 rounded-lg overflow-hidden">
+                <div className="grid grid-cols-7 gap-px bg-slate-200 rounded-lg">
                   {/* Day Headers */}
                   {daysOfWeek.map((day) => (
                     <div key={day} className="bg-slate-100 p-3 text-center">

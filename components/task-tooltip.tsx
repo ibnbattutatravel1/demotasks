@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Clock, User, CheckCircle2, Circle } from "lucide-react"
@@ -14,6 +14,16 @@ interface TaskTooltipProps {
 
 export function TaskTooltip({ task, children }: TaskTooltipProps) {
   const [isVisible, setIsVisible] = useState(false)
+  const [showBelow, setShowBelow] = useState(false)
+  const triggerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (isVisible && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      // If the element is in the top 30% of the viewport, show tooltip below
+      setShowBelow(rect.top < window.innerHeight * 0.3)
+    }
+  }, [isVisible])
 
   const getTaskSummary = () => {
     if (task.type === "meeting") {
@@ -42,12 +52,27 @@ export function TaskTooltip({ task, children }: TaskTooltipProps) {
   const summary = getTaskSummary()
 
   return (
-    <div className="relative" onMouseEnter={() => setIsVisible(true)} onMouseLeave={() => setIsVisible(false)}>
+    <div 
+      ref={triggerRef}
+      className="relative" 
+      onMouseEnter={() => setIsVisible(true)} 
+      onMouseLeave={() => setIsVisible(false)}
+    >
       {children}
 
       {isVisible && (
-        <div className="absolute z-50 bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64">
-          <Card className="shadow-lg border-slate-200">
+        <div 
+          className={`absolute z-50 left-1/2 transform -translate-x-1/2 w-64 animate-in fade-in duration-200 ${
+            showBelow ? 'top-full mt-2' : 'bottom-full mb-2'
+          }`}
+        >
+          {/* Arrow pointer */}
+          <div 
+            className={`absolute left-1/2 transform -translate-x-1/2 w-3 h-3 bg-white border-slate-200 rotate-45 ${
+              showBelow ? '-top-1.5 border-t border-l' : '-bottom-1.5 border-b border-r'
+            }`}
+          />
+          <Card className="shadow-lg border-slate-200 relative">
             <CardContent className="p-3 space-y-2">
               <div className="flex items-start justify-between gap-2">
                 <h4 className="font-medium text-slate-900 text-sm leading-tight">{summary.title}</h4>
