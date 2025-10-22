@@ -21,7 +21,7 @@ export async function GET(
     if (!payload?.sub) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
     // Get posts with author info and comment counts
-    const query = `
+    const result = await db.execute(sql`
       SELECT 
         p.*,
         u.name as author_name,
@@ -30,16 +30,15 @@ export async function GET(
         (SELECT COUNT(*) FROM community_comments WHERE post_id = p.id AND is_deleted = FALSE) as comments_count
       FROM community_posts p
       LEFT JOIN users u ON p.author_id = u.id
-      WHERE p.community_id = ? AND p.is_deleted = FALSE AND p.is_draft = FALSE
+      WHERE p.community_id = ${id} AND p.is_deleted = FALSE AND p.is_draft = FALSE
       ORDER BY p.is_pinned DESC, p.created_at DESC
-      LIMIT ? OFFSET ?
-    `
-
-    const result = await db.execute(sql.raw(query, [id, limit, offset]))
+      LIMIT ${limit} OFFSET ${offset}
+    `)
+    const data = Array.isArray(result[0]) ? result[0] : result.rows || result || []
 
     return NextResponse.json({
       success: true,
-      data: result.rows || []
+      data: data
     })
 
   } catch (error) {
@@ -71,9 +70,8 @@ export async function POST(
     }
 
     // Check if user is member
-    const memberQuery = `SELECT role FROM community_members WHERE community_id = ? AND user_id = ?`
-    const memberResult = await db.execute(sql.raw(memberQuery, [id, userId]))
-    const member = memberResult.rows?.[0]
+    const memberResult = await db.execute(sql`SELECT role FROM community_members WHERE community_id = ${id} AND user_id = ${userId}`)
+    const member = Array.isArray(memberResult[0]) ? memberResult[0][0] : memberResult.rows?.[0] || memberResult[0]
 
     if (!member) {
       return NextResponse.json({ success: false, error: 'Not a member' }, { status: 403 })
@@ -86,42 +84,44 @@ export async function POST(
 
     const postId = `post_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-    const insertQuery = `
+    await db.execute(sql`
       INSERT INTO community_posts (
         id, community_id, title, content, content_type, author_id,
         is_draft, tags, mentioned_users, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-    `
-
-    await db.execute(sql.raw(insertQuery, [
-      postId,
-      id,
-      title || null,
-      content,
-      content_type || 'markdown',
-      userId,
-      is_draft || false,
-      tags ? JSON.stringify(tags) : null,
-      mentioned_users ? JSON.stringify(mentioned_users) : null
-    ]))
+      ) VALUES (
+        ${postId},
+        ${id},
+        ${title || null},
+        ${content},
+        ${content_type || 'markdown'},
+        ${userId},
+        ${is_draft || false},
+        ${tags ? JSON.stringify(tags) : null},
+        ${mentioned_users ? JSON.stringify(mentioned_users) : null},
+        NOW(),
+        NOW()
+      )
+    `)
 
     // Create notifications for mentions
     if (mentioned_users && Array.isArray(mentioned_users)) {
       for (const mentionedUserId of mentioned_users) {
         try {
-          const notifQuery = `
+          const notifId = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          await db.execute(sql`
             INSERT INTO notifications (
-              id, user_id, type, title, message, related_id, related_type, is_read, created_at
-            ) VALUES (?, ?, 'community', ?, ?, ?, 'post', FALSE, NOW())
-          `
-          
-          await db.execute(sql.raw(notifQuery, [
-            `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            mentionedUserId,
-            'You were mentioned',
-            `${payload.name} mentioned you in a post`,
-            postId
-          ]))
+              id, user_id, type, title, message, related_id, related_type, created_at
+            ) VALUES (
+              ${notifId},
+              ${mentionedUserId},
+              'community',
+              ${'You were mentioned'},
+              ${'You were mentioned in a post'},
+              ${postId},
+              'post',
+              NOW()
+            )
+          `)
         } catch (e) {
           console.error('Failed to create mention notification:', e)
         }
@@ -130,18 +130,12 @@ export async function POST(
 
     // Log activity
     try {
-      const activityQuery = `
+      const activityId = `act_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      await db.execute(sql`
         INSERT INTO community_activity (
           id, community_id, user_id, action, target_type, target_id, created_at
-        ) VALUES (?, ?, ?, 'created', 'post', ?, NOW())
-      `
-      
-      await db.execute(sql.raw(activityQuery, [
-        `act_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        id,
-        userId,
-        postId
-      ]))
+        ) VALUES (${activityId}, ${id}, ${userId}, 'created', 'post', ${postId}, NOW())
+      `)
     } catch (e) {
       console.error('Failed to log activity:', e)
     }

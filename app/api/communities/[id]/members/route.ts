@@ -11,7 +11,7 @@ export async function GET(
   try {
     const { id } = await params
 
-    const query = `
+    const result = await db.execute(sql`
       SELECT 
         cm.*,
         u.name,
@@ -20,7 +20,7 @@ export async function GET(
         u.initials
       FROM community_members cm
       LEFT JOIN users u ON cm.user_id = u.id
-      WHERE cm.community_id = ?
+      WHERE cm.community_id = ${id}
       ORDER BY 
         CASE cm.role
           WHEN 'owner' THEN 1
@@ -31,13 +31,12 @@ export async function GET(
           WHEN 'viewer' THEN 6
         END,
         cm.joined_at DESC
-    `
-
-    const result = await db.execute(sql.raw(query, [id]))
+    `)
+    const data = Array.isArray(result[0]) ? result[0] : result.rows || result || []
 
     return NextResponse.json({
       success: true,
-      data: result.rows || []
+      data: data
     })
 
   } catch (error) {
@@ -63,9 +62,8 @@ export async function POST(
     const userId = payload.sub
 
     // Check permissions
-    const memberQuery = `SELECT role FROM community_members WHERE community_id = ? AND user_id = ?`
-    const memberResult = await db.execute(sql.raw(memberQuery, [id, userId]))
-    const member = memberResult.rows?.[0]
+    const memberResult = await db.execute(sql`SELECT role FROM community_members WHERE community_id = ${id} AND user_id = ${userId}`)
+    const member = Array.isArray(memberResult[0]) ? memberResult[0][0] : memberResult.rows?.[0] || memberResult[0]
 
     if (!member || !['owner', 'admin', 'moderator'].includes(member.role)) {
       return NextResponse.json({ success: false, error: 'Insufficient permissions' }, { status: 403 })
@@ -79,42 +77,41 @@ export async function POST(
     }
 
     // Check if already member
-    const existingQuery = `SELECT id FROM community_members WHERE community_id = ? AND user_id = ?`
-    const existingResult = await db.execute(sql.raw(existingQuery, [id, user_id]))
+    const existingResult = await db.execute(sql`SELECT id FROM community_members WHERE community_id = ${id} AND user_id = ${user_id}`)
+    const existing = Array.isArray(existingResult[0]) ? existingResult[0] : existingResult.rows || existingResult || []
     
-    if (existingResult.rows && existingResult.rows.length > 0) {
+    if (existing.length > 0) {
       return NextResponse.json({ success: false, error: 'User already a member' }, { status: 400 })
     }
 
     const memberId = `mem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-    const insertQuery = `
+    await db.execute(sql`
       INSERT INTO community_members (
         id, community_id, user_id, role, joined_at
-      ) VALUES (?, ?, ?, ?, NOW())
-    `
-
-    await db.execute(sql.raw(insertQuery, [memberId, id, user_id, role]))
+      ) VALUES (${memberId}, ${id}, ${user_id}, ${role}, NOW())
+    `)
 
     // Create notification
     try {
-      const commQuery = `SELECT name FROM communities WHERE id = ?`
-      const commResult = await db.execute(sql.raw(commQuery, [id]))
-      const community = commResult.rows?.[0]
+      const commResult = await db.execute(sql`SELECT name FROM communities WHERE id = ${id}`)
+      const community = Array.isArray(commResult[0]) ? commResult[0][0] : commResult.rows?.[0] || commResult[0]
 
-      const notifQuery = `
+      const notifId = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      await db.execute(sql`
         INSERT INTO notifications (
-          id, user_id, type, title, message, related_id, related_type, is_read, created_at
-        ) VALUES (?, ?, 'community', ?, ?, ?, 'community', FALSE, NOW())
-      `
-      
-      await db.execute(sql.raw(notifQuery, [
-        `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        user_id,
-        'Added to Community',
-        `You've been added to ${community?.name || 'a community'}`,
-        id
-      ]))
+          id, user_id, type, title, message, related_id, related_type, created_at
+        ) VALUES (
+          ${notifId},
+          ${user_id},
+          'community',
+          ${'Added to Community'},
+          ${`You've been added to ${community?.name || 'a community'}`},
+          ${id},
+          'community',
+          NOW()
+        )
+      `)
     } catch (e) {
       console.error('Failed to create notification:', e)
     }

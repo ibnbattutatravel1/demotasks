@@ -24,7 +24,7 @@ export async function GET(
     const userId = payload.sub
 
     // Get community with user's role
-    const query = `
+    const result = await db.execute(sql`
       SELECT 
         c.*,
         cm.role as user_role,
@@ -32,13 +32,11 @@ export async function GET(
         u.name as creator_name,
         u.avatar as creator_avatar
       FROM communities c
-      LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.user_id = ?
+      LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.user_id = ${userId}
       LEFT JOIN users u ON c.created_by = u.id
-      WHERE c.id = ? AND c.is_archived = FALSE
-    `
-
-    const result = await db.execute(sql.raw(query, [userId, id]))
-    const community = result.rows?.[0]
+      WHERE c.id = ${id} AND c.is_archived = FALSE
+    `)
+    const community = Array.isArray(result[0]) ? result[0][0] : result.rows?.[0] || result[0]
 
     if (!community) {
       return NextResponse.json({ success: false, error: 'Community not found' }, { status: 404 })
@@ -58,7 +56,7 @@ export async function GET(
     }
 
     // Get recent posts
-    const postsQuery = `
+    const postsResult = await db.execute(sql`
       SELECT 
         p.*,
         u.name as author_name,
@@ -67,28 +65,24 @@ export async function GET(
         (SELECT COUNT(*) FROM community_comments WHERE post_id = p.id AND is_deleted = FALSE) as comments_count
       FROM community_posts p
       LEFT JOIN users u ON p.author_id = u.id
-      WHERE p.community_id = ? AND p.is_deleted = FALSE
+      WHERE p.community_id = ${id} AND p.is_deleted = FALSE
       ORDER BY 
         p.is_pinned DESC,
         p.created_at DESC
       LIMIT 20
-    `
-
-    const postsResult = await db.execute(sql.raw(postsQuery, [id]))
-    const posts = postsResult.rows || []
+    `)
+    const posts = Array.isArray(postsResult[0]) ? postsResult[0] : postsResult.rows || postsResult || []
 
     // Get members count by role
-    const membersQuery = `
+    const membersResult = await db.execute(sql`
       SELECT 
         role,
         COUNT(*) as count
       FROM community_members
-      WHERE community_id = ?
+      WHERE community_id = ${id}
       GROUP BY role
-    `
-
-    const membersResult = await db.execute(sql.raw(membersQuery, [id]))
-    const membersByRole = membersResult.rows || []
+    `)
+    const membersByRole = Array.isArray(membersResult[0]) ? membersResult[0] : membersResult.rows || membersResult || []
 
     return NextResponse.json({
       success: true,
@@ -129,12 +123,11 @@ export async function PATCH(
     const userId = payload.sub
 
     // Check if user is admin or community owner/admin
-    const memberQuery = `
+    const memberResult = await db.execute(sql`
       SELECT role FROM community_members 
-      WHERE community_id = ? AND user_id = ?
-    `
-    const memberResult = await db.execute(sql.raw(memberQuery, [id, userId]))
-    const member = memberResult.rows?.[0]
+      WHERE community_id = ${id} AND user_id = ${userId}
+    `)
+    const member = Array.isArray(memberResult[0]) ? memberResult[0][0] : memberResult.rows?.[0] || memberResult[0]
 
     const userRows = await db.select().from(dbSchema.users).where(eq(dbSchema.users.id, userId))
     const user = userRows[0]
@@ -187,28 +180,18 @@ export async function PATCH(
     updates.push('updated_at = NOW()')
     values.push(id)
 
-    const updateQuery = `
-      UPDATE communities 
-      SET ${updates.join(', ')}
-      WHERE id = ?
-    `
-
-    await db.execute(sql.raw(updateQuery, values))
+    // Execute update using sql template literal
+    const updateSQL = `UPDATE communities SET ${updates.join(', ')} WHERE id = '${id}'`
+    await db.execute(sql.raw(updateSQL))
 
     // Log activity
     try {
-      const activityQuery = `
+      const activityId = `act_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      await db.execute(sql`
         INSERT INTO community_activity (
           id, community_id, user_id, action, target_type, target_id, created_at
-        ) VALUES (?, ?, ?, 'updated', 'community', ?, NOW())
-      `
-      
-      await db.execute(sql.raw(activityQuery, [
-        `act_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        id,
-        userId,
-        id
-      ]))
+        ) VALUES (${activityId}, ${id}, ${userId}, 'updated', 'community', ${id}, NOW())
+      `)
     } catch (e) {
       console.error('Failed to log activity:', e)
     }
@@ -248,12 +231,11 @@ export async function DELETE(
     const userId = payload.sub
 
     // Check if user is admin or community owner
-    const memberQuery = `
+    const memberResult = await db.execute(sql`
       SELECT role FROM community_members 
-      WHERE community_id = ? AND user_id = ?
-    `
-    const memberResult = await db.execute(sql.raw(memberQuery, [id, userId]))
-    const member = memberResult.rows?.[0]
+      WHERE community_id = ${id} AND user_id = ${userId}
+    `)
+    const member = Array.isArray(memberResult[0]) ? memberResult[0][0] : memberResult.rows?.[0] || memberResult[0]
 
     const userRows = await db.select().from(dbSchema.users).where(eq(dbSchema.users.id, userId))
     const user = userRows[0]
@@ -267,28 +249,20 @@ export async function DELETE(
     }
 
     // Soft delete (archive)
-    const deleteQuery = `
+    await db.execute(sql`
       UPDATE communities 
       SET is_archived = TRUE, archived_at = NOW(), updated_at = NOW()
-      WHERE id = ?
-    `
-
-    await db.execute(sql.raw(deleteQuery, [id]))
+      WHERE id = ${id}
+    `)
 
     // Log activity
     try {
-      const activityQuery = `
+      const activityId = `act_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      await db.execute(sql`
         INSERT INTO community_activity (
           id, community_id, user_id, action, target_type, target_id, created_at
-        ) VALUES (?, ?, ?, 'archived', 'community', ?, NOW())
-      `
-      
-      await db.execute(sql.raw(activityQuery, [
-        `act_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        id,
-        userId,
-        id
-      ]))
+        ) VALUES (${activityId}, ${id}, ${userId}, 'archived', 'community', ${id}, NOW())
+      `)
     } catch (e) {
       console.error('Failed to log activity:', e)
     }

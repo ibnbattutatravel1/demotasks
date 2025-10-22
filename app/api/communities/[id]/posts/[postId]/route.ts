@@ -17,7 +17,7 @@ export async function GET(
     const payload = await verifyAuthToken(token).catch(() => null)
     if (!payload?.sub) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
-    const query = `
+    const result = await db.execute(sql`
       SELECT 
         p.*,
         u.name as author_name,
@@ -25,11 +25,9 @@ export async function GET(
         u.initials as author_initials
       FROM community_posts p
       LEFT JOIN users u ON p.author_id = u.id
-      WHERE p.id = ? AND p.is_deleted = FALSE
-    `
-
-    const result = await db.execute(sql.raw(query, [postId]))
-    const post = result.rows?.[0]
+      WHERE p.id = ${postId} AND p.is_deleted = FALSE
+    `)
+    const post = Array.isArray(result[0]) ? result[0][0] : result.rows?.[0] || result[0]
 
     if (!post) {
       return NextResponse.json({ success: false, error: 'Post not found' }, { status: 404 })
@@ -37,8 +35,7 @@ export async function GET(
 
     // Increment view count
     try {
-      const updateQuery = `UPDATE community_posts SET views_count = views_count + 1 WHERE id = ?`
-      await db.execute(sql.raw(updateQuery, [postId]))
+      await db.execute(sql`UPDATE community_posts SET views_count = views_count + 1 WHERE id = ${postId}`)
     } catch (e) {
       console.error('Failed to increment view count:', e)
     }
@@ -73,13 +70,11 @@ export async function PATCH(
     const { content, title, is_pinned } = body
 
     // Check if user can edit
-    const postQuery = `SELECT author_id FROM community_posts WHERE id = ?`
-    const postResult = await db.execute(sql.raw(postQuery, [postId]))
-    const post = postResult.rows?.[0]
+    const postResult = await db.execute(sql`SELECT author_id FROM community_posts WHERE id = ${postId}`)
+    const post = Array.isArray(postResult[0]) ? postResult[0][0] : postResult.rows?.[0] || postResult[0]
 
-    const memberQuery = `SELECT role FROM community_members WHERE community_id = ? AND user_id = ?`
-    const memberResult = await db.execute(sql.raw(memberQuery, [id, userId]))
-    const member = memberResult.rows?.[0]
+    const memberResult = await db.execute(sql`SELECT role FROM community_members WHERE community_id = ${id} AND user_id = ${userId}`)
+    const member = Array.isArray(memberResult[0]) ? memberResult[0][0] : memberResult.rows?.[0] || memberResult[0]
 
     const canEdit = 
       post?.author_id === userId ||
@@ -111,10 +106,9 @@ export async function PATCH(
 
     updates.push('edited_at = NOW()')
     updates.push('updated_at = NOW()')
-    values.push(postId)
 
-    const updateQuery = `UPDATE community_posts SET ${updates.join(', ')} WHERE id = ?`
-    await db.execute(sql.raw(updateQuery, values))
+    const updateSQL = `UPDATE community_posts SET ${updates.join(', ')} WHERE id = '${postId}'`
+    await db.execute(sql.raw(updateSQL))
 
     return NextResponse.json({
       success: true,
@@ -144,13 +138,11 @@ export async function DELETE(
     const userId = payload.sub
 
     // Check permissions
-    const postQuery = `SELECT author_id FROM community_posts WHERE id = ?`
-    const postResult = await db.execute(sql.raw(postQuery, [postId]))
-    const post = postResult.rows?.[0]
+    const postResult = await db.execute(sql`SELECT author_id FROM community_posts WHERE id = ${postId}`)
+    const post = Array.isArray(postResult[0]) ? postResult[0][0] : postResult.rows?.[0] || postResult[0]
 
-    const memberQuery = `SELECT role FROM community_members WHERE community_id = ? AND user_id = ?`
-    const memberResult = await db.execute(sql.raw(memberQuery, [id, userId]))
-    const member = memberResult.rows?.[0]
+    const memberResult = await db.execute(sql`SELECT role FROM community_members WHERE community_id = ${id} AND user_id = ${userId}`)
+    const member = Array.isArray(memberResult[0]) ? memberResult[0][0] : memberResult.rows?.[0] || memberResult[0]
 
     const canDelete = 
       post?.author_id === userId ||
@@ -161,8 +153,7 @@ export async function DELETE(
     }
 
     // Soft delete
-    const deleteQuery = `UPDATE community_posts SET is_deleted = TRUE, updated_at = NOW() WHERE id = ?`
-    await db.execute(sql.raw(deleteQuery, [postId]))
+    await db.execute(sql`UPDATE community_posts SET is_deleted = TRUE, updated_at = NOW() WHERE id = ${postId}`)
 
     return NextResponse.json({
       success: true,

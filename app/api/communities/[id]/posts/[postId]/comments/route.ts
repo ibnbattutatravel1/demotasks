@@ -11,7 +11,7 @@ export async function GET(
   try {
     const { postId } = await params
 
-    const query = `
+    const result = await db.execute(sql`
       SELECT 
         c.*,
         u.name as author_name,
@@ -19,15 +19,14 @@ export async function GET(
         u.initials as author_initials
       FROM community_comments c
       LEFT JOIN users u ON c.author_id = u.id
-      WHERE c.post_id = ? AND c.is_deleted = FALSE
+      WHERE c.post_id = ${postId} AND c.is_deleted = FALSE
       ORDER BY c.created_at ASC
-    `
-
-    const result = await db.execute(sql.raw(query, [postId]))
+    `)
+    const data = Array.isArray(result[0]) ? result[0] : result.rows || result || []
 
     return NextResponse.json({
       success: true,
-      data: result.rows || []
+      data: data
     })
 
   } catch (error) {
@@ -60,42 +59,43 @@ export async function POST(
 
     const commentId = `comm_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-    const insertQuery = `
+    await db.execute(sql`
       INSERT INTO community_comments (
         id, post_id, content, author_id, parent_comment_id, mentioned_users, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
-    `
-
-    await db.execute(sql.raw(insertQuery, [
-      commentId,
-      postId,
-      content.trim(),
-      userId,
-      parent_comment_id || null,
-      mentioned_users ? JSON.stringify(mentioned_users) : null
-    ]))
+      ) VALUES (
+        ${commentId},
+        ${postId},
+        ${content.trim()},
+        ${userId},
+        ${parent_comment_id || null},
+        ${mentioned_users ? JSON.stringify(mentioned_users) : null},
+        NOW(),
+        NOW()
+      )
+    `)
 
     // Get post author for notification
-    const postQuery = `SELECT author_id FROM community_posts WHERE id = ?`
-    const postResult = await db.execute(sql.raw(postQuery, [postId]))
-    const post = postResult.rows?.[0]
+    const postResult = await db.execute(sql`SELECT author_id FROM community_posts WHERE id = ${postId}`)
+    const post = Array.isArray(postResult[0]) ? postResult[0][0] : postResult.rows?.[0] || postResult[0]
 
     // Notify post author
     if (post && post.author_id !== userId) {
       try {
-        const notifQuery = `
+        const notifId = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        await db.execute(sql`
           INSERT INTO notifications (
-            id, user_id, type, title, message, related_id, related_type, is_read, created_at
-          ) VALUES (?, ?, 'community', ?, ?, ?, 'comment', FALSE, NOW())
-        `
-        
-        await db.execute(sql.raw(notifQuery, [
-          `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          post.author_id,
-          'New Comment',
-          `${payload.name} commented on your post`,
-          commentId
-        ]))
+            id, user_id, type, title, message, related_id, related_type, created_at
+          ) VALUES (
+            ${notifId},
+            ${post.author_id},
+            'community',
+            ${'New Comment'},
+            ${'New comment on your post'},
+            ${commentId},
+            'comment',
+            NOW()
+          )
+        `)
       } catch (e) {
         console.error('Failed to create notification:', e)
       }
@@ -105,19 +105,21 @@ export async function POST(
     if (mentioned_users && Array.isArray(mentioned_users)) {
       for (const mentionedUserId of mentioned_users) {
         try {
-          const notifQuery = `
+          const notifId = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          await db.execute(sql`
             INSERT INTO notifications (
-              id, user_id, type, title, message, related_id, related_type, is_read, created_at
-            ) VALUES (?, ?, 'community', ?, ?, ?, 'comment', FALSE, NOW())
-          `
-          
-          await db.execute(sql.raw(notifQuery, [
-            `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            mentionedUserId,
-            'You were mentioned',
-            `${payload.name} mentioned you in a comment`,
-            commentId
-          ]))
+              id, user_id, type, title, message, related_id, related_type, created_at
+            ) VALUES (
+              ${notifId},
+              ${mentionedUserId},
+              'community',
+              ${'You were mentioned'},
+              ${'You were mentioned in a comment'},
+              ${commentId},
+              'comment',
+              NOW()
+            )
+          `)
         } catch (e) {
           console.error('Failed to create mention notification:', e)
         }
