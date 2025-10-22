@@ -59,7 +59,12 @@ export async function GET(req: NextRequest) {
     // Handle both array and rows format
     let data = []
     if (Array.isArray(communities)) {
-      data = communities
+      // Check if it's a nested array [[...]]
+      if (Array.isArray(communities[0])) {
+        data = communities[0]
+      } else {
+        data = communities
+      }
     } else if (communities.rows && Array.isArray(communities.rows)) {
       data = communities.rows
     } else if (communities[0]) {
@@ -67,8 +72,8 @@ export async function GET(req: NextRequest) {
       data = Object.values(communities)
     }
     
-    console.log('Sending data count:', data.length)
-    console.log('First item:', data[0] ? JSON.stringify(data[0]).substring(0, 200) : 'none')
+    console.log('✅ Sending data count:', data.length)
+    console.log('✅ First community:', data[0]?.name || 'none')
 
     return NextResponse.json({
       success: true,
