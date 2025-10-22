@@ -13,11 +13,25 @@
 
 ## 🚀 التثبيت (Installation)
 
-### 1. تشغيل Migration للـ Database
+### 1. تشغيل SQL للـ Database
 
+#### طريقة 1: MySQL Workbench
+1. افتح MySQL Workbench
+2. اتصل بالـ database
+3. افتح ملف `scripts/workspace-tables.sql`
+4. اضغط Execute (⚡)
+
+#### طريقة 2: Command Line
 ```bash
-npx tsx scripts/add-workspace-tables.ts
+mysql -u your_username -p your_database < scripts/workspace-tables.sql
 ```
+
+#### طريقة 3: phpMyAdmin
+1. افتح phpMyAdmin
+2. اختر الـ database
+3. اذهب لـ SQL tab
+4. انسخ والصق محتوى `scripts/workspace-tables.sql`
+5. اضغط Go
 
 هذا سيضيف:
 - جدول `project_notes` 
