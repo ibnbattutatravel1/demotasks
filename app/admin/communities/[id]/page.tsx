@@ -74,78 +74,51 @@ export default function AdminCommunityDetailPage() {
     }
   }, [user, router])
 
-  // Load community details
-  useEffect(() => {
-    const loadCommunity = async () => {
-      try {
-        setLoading(true)
-        const res = await fetch(`/api/communities/${communityId}`)
-        const json = await res.json()
-        
-        if (res.ok && json.success) {
-          setCommunity(json.data)
-        } else {
-          toast({ 
-            title: 'Error', 
-            description: json.error || 'Failed to load community',
-            variant: 'destructive' 
-          })
-        }
-      } catch (e) {
-        console.error('Failed to load community', e)
-        toast({ 
-          title: 'Error', 
-          description: 'Failed to load community', 
-          variant: 'destructive' 
-        })
-      } finally {
-        setLoading(false)
+  // Load all data
+  const loadAllData = async () => {
+    if (!user?.role || user.role !== 'admin' || !communityId) return
+
+    try {
+      setLoading(true)
+      
+      // Load community
+      const communityRes = await fetch(`/api/communities/${communityId}`)
+      const communityJson = await communityRes.json()
+      if (communityRes.ok && communityJson.success) {
+        setCommunity(communityJson.data)
       }
-    }
 
-    if (user?.role === 'admin' && communityId) {
-      loadCommunity()
-    }
-  }, [user, communityId, toast])
-
-  // Load posts
-  useEffect(() => {
-    const loadPosts = async () => {
-      try {
-        const res = await fetch(`/api/communities/${communityId}/posts`)
-        const json = await res.json()
-        
-        if (res.ok && json.success) {
-          setPosts(json.data || [])
-        }
-      } catch (e) {
-        console.error('Failed to load posts', e)
+      // Load posts
+      const postsRes = await fetch(`/api/communities/${communityId}/posts`)
+      const postsJson = await postsRes.json()
+      if (postsRes.ok && postsJson.success) {
+        setPosts(postsJson.data || [])
       }
-    }
 
-    if (user?.role === 'admin' && communityId) {
-      loadPosts()
-    }
-  }, [user, communityId])
-
-  // Load members
-  useEffect(() => {
-    const loadMembers = async () => {
-      try {
-        const res = await fetch(`/api/communities/${communityId}/members`)
-        const json = await res.json()
-        
-        if (res.ok && json.success) {
-          setMembers(json.data || [])
-        }
-      } catch (e) {
-        console.error('Failed to load members', e)
+      // Load members
+      const membersRes = await fetch(`/api/communities/${communityId}/members`)
+      const membersJson = await membersRes.json()
+      if (membersRes.ok && membersJson.success) {
+        setMembers(membersJson.data || [])
       }
+    } catch (e) {
+      console.error('Failed to load data', e)
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to load community data', 
+        variant: 'destructive' 
+      })
+    } finally {
+      setLoading(false)
     }
+  }
 
+  // Load all data on mount
+  useEffect(() => {
     if (user?.role === 'admin' && communityId) {
-      loadMembers()
+      loadAllData()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, communityId])
 
   if (user?.role !== 'admin') {
@@ -386,7 +359,7 @@ export default function AdminCommunityDetailPage() {
             <CommunityMembersManager
               communityId={communityId}
               members={members}
-              onMembersUpdate={fetchData}
+              onMembersUpdate={loadAllData}
               currentUserRole={community?.user_role || 'viewer'}
             />
           </TabsContent>
