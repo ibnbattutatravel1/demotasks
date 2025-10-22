@@ -25,6 +25,14 @@ import {
   Clock,
   Pin,
   MoreVertical,
+  ChevronDown,
+  SortAsc,
+  SortDesc,
+  Calendar as CalendarIcon,
+  Tag,
+  RefreshCw,
+  Eye,
+  Star,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -44,6 +52,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { formatDate, formatDateTime } from "@/lib/format-date"
 import type { Project } from "@/lib/types"
+import { VoiceInput } from "@/components/ui/voice-input"
 
 interface Note {
   id: string
@@ -93,6 +102,19 @@ export default function ProjectWorkspacePage() {
   const [notesSearch, setNotesSearch] = useState("")
   const [docsSearch, setDocsSearch] = useState("")
   const [filterAuthor, setFilterAuthor] = useState<string>("all")
+  const [filterPinned, setFilterPinned] = useState<string>("all") // all | pinned | unpinned
+  const [sortBy, setSortBy] = useState<string>("recent") // recent | oldest | title
+  const [filterDateRange, setFilterDateRange] = useState<string>("all") // all | today | week | month
+  const [docFilterType, setDocFilterType] = useState<string>("all") // all | pdf | image | document
+  
+  // Pagination
+  const [notesPage, setNotesPage] = useState(1)
+  const [docsPage, setDocsPage] = useState(1)
+  const ITEMS_PER_PAGE = 20
+  
+  // View options
+  const [showFavorites, setShowFavorites] = useState(false)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
   // Note dialog
   const [showNoteDialog, setShowNoteDialog] = useState(false)
@@ -292,27 +314,97 @@ export default function ProjectWorkspacePage() {
     }
   }
 
-  // Filtered data
+  // Filtered and sorted data
   const filteredNotes = notes
     .filter((note) => {
+      // Search filter
       const matchesSearch =
         note.title.toLowerCase().includes(notesSearch.toLowerCase()) ||
         note.content.toLowerCase().includes(notesSearch.toLowerCase())
+      
+      // Author filter
       const matchesAuthor = filterAuthor === 'all' || note.createdBy.id === filterAuthor
-      return matchesSearch && matchesAuthor
+      
+      // Pinned filter
+      const matchesPinned = 
+        filterPinned === 'all' ||
+        (filterPinned === 'pinned' && note.isPinned) ||
+        (filterPinned === 'unpinned' && !note.isPinned)
+      
+      // Date range filter
+      const noteDate = new Date(note.createdAt)
+      const now = new Date()
+      let matchesDate = true
+      
+      if (filterDateRange === 'today') {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        matchesDate = noteDate >= today
+      } else if (filterDateRange === 'week') {
+        const weekAgo = new Date()
+        weekAgo.setDate(weekAgo.getDate() - 7)
+        matchesDate = noteDate >= weekAgo
+      } else if (filterDateRange === 'month') {
+        const monthAgo = new Date()
+        monthAgo.setMonth(monthAgo.getMonth() - 1)
+        matchesDate = noteDate >= monthAgo
+      }
+      
+      return matchesSearch && matchesAuthor && matchesPinned && matchesDate
     })
     .sort((a, b) => {
+      // Always show pinned first
       if (a.isPinned && !b.isPinned) return -1
       if (!a.isPinned && b.isPinned) return 1
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      
+      // Then sort by selected option
+      if (sortBy === 'recent') {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      } else if (sortBy === 'oldest') {
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      } else if (sortBy === 'title') {
+        return a.title.localeCompare(b.title)
+      }
+      return 0
     })
 
-  const filteredDocuments = documents.filter((doc) => {
-    const matchesSearch = doc.name.toLowerCase().includes(docsSearch.toLowerCase())
-    const matchesAuthor = filterAuthor === 'all' || doc.uploadedBy.id === filterAuthor
-    return matchesSearch && matchesAuthor
-  })
+  const filteredDocuments = documents
+    .filter((doc) => {
+      // Search filter
+      const matchesSearch = doc.name.toLowerCase().includes(docsSearch.toLowerCase())
+      
+      // Author filter
+      const matchesAuthor = filterAuthor === 'all' || doc.uploadedBy.id === filterAuthor
+      
+      // Type filter
+      let matchesType = true
+      if (docFilterType === 'pdf') {
+        matchesType = doc.type.includes('pdf')
+      } else if (docFilterType === 'image') {
+        matchesType = doc.type.includes('image')
+      } else if (docFilterType === 'document') {
+        matchesType = doc.type.includes('word') || doc.type.includes('document') || doc.type.includes('text')
+      }
+      
+      return matchesSearch && matchesAuthor && matchesType
+    })
+    .sort((a, b) => {
+      if (sortBy === 'recent') {
+        return new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+      } else if (sortBy === 'oldest') {
+        return new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime()
+      } else if (sortBy === 'title') {
+        return a.name.localeCompare(b.name)
+      }
+      return 0
+    })
 
+  // Pagination
+  const paginatedNotes = filteredNotes.slice(0, notesPage * ITEMS_PER_PAGE)
+  const paginatedDocuments = filteredDocuments.slice(0, docsPage * ITEMS_PER_PAGE)
+  const hasMoreNotes = filteredNotes.length > paginatedNotes.length
+  const hasMoreDocs = filteredDocuments.length > paginatedDocuments.length
+  
   // Get unique authors
   const authors = Array.from(
     new Set([
@@ -320,6 +412,18 @@ export default function ProjectWorkspacePage() {
       ...documents.map((d) => d.uploadedBy.id),
     ])
   )
+  
+  // Stats
+  const pinnedCount = notes.filter(n => n.isPinned).length
+  const myNotesCount = notes.filter(n => n.createdBy.id === user?.id).length
+  const totalSize = documents.reduce((sum, doc) => sum + doc.size, 0)
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+  }
 
   const canEdit = (creatorId: string) => hasFullControl || creatorId === user?.id
 
@@ -386,46 +490,206 @@ export default function ProjectWorkspacePage() {
 
           {/* Notes Tab */}
           <TabsContent value="notes" className="space-y-4">
-            {/* Filters and Actions */}
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2 flex-1">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input
-                    placeholder="Search notes..."
-                    value={notesSearch}
-                    onChange={(e) => setNotesSearch(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <Filter className="h-4 w-4 mr-2" />
-                      Filter
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-600">Total Notes</p>
+                      <p className="text-2xl font-bold text-slate-900">{notes.length}</p>
+                    </div>
+                    <FileText className="h-8 w-8 text-indigo-600" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-600">Pinned</p>
+                      <p className="text-2xl font-bold text-amber-600">{pinnedCount}</p>
+                    </div>
+                    <Pin className="h-8 w-8 text-amber-600" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-600">My Notes</p>
+                      <p className="text-2xl font-bold text-emerald-600">{myNotesCount}</p>
+                    </div>
+                    <UserIcon className="h-8 w-8 text-emerald-600" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-600">Showing</p>
+                      <p className="text-2xl font-bold text-blue-600">{paginatedNotes.length}/{filteredNotes.length}</p>
+                    </div>
+                    <Eye className="h-8 w-8 text-blue-600" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Advanced Filters Bar */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Search */}
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder="Search notes..."
+                      value={notesSearch}
+                      onChange={(e) => setNotesSearch(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+
+                  {/* Author Filter */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <UserIcon className="h-4 w-4 mr-2" />
+                        {filterAuthor === 'all' ? 'All Authors' : authors.find(a => a === filterAuthor) ? 'Filtered' : 'Author'}
+                        <ChevronDown className="h-4 w-4 ml-2" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setFilterAuthor('all')}>
+                        <UserIcon className="h-4 w-4 mr-2" />
+                        All Authors
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      {authors.map((authorId) => {
+                        const note = notes.find((n) => n.createdBy.id === authorId)
+                        const doc = documents.find((d) => d.uploadedBy.id === authorId)
+                        const author = note?.createdBy || doc?.uploadedBy
+                        if (!author) return null
+                        return (
+                          <DropdownMenuItem
+                            key={authorId}
+                            onClick={() => setFilterAuthor(authorId)}
+                          >
+                            <Avatar className="h-4 w-4 mr-2">
+                              <AvatarImage src={author.avatar} />
+                              <AvatarFallback className="text-[10px]">{author.initials}</AvatarFallback>
+                            </Avatar>
+                            {author.name}
+                          </DropdownMenuItem>
+                        )
+                      })}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {/* Pinned Filter */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Pin className="h-4 w-4 mr-2" />
+                        {filterPinned === 'all' ? 'All' : filterPinned === 'pinned' ? 'Pinned' : 'Unpinned'}
+                        <ChevronDown className="h-4 w-4 ml-2" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setFilterPinned('all')}>
+                        All Notes
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setFilterPinned('pinned')}>
+                        <Pin className="h-4 w-4 mr-2" />
+                        Pinned Only
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setFilterPinned('unpinned')}>
+                        Unpinned Only
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {/* Date Range Filter */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <CalendarIcon className="h-4 w-4 mr-2" />
+                        {filterDateRange === 'all' ? 'All Time' : filterDateRange === 'today' ? 'Today' : filterDateRange === 'week' ? 'This Week' : 'This Month'}
+                        <ChevronDown className="h-4 w-4 ml-2" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setFilterDateRange('all')}>
+                        All Time
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setFilterDateRange('today')}>
+                        <CalendarIcon className="h-4 w-4 mr-2" />
+                        Today
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setFilterDateRange('week')}>
+                        Last 7 Days
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setFilterDateRange('month')}>
+                        Last 30 Days
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {/* Sort */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        {sortBy === 'recent' ? <SortDesc className="h-4 w-4 mr-2" /> : <SortAsc className="h-4 w-4 mr-2" />}
+                        Sort
+                        <ChevronDown className="h-4 w-4 ml-2" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setSortBy('recent')}>
+                        <SortDesc className="h-4 w-4 mr-2" />
+                        Newest First
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setSortBy('oldest')}>
+                        <SortAsc className="h-4 w-4 mr-2" />
+                        Oldest First
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setSortBy('title')}>
+                        <Tag className="h-4 w-4 mr-2" />
+                        By Title (A-Z)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {/* Reset Filters */}
+                  {(notesSearch || filterAuthor !== 'all' || filterPinned !== 'all' || filterDateRange !== 'all' || sortBy !== 'recent') && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setNotesSearch('')
+                        setFilterAuthor('all')
+                        setFilterPinned('all')
+                        setFilterDateRange('all')
+                        setSortBy('recent')
+                        setNotesPage(1)
+                      }}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Reset
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setFilterAuthor('all')}>
-                      All Authors
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    {authors.map((authorId) => {
-                      const note = notes.find((n) => n.createdBy.id === authorId)
-                      const doc = documents.find((d) => d.uploadedBy.id === authorId)
-                      const author = note?.createdBy || doc?.uploadedBy
-                      if (!author) return null
-                      return (
-                        <DropdownMenuItem
-                          key={authorId}
-                          onClick={() => setFilterAuthor(authorId)}
-                        >
-                          {author.name}
-                        </DropdownMenuItem>
-                      )
-                    })}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-slate-600">
+                Showing {paginatedNotes.length} of {filteredNotes.length} notes
+              </p>
+              <div className="flex items-center gap-2">
               </div>
               <Dialog open={showNoteDialog} onOpenChange={(open) => {
                 setShowNoteDialog(open)
@@ -460,12 +724,22 @@ export default function ProjectWorkspacePage() {
                     </div>
                     <div>
                       <label className="text-sm font-medium text-slate-700">Content</label>
-                      <Textarea
-                        placeholder="Write your note here..."
-                        value={noteContent}
-                        onChange={(e) => setNoteContent(e.target.value)}
-                        className="mt-1 min-h-[200px]"
-                      />
+                      <div className="relative mt-1">
+                        <Textarea
+                          placeholder="Write your note here..."
+                          value={noteContent}
+                          onChange={(e) => setNoteContent(e.target.value)}
+                          className="min-h-[200px] pr-12"
+                        />
+                        <div className="absolute right-2 top-2">
+                          <VoiceInput
+                            onTranscript={(text) => {
+                              setNoteContent(prev => prev ? `${prev}\n${text}` : text)
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">Use the microphone to dictate your note</p>
                     </div>
                     <div className="flex justify-end gap-2">
                       <Button
@@ -491,7 +765,7 @@ export default function ProjectWorkspacePage() {
             {/* Notes Grid */}
             {loading ? (
               <div className="text-center py-12 text-slate-500">Loading notes...</div>
-            ) : filteredNotes.length === 0 ? (
+            ) : paginatedNotes.length === 0 ? (
               <Card>
                 <CardContent className="p-12 text-center">
                   <FileText className="h-12 w-12 text-slate-400 mx-auto mb-4" />
@@ -503,7 +777,7 @@ export default function ProjectWorkspacePage() {
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredNotes.map((note) => (
+                {paginatedNotes.map((note) => (
                   <Card key={note.id} className="hover:shadow-md transition-shadow">
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
@@ -565,23 +839,165 @@ export default function ProjectWorkspacePage() {
                 ))}
               </div>
             )}
+
+            {/* Load More Button */}
+            {hasMoreNotes && (
+              <div className="flex justify-center pt-4">
+                <Button
+                  onClick={() => setNotesPage(prev => prev + 1)}
+                  variant="outline"
+                  className="min-w-[200px]"
+                >
+                  <ChevronDown className="h-4 w-4 mr-2" />
+                  Load More Notes ({filteredNotes.length - paginatedNotes.length} remaining)
+                </Button>
+              </div>
+            )}
           </TabsContent>
 
           {/* Documents Tab */}
           <TabsContent value="documents" className="space-y-4">
-            {/* Filters and Actions */}
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2 flex-1">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input
-                    placeholder="Search documents..."
-                    value={docsSearch}
-                    onChange={(e) => setDocsSearch(e.target.value)}
-                    className="pl-10"
-                  />
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-600">Total Files</p>
+                      <p className="text-2xl font-bold text-slate-900">{documents.length}</p>
+                    </div>
+                    <File className="h-8 w-8 text-indigo-600" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-600">Total Size</p>
+                      <p className="text-2xl font-bold text-emerald-600">{formatFileSize(totalSize)}</p>
+                    </div>
+                    <Upload className="h-8 w-8 text-emerald-600" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-600">My Files</p>
+                      <p className="text-2xl font-bold text-blue-600">{documents.filter(d => d.uploadedBy.id === user?.id).length}</p>
+                    </div>
+                    <UserIcon className="h-8 w-8 text-blue-600" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-600">Showing</p>
+                      <p className="text-2xl font-bold text-amber-600">{paginatedDocuments.length}/{filteredDocuments.length}</p>
+                    </div>
+                    <Eye className="h-8 w-8 text-amber-600" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Advanced Filters Bar */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Search */}
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder="Search documents..."
+                      value={docsSearch}
+                      onChange={(e) => setDocsSearch(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+
+                  {/* Type Filter */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <File className="h-4 w-4 mr-2" />
+                        {docFilterType === 'all' ? 'All Types' : docFilterType === 'pdf' ? 'PDF' : docFilterType === 'image' ? 'Images' : 'Documents'}
+                        <ChevronDown className="h-4 w-4 ml-2" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setDocFilterType('all')}>
+                        All File Types
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setDocFilterType('pdf')}>
+                        <File className="h-4 w-4 mr-2" />
+                        PDF Files
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setDocFilterType('image')}>
+                        <File className="h-4 w-4 mr-2" />
+                        Images
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setDocFilterType('document')}>
+                        <File className="h-4 w-4 mr-2" />
+                        Documents
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {/* Sort */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        {sortBy === 'recent' ? <SortDesc className="h-4 w-4 mr-2" /> : <SortAsc className="h-4 w-4 mr-2" />}
+                        Sort
+                        <ChevronDown className="h-4 w-4 ml-2" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setSortBy('recent')}>
+                        <SortDesc className="h-4 w-4 mr-2" />
+                        Newest First
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setSortBy('oldest')}>
+                        <SortAsc className="h-4 w-4 mr-2" />
+                        Oldest First
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setSortBy('title')}>
+                        <Tag className="h-4 w-4 mr-2" />
+                        By Name (A-Z)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {/* Reset Filters */}
+                  {(docsSearch || docFilterType !== 'all' || sortBy !== 'recent') && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setDocsSearch('')
+                        setDocFilterType('all')
+                        setSortBy('recent')
+                        setDocsPage(1)
+                      }}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Reset
+                    </Button>
+                  )}
                 </div>
-              </div>
+              </CardContent>
+            </Card>
+
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-slate-600">
+                Showing {paginatedDocuments.length} of {filteredDocuments.length} documents
+              </p>
               <div className="flex items-center gap-2">
                 <input
                   type="file"
@@ -596,7 +1012,7 @@ export default function ProjectWorkspacePage() {
                   className="bg-indigo-500 hover:bg-indigo-600"
                 >
                   <Upload className="h-4 w-4 mr-2" />
-                  {isUploading ? 'Uploading...' : 'Upload'}
+                  {isUploading ? 'Uploading...' : 'Upload Files'}
                 </Button>
               </div>
             </div>
@@ -604,7 +1020,7 @@ export default function ProjectWorkspacePage() {
             {/* Documents List */}
             {loading ? (
               <div className="text-center py-12 text-slate-500">Loading documents...</div>
-            ) : filteredDocuments.length === 0 ? (
+            ) : paginatedDocuments.length === 0 ? (
               <Card>
                 <CardContent className="p-12 text-center">
                   <File className="h-12 w-12 text-slate-400 mx-auto mb-4" />
@@ -618,7 +1034,7 @@ export default function ProjectWorkspacePage() {
               <Card>
                 <CardContent className="p-0">
                   <div className="divide-y divide-slate-200">
-                    {filteredDocuments.map((doc) => (
+                    {paginatedDocuments.map((doc) => (
                       <div
                         key={doc.id}
                         className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between"
@@ -672,6 +1088,20 @@ export default function ProjectWorkspacePage() {
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Load More Button */}
+            {hasMoreDocs && (
+              <div className="flex justify-center pt-4">
+                <Button
+                  onClick={() => setDocsPage(prev => prev + 1)}
+                  variant="outline"
+                  className="min-w-[200px]"
+                >
+                  <ChevronDown className="h-4 w-4 mr-2" />
+                  Load More Files ({filteredDocuments.length - paginatedDocuments.length} remaining)
+                </Button>
+              </div>
             )}
           </TabsContent>
         </Tabs>
