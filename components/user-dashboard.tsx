@@ -35,6 +35,7 @@ import {
   MapPin,
   Bell,
   MessageSquare,
+  FileText,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -372,6 +373,13 @@ export function UserDashboard() {
             >
               <Calendar className="h-4 w-4 text-slate-600" />
               <span className="text-sm font-medium text-slate-900">Timesheet</span>
+            </button>
+            <button
+              onClick={() => handleNavigation("/questionnaires")}
+              className="flex items-center gap-2 mb-3 w-full text-left hover:bg-slate-50 rounded-lg px-2 py-1.5 transition-colors"
+            >
+              <FileText className="h-4 w-4 text-slate-600" />
+              <span className="text-sm font-medium text-slate-900">Questionnaires</span>
             </button>
           </div>
 

@@ -35,6 +35,7 @@ import {
   User,
   Inbox,
   Clock,
+  FileText,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -434,6 +435,16 @@ export function AdminDashboard() {
             >
               <Calendar className="h-4 w-4 text-slate-600" />
               <span className="text-sm font-medium text-slate-900">Timesheets</span>
+            </button>
+            <button
+              onClick={() => handleNavigation("/admin/questionnaires")}
+              className="flex items-center gap-2 mb-3 w-full text-left hover:bg-slate-50 rounded-lg px-2 py-1.5 transition-colors"
+            >
+              <FileText className="h-4 w-4 text-slate-600" />
+              <span className="text-sm font-medium text-slate-900">Questionnaires</span>
+              <Badge variant="outline" className="ml-auto text-xs bg-red-50 text-red-600 border-red-200">
+                New
+              </Badge>
             </button>
           </div>
         </div>
