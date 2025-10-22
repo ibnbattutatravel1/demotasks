@@ -4,9 +4,10 @@ import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useToast } from "@/hooks/use-toast"
 import {
   ArrowLeft,
   Users,
@@ -18,7 +19,6 @@ import {
   MessageSquare,
   TrendingUp,
 } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
 
 interface Community {
   id: string
@@ -314,6 +314,7 @@ export default function AdminCommunityDetailPage() {
             <TabsList>
               <TabsTrigger value="posts">Posts ({posts.length})</TabsTrigger>
               <TabsTrigger value="members">Members ({members.length})</TabsTrigger>
+              <TabsTrigger value="files">Files</TabsTrigger>
               <TabsTrigger value="settings">Settings</TabsTrigger>
             </TabsList>
           </div>
@@ -482,6 +483,100 @@ export default function AdminCommunityDetailPage() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="files" className="space-y-4">
+            <Card className="bg-purple-50 border-purple-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-5 w-5 text-purple-600" />
+                    <div>
+                      <p className="text-sm font-medium text-purple-900">Files & Documents</p>
+                      <p className="text-xs text-purple-600">
+                        Share files, documents, and resources within your community
+                      </p>
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={() => {
+                      toast({
+                        title: 'Upload File',
+                        description: 'File upload UI coming soon. Use API endpoint to upload files.',
+                      })
+                    }}
+                    size="sm"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Upload File
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Shared Files</CardTitle>
+                <CardDescription>Documents and files shared in this community</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-12">
+                  <FileText className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-slate-900 mb-2">No files yet</h3>
+                  <p className="text-slate-600 mb-4">
+                    Upload files to share with your community members
+                  </p>
+                  <Button
+                    onClick={() => {
+                      toast({
+                        title: 'File Upload',
+                        description: 'File upload system will be implemented here.',
+                      })
+                    }}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Upload First File
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Features</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                      <span className="text-green-600 text-sm">✓</span>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-slate-900">Secure Storage</h4>
+                      <p className="text-sm text-slate-600">Your files are encrypted and stored securely</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                      <span className="text-green-600 text-sm">✓</span>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-slate-900">Version Control</h4>
+                      <p className="text-sm text-slate-600">Track changes and maintain file versions</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                      <span className="text-green-600 text-sm">✓</span>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-slate-900">Access Control</h4>
+                      <p className="text-sm text-slate-600">Control who can view and download files</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="settings">

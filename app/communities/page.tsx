@@ -17,7 +17,12 @@ import {
   Eye,
   MessageSquare,
   TrendingUp,
+  Filter,
+  Clock,
+  UserCheck,
+  SlidersHorizontal,
 } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Community {
   id: string
@@ -39,6 +44,8 @@ export default function CommunitiesPage() {
   const [communities, setCommunities] = useState<Community[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'active'>('recent')
+  const [filterBy, setFilterBy] = useState<'all' | 'joined' | 'public'>('all')
 
   useEffect(() => {
     const load = async () => {
@@ -60,10 +67,25 @@ export default function CommunitiesPage() {
     }
   }, [user])
 
-  const filtered = communities.filter(c =>
+  // Apply filters
+  let filtered = communities.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     c.description?.toLowerCase().includes(search.toLowerCase())
   )
+
+  // Filter by membership
+  if (filterBy === 'joined') {
+    filtered = filtered.filter(c => c.user_role)
+  } else if (filterBy === 'public') {
+    filtered = filtered.filter(c => !c.user_role && c.visibility === 'public')
+  }
+
+  // Sort
+  if (sortBy === 'popular') {
+    filtered = filtered.sort((a, b) => (b.members_count || 0) - (a.members_count || 0))
+  } else if (sortBy === 'active') {
+    filtered = filtered.sort((a, b) => (b.posts_count || 0) - (a.posts_count || 0))
+  }
 
   const myCommunities = filtered.filter(c => c.user_role)
   const publicCommunities = filtered.filter(c => !c.user_role && c.visibility === 'public')
@@ -133,17 +155,75 @@ export default function CommunitiesPage() {
           </Card>
         </div>
 
-        {/* Search */}
+        {/* Search & Filters */}
         <Card className="mb-6">
           <CardContent className="p-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Search communities..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
-              />
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Search communities..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              
+              <div className="flex gap-2">
+                <Select value={filterBy} onValueChange={(v: any) => setFilterBy(v)}>
+                  <SelectTrigger className="w-[150px]">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">
+                      <div className="flex items-center gap-2">
+                        <Globe className="h-4 w-4" />
+                        All Communities
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="joined">
+                      <div className="flex items-center gap-2">
+                        <UserCheck className="h-4 w-4" />
+                        Joined
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="public">
+                      <div className="flex items-center gap-2">
+                        <Eye className="h-4 w-4" />
+                        Public Only
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
+                  <SelectTrigger className="w-[150px]">
+                    <SlidersHorizontal className="h-4 w-4 mr-2" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="recent">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Most Recent
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="popular">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Most Popular
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="active">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4" />
+                        Most Active
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardContent>
         </Card>
