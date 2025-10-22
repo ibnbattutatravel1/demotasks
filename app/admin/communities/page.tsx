@@ -65,8 +65,21 @@ export default function AdminCommunitiesPage() {
         setLoading(true)
         const res = await fetch('/api/communities')
         const json = await res.json()
+        
+        console.log('🔍 Communities API Response:', {
+          status: res.status,
+          ok: res.ok,
+          success: json.success,
+          dataType: typeof json.data,
+          dataIsArray: Array.isArray(json.data),
+          dataLength: json.data?.length || 0,
+          firstItem: json.data?.[0] || null
+        })
+        
         if (res.ok && json.success) {
           setCommunities(json.data || [])
+        } else {
+          console.error('❌ API Error:', json.error)
         }
       } catch (e) {
         console.error('Failed to load communities', e)
@@ -81,10 +94,14 @@ export default function AdminCommunitiesPage() {
   }, [user, toast])
 
   // Filter
-  const filtered = communities.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.description?.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = communities.filter(c => {
+    if (!c || !c.name) return false
+    const searchLower = search.toLowerCase()
+    return (
+      c.name.toLowerCase().includes(searchLower) ||
+      (c.description && c.description.toLowerCase().includes(searchLower))
+    )
+  })
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete "${name}"?`)) return

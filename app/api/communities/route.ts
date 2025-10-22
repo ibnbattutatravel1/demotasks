@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Get communities where user is a member OR public communities
-    const query = `
+    const communities = await db.execute(sql`
       SELECT DISTINCT
         c.*,
         cm.role as user_role,
@@ -34,21 +34,45 @@ export async function GET(req: NextRequest) {
         u.name as creator_name,
         u.avatar as creator_avatar
       FROM communities c
-      LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.user_id = ?
+      LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.user_id = ${userId}
       LEFT JOIN users u ON c.created_by = u.id
       WHERE 
-        (cm.user_id = ? OR c.visibility = 'public' OR ? = 'admin')
+        (cm.user_id = ${userId} OR c.visibility = 'public' OR ${user.role} = 'admin')
         AND c.is_archived = FALSE
       ORDER BY 
         CASE WHEN cm.user_id IS NOT NULL THEN 0 ELSE 1 END,
         c.created_at DESC
-    `
+    `)
 
-    const communities = await db.execute(sql.raw(query, [userId, userId, user.role]))
+    // Debug logging
+    console.log('Communities raw response:', JSON.stringify(communities).substring(0, 500))
+    console.log('Communities response structure:', {
+      hasRows: !!communities.rows,
+      rowsLength: communities.rows?.length || 0,
+      hasArray: Array.isArray(communities),
+      arrayLength: Array.isArray(communities) ? communities.length : 0,
+      type: typeof communities,
+      keys: Object.keys(communities || {}),
+      constructor: communities?.constructor?.name
+    })
+
+    // Handle both array and rows format
+    let data = []
+    if (Array.isArray(communities)) {
+      data = communities
+    } else if (communities.rows && Array.isArray(communities.rows)) {
+      data = communities.rows
+    } else if (communities[0]) {
+      // Convert object with numeric keys to array
+      data = Object.values(communities)
+    }
+    
+    console.log('Sending data count:', data.length)
+    console.log('First item:', data[0] ? JSON.stringify(data[0]).substring(0, 200) : 'none')
 
     return NextResponse.json({
       success: true,
-      data: communities.rows || []
+      data: data
     })
 
   } catch (error) {
@@ -99,68 +123,61 @@ export async function POST(req: NextRequest) {
     const communityId = `comm_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
     // Create community
-    const query = `
+    await db.execute(sql`
       INSERT INTO communities (
         id, name, description, icon, color, visibility, 
         created_by, settings, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-    `
-
-    await db.execute(sql.raw(query, [
-      communityId,
-      name,
-      description || null,
-      icon || '🏘️',
-      color || '#6366f1',
-      visibility || 'private',
-      userId,
-      settings ? JSON.stringify(settings) : null
-    ]))
+      ) VALUES (
+        ${communityId},
+        ${name},
+        ${description || null},
+        ${icon || '🏘️'},
+        ${color || '#6366f1'},
+        ${visibility || 'private'},
+        ${userId},
+        ${settings ? JSON.stringify(settings) : null},
+        NOW(),
+        NOW()
+      )
+    `)
 
     // Add creator as owner
-    const memberQuery = `
+    const memberId = `mem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    await db.execute(sql`
       INSERT INTO community_members (
         id, community_id, user_id, role, joined_at
-      ) VALUES (?, ?, ?, 'owner', NOW())
-    `
-    
-    await db.execute(sql.raw(memberQuery, [
-      `mem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      communityId,
-      userId
-    ]))
+      ) VALUES (${memberId}, ${communityId}, ${userId}, 'owner', NOW())
+    `)
 
     // Add initial members if provided
     if (memberIds && Array.isArray(memberIds) && memberIds.length > 0) {
       for (const memberId of memberIds) {
         try {
-          const memberInsertQuery = `
+          const newMemberId = `mem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          await db.execute(sql`
             INSERT INTO community_members (
               id, community_id, user_id, role, joined_at
-            ) VALUES (?, ?, ?, 'viewer', NOW())
-          `
-          
-          await db.execute(sql.raw(memberInsertQuery, [
-            `mem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            communityId,
-            memberId
-          ]))
+            ) VALUES (${newMemberId}, ${communityId}, ${memberId}, 'viewer', NOW())
+          `)
 
           // Create notification
           try {
-            const notifQuery = `
+            const notifId = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+            await db.execute(sql`
               INSERT INTO notifications (
                 id, user_id, type, title, message, related_id, related_type, is_read, created_at
-              ) VALUES (?, ?, 'community', ?, ?, ?, 'community', FALSE, NOW())
-            `
-            
-            await db.execute(sql.raw(notifQuery, [
-              `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-              memberId,
-              'Added to Community',
-              `You've been added to ${name}`,
-              communityId
-            ]))
+              ) VALUES (
+                ${notifId},
+                ${memberId},
+                'community',
+                ${'Added to Community'},
+                ${`You've been added to ${name}`},
+                ${communityId},
+                'community',
+                FALSE,
+                NOW()
+              )
+            `)
           } catch (e) {
             console.error('Failed to create notification:', e)
           }
@@ -172,18 +189,20 @@ export async function POST(req: NextRequest) {
 
     // Log activity
     try {
-      const activityQuery = `
+      const activityId = `act_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      await db.execute(sql`
         INSERT INTO community_activity (
           id, community_id, user_id, action, target_type, target_id, created_at
-        ) VALUES (?, ?, ?, 'created', 'community', ?, NOW())
-      `
-      
-      await db.execute(sql.raw(activityQuery, [
-        `act_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        communityId,
-        userId,
-        communityId
-      ]))
+        ) VALUES (
+          ${activityId},
+          ${communityId},
+          ${userId},
+          'created',
+          'community',
+          ${communityId},
+          NOW()
+        )
+      `)
     } catch (e) {
       console.error('Failed to log activity:', e)
     }
