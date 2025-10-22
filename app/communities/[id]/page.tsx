@@ -20,10 +20,18 @@ import {
   Settings,
   Search,
   Plus,
+  Filter,
+  Clock,
+  TrendingUp,
+  FileText,
 } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { VoiceInput } from "@/components/voice-input"
 import { useToast } from "@/hooks/use-toast"
 import { formatDate } from "@/lib/format-date"
+import { CommunityFiles } from "@/components/community-files"
 
 interface Post {
   id: string
@@ -51,6 +59,10 @@ export default function CommunityViewPage() {
   const [loading, setLoading] = useState(true)
   const [newPost, setNewPost] = useState("")
   const [posting, setPosting] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'commented'>('recent')
+  const [filterPinned, setFilterPinned] = useState<'all' | 'pinned' | 'regular'>('all')
+  const [activeTab, setActiveTab] = useState<'posts' | 'files'>('posts')
 
   useEffect(() => {
     const load = async () => {
@@ -110,6 +122,34 @@ export default function CommunityViewPage() {
   }
 
   const canPost = community?.user_role && community.user_role !== 'viewer'
+
+  // Apply filters
+  let filteredPosts = [...posts]
+
+  // Search filter
+  if (searchQuery.trim()) {
+    filteredPosts = filteredPosts.filter(post =>
+      post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      post.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      post.author_name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  }
+
+  // Pinned filter
+  if (filterPinned === 'pinned') {
+    filteredPosts = filteredPosts.filter(post => post.is_pinned)
+  } else if (filterPinned === 'regular') {
+    filteredPosts = filteredPosts.filter(post => !post.is_pinned)
+  }
+
+  // Sort
+  if (sortBy === 'popular') {
+    filteredPosts.sort((a, b) => (b.views_count || 0) - (a.views_count || 0))
+  } else if (sortBy === 'commented') {
+    filteredPosts.sort((a, b) => (b.comments_count || 0) - (a.comments_count || 0))
+  } else {
+    // recent - keep as is (already sorted by created_at DESC from API)
+  }
 
   if (loading) {
     return (
@@ -204,20 +244,34 @@ export default function CommunityViewPage() {
 
       {/* Main Content */}
       <div className="max-w-5xl mx-auto px-6 py-6">
-        {/* Create Post */}
-        {canPost && (
-          <Card className="mb-6">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <Textarea
-                  placeholder="Share something with the community..."
-                  value={newPost}
-                  onChange={(e) => setNewPost(e.target.value)}
-                  rows={4}
-                  className="resize-none"
-                />
-                <div className="flex items-center justify-between">
-                  <VoiceInput
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="mb-6">
+          <TabsList>
+            <TabsTrigger value="posts">
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Posts
+            </TabsTrigger>
+            <TabsTrigger value="files">
+              <FileText className="h-4 w-4 mr-2" />
+              Files
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="posts" className="space-y-6 mt-6">
+            {/* Create Post */}
+            {canPost && (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    <Textarea
+                      placeholder="Share something with the community..."
+                      value={newPost}
+                      onChange={(e) => setNewPost(e.target.value)}
+                      rows={4}
+                      className="resize-none"
+                    />
+                    <div className="flex items-center justify-between">
+                      <VoiceInput
                     onTranscript={(text) => setNewPost(prev => prev + ' ' + text)}
                     mode="transcript"
                   />
@@ -235,9 +289,83 @@ export default function CommunityViewPage() {
           </Card>
         )}
 
-        {/* Posts List */}
-        <div className="space-y-4">
-          {posts.length === 0 ? (
+            {/* Filters & Search */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder="Search posts..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Select value={filterPinned} onValueChange={(v: any) => setFilterPinned(v)}>
+                      <SelectTrigger className="w-[140px]">
+                        <Filter className="h-4 w-4 mr-2" />
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Posts</SelectItem>
+                        <SelectItem value="pinned">
+                          <div className="flex items-center gap-2">
+                            <Pin className="h-4 w-4" />
+                            Pinned Only
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="regular">Regular Only</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
+                      <SelectTrigger className="w-[140px]">
+                        <TrendingUp className="h-4 w-4 mr-2" />
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="recent">
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4" />
+                            Most Recent
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="popular">
+                          <div className="flex items-center gap-2">
+                            <Eye className="h-4 w-4" />
+                            Most Popular
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="commented">
+                          <div className="flex items-center gap-2">
+                            <MessageSquare className="h-4 w-4" />
+                            Most Commented
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                {(searchQuery || filterPinned !== 'all') && (
+                  <div className="mt-3 flex items-center gap-2 text-sm text-slate-600">
+                    <span>Showing {filteredPosts.length} of {posts.length} posts</span>
+                    {searchQuery && (
+                      <Badge variant="outline" className="text-xs">
+                        Search: "{searchQuery}"
+                      </Badge>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Posts List */}
+            <div className="space-y-4">
+              {filteredPosts.length === 0 ? (
             <Card>
               <CardContent className="p-12 text-center">
                 <MessageSquare className="h-12 w-12 text-slate-400 mx-auto mb-4" />
@@ -248,7 +376,7 @@ export default function CommunityViewPage() {
               </CardContent>
             </Card>
           ) : (
-            posts.map((post) => (
+            filteredPosts.map((post) => (
               <Card
                 key={post.id}
                 className={`hover:shadow-md transition-shadow cursor-pointer ${
@@ -306,7 +434,13 @@ export default function CommunityViewPage() {
               </Card>
             ))
           )}
-        </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="files" className="space-y-6 mt-6">
+            <CommunityFiles communityId={communityId} canUpload={canPost} />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   )

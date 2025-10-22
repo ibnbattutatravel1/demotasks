@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
+import { CommunityMembersManager } from "@/components/community-members-manager"
 import {
   ArrowLeft,
   Users,
@@ -382,107 +383,12 @@ export default function AdminCommunityDetailPage() {
           </TabsContent>
 
           <TabsContent value="members" className="space-y-4">
-            <Card className="bg-green-50 border-green-200">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Users className="h-5 w-5 text-green-600" />
-                    <div>
-                      <p className="text-sm font-medium text-green-900">Members Management</p>
-                      <p className="text-xs text-green-600">
-                        Manage community members and their roles. You can add or remove members as needed.
-                      </p>
-                    </div>
-                  </div>
-                  <Button 
-                    onClick={() => {
-                      toast({
-                        title: 'Add Member',
-                        description: 'Member management UI coming soon. Use API directly for now.',
-                      })
-                    }}
-                    size="sm"
-                  >
-                    <Users className="h-4 w-4 mr-2" />
-                    Add Member
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {members.length === 0 ? (
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <Users className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-slate-900 mb-2">No members yet</h3>
-                  <p className="text-slate-600 mb-4">This community doesn't have any members yet.</p>
-                  <Button 
-                    onClick={() => {
-                      toast({
-                        title: 'Add Member',
-                        description: 'Use the "Add Member" button above to invite users.',
-                      })
-                    }}
-                  >
-                    <Users className="h-4 w-4 mr-2" />
-                    Add First Member
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Members ({members.length})</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {members.map((member) => (
-                      <div
-                        key={member.id}
-                        className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50"
-                      >
-                        <div>
-                          <p className="font-medium text-slate-900">
-                            {member.user_name || member.user_email || 'Unknown User'}
-                          </p>
-                          <p className="text-sm text-slate-500">
-                            Joined {new Date(member.joined_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            className={
-                              member.role === 'owner'
-                                ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                : member.role === 'admin'
-                                ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                : 'bg-slate-50 text-slate-700'
-                            }
-                          >
-                            {member.role}
-                          </Badge>
-                          {member.role !== 'owner' && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                toast({
-                                  title: 'Edit Member',
-                                  description: 'Member editing coming soon.',
-                                })
-                              }}
-                            >
-                              Edit
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            <CommunityMembersManager
+              communityId={communityId}
+              members={members}
+              onMembersUpdate={fetchData}
+              currentUserRole={community?.user_role || 'viewer'}
+            />
           </TabsContent>
 
           <TabsContent value="files" className="space-y-4">

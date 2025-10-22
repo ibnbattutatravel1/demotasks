@@ -14,22 +14,21 @@ export async function GET(
   try {
     const { id } = await params
 
-    const query = `
+    const result = await db.execute(sql`
       SELECT 
         f.*,
         u.name as uploader_name,
         u.avatar as uploader_avatar
       FROM community_files f
       LEFT JOIN users u ON f.uploaded_by = u.id
-      WHERE f.community_id = ?
+      WHERE f.community_id = ${id}
       ORDER BY f.uploaded_at DESC
-    `
-
-    const result = await db.execute(sql.raw(query, [id]))
+    `)
+    const data = Array.isArray(result[0]) ? result[0] : result.rows || result || []
 
     return NextResponse.json({
       success: true,
-      data: result.rows || []
+      data: data
     })
 
   } catch (error) {
@@ -55,9 +54,8 @@ export async function POST(
     const userId = payload.sub
 
     // Check member permissions
-    const memberQuery = `SELECT role FROM community_members WHERE community_id = ? AND user_id = ?`
-    const memberResult = await db.execute(sql.raw(memberQuery, [id, userId]))
-    const member = memberResult.rows?.[0]
+    const memberResult = await db.execute(sql`SELECT role FROM community_members WHERE community_id = ${id} AND user_id = ${userId}`)
+    const member = Array.isArray(memberResult[0]) ? memberResult[0][0] : memberResult.rows?.[0] || memberResult[0]
 
     if (!member) {
       return NextResponse.json({ success: false, error: 'Not a member' }, { status: 403 })
@@ -70,6 +68,7 @@ export async function POST(
     const formData = await req.formData()
     const file = formData.get('file') as File
     const description = formData.get('description') as string
+    const notes = formData.get('notes') as string
     const postId = formData.get('post_id') as string
 
     if (!file) {
@@ -97,42 +96,67 @@ export async function POST(
     const fileId = `file_${timestamp}_${Math.random().toString(36).substr(2, 9)}`
     const relativePath = `/uploads/communities/${id}/${filename}`
 
-    const insertQuery = `
+    await db.execute(sql`
       INSERT INTO community_files (
         id, community_id, post_id, file_name, file_path, file_type, 
-        file_size, mime_type, uploaded_by, description, uploaded_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-    `
-
-    await db.execute(sql.raw(insertQuery, [
-      fileId,
-      id,
-      postId || null,
-      originalName,
-      relativePath,
-      file.type.split('/')[0] || 'other',
-      file.size,
-      file.type,
-      userId,
-      description || null
-    ]))
+        file_size, mime_type, uploaded_by, description, notes, uploaded_at
+      ) VALUES (
+        ${fileId},
+        ${id},
+        ${postId || null},
+        ${originalName},
+        ${relativePath},
+        ${file.type.split('/')[0] || 'other'},
+        ${file.size},
+        ${file.type},
+        ${userId},
+        ${description || null},
+        ${notes || null},
+        NOW()
+      )
+    `)
 
     // Log activity
     try {
-      const activityQuery = `
+      const activityId = `act_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      await db.execute(sql`
         INSERT INTO community_activity (
           id, community_id, user_id, action, target_type, target_id, created_at
-        ) VALUES (?, ?, ?, 'shared', 'file', ?, NOW())
-      `
-      
-      await db.execute(sql.raw(activityQuery, [
-        `act_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        id,
-        userId,
-        fileId
-      ]))
+        ) VALUES (${activityId}, ${id}, ${userId}, 'shared', 'file', ${fileId}, NOW())
+      `)
     } catch (e) {
       console.error('Failed to log activity:', e)
+    }
+
+    // Send notifications to admins/moderators
+    try {
+      const adminsResult = await db.execute(sql`
+        SELECT user_id FROM community_members 
+        WHERE community_id = ${id} 
+        AND role IN ('owner', 'admin', 'moderator')
+        AND user_id != ${userId}
+      `)
+      const admins = Array.isArray(adminsResult[0]) ? adminsResult[0] : adminsResult.rows || []
+      
+      for (const admin of admins) {
+        const notifId = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        await db.execute(sql`
+          INSERT INTO notifications (
+            id, user_id, type, title, message, related_id, related_type, created_at
+          ) VALUES (
+            ${notifId},
+            ${admin.user_id},
+            'community',
+            ${'New File Uploaded'},
+            ${'A file has been shared in the community'},
+            ${id},
+            'community',
+            NOW()
+          )
+        `)
+      }
+    } catch (e) {
+      console.error('Failed to send notifications:', e)
     }
 
     return NextResponse.json({
