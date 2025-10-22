@@ -1,4 +1,4 @@
-import { mysqlTable, varchar, int, decimal, text, boolean, datetime, primaryKey } from 'drizzle-orm/mysql-core'
+import { mysqlTable, varchar, int, decimal, text, boolean, datetime, primaryKey, json } from 'drizzle-orm/mysql-core'
 import { sql } from 'drizzle-orm'
 
 // Users
@@ -231,4 +231,107 @@ export const projectDocuments = mysqlTable('project_documents', {
   url: varchar('url', { length: 1000 }).notNull(),
   uploadedById: varchar('uploaded_by_id', { length: 191 }).notNull().references(() => users.id),
   uploadedAt: datetime('uploaded_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+})
+
+// ====================================
+// Questionnaires/Surveys System
+// ====================================
+
+// Questionnaires
+export const questionnaires = mysqlTable('questionnaires', {
+  id: varchar('id', { length: 191 }).primaryKey(),
+  title: varchar('title', { length: 500 }).notNull(),
+  description: text('description'),
+  instructions: text('instructions'),
+  createdById: varchar('created_by_id', { length: 191 }).notNull().references(() => users.id),
+  targetType: varchar('target_type', { length: 50 }).notNull(), // 'all_users' | 'specific_users' | 'role_based'
+  targetRole: varchar('target_role', { length: 50 }), // 'user' | 'project_lead'
+  deadline: datetime('deadline').notNull(),
+  isMandatory: boolean('is_mandatory').notNull().default(true),
+  allowLateSubmission: boolean('allow_late_submission').notNull().default(false),
+  showResultsToUsers: boolean('show_results_to_users').notNull().default(false),
+  status: varchar('status', { length: 50 }).notNull().default('draft'), // 'draft' | 'published' | 'closed'
+  publishedAt: datetime('published_at'),
+  createdAt: datetime('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: datetime('updated_at'),
+})
+
+// Questionnaire Target Users
+export const questionnaireTargets = mysqlTable('questionnaire_targets', {
+  id: varchar('id', { length: 191 }).primaryKey(),
+  questionnaireId: varchar('questionnaire_id', { length: 191 }).notNull().references(() => questionnaires.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id', { length: 191 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  isNotified: boolean('is_notified').notNull().default(false),
+  notifiedAt: datetime('notified_at'),
+  createdAt: datetime('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+})
+
+// Questions
+export const questionnaireQuestions = mysqlTable('questionnaire_questions', {
+  id: varchar('id', { length: 191 }).primaryKey(),
+  questionnaireId: varchar('questionnaire_id', { length: 191 }).notNull().references(() => questionnaires.id, { onDelete: 'cascade' }),
+  questionText: text('question_text').notNull(),
+  questionType: varchar('question_type', { length: 50 }).notNull(), // 'mcq' | 'text' | 'rating' | 'yes_no' | 'file' | 'date' | 'multiple_choice' | 'checkbox'
+  isRequired: boolean('is_required').notNull().default(true),
+  options: json('options'), // للـ MCQ
+  minValue: int('min_value'),
+  maxValue: int('max_value'),
+  maxFileSize: int('max_file_size'),
+  allowedFileTypes: varchar('allowed_file_types', { length: 500 }),
+  placeholderText: varchar('placeholder_text', { length: 500 }),
+  helpText: text('help_text'),
+  displayOrder: int('display_order').notNull(),
+  createdAt: datetime('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+})
+
+// User Responses
+export const questionnaireResponses = mysqlTable('questionnaire_responses', {
+  id: varchar('id', { length: 191 }).primaryKey(),
+  questionnaireId: varchar('questionnaire_id', { length: 191 }).notNull().references(() => questionnaires.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id', { length: 191 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  status: varchar('status', { length: 50 }).notNull().default('pending'), // 'pending' | 'submitted' | 'approved' | 'rejected' | 'returned'
+  submittedAt: datetime('submitted_at'),
+  reviewedAt: datetime('reviewed_at'),
+  reviewedById: varchar('reviewed_by_id', { length: 191 }).references(() => users.id, { onDelete: 'set null' }),
+  adminNotes: text('admin_notes'),
+  isLate: boolean('is_late').notNull().default(false),
+  score: decimal('score', { precision: 5, scale: 2 }),
+  createdAt: datetime('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: datetime('updated_at'),
+})
+
+// Answers
+export const questionnaireAnswers = mysqlTable('questionnaire_answers', {
+  id: varchar('id', { length: 191 }).primaryKey(),
+  responseId: varchar('response_id', { length: 191 }).notNull().references(() => questionnaireResponses.id, { onDelete: 'cascade' }),
+  questionId: varchar('question_id', { length: 191 }).notNull().references(() => questionnaireQuestions.id, { onDelete: 'cascade' }),
+  answerText: text('answer_text'),
+  answerValue: varchar('answer_value', { length: 500 }),
+  answerNumber: decimal('answer_number', { precision: 10, scale: 2 }),
+  answerFileUrl: varchar('answer_file_url', { length: 1000 }),
+  answerOptions: json('answer_options'),
+  createdAt: datetime('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: datetime('updated_at'),
+})
+
+// History/Audit
+export const questionnaireHistory = mysqlTable('questionnaire_history', {
+  id: varchar('id', { length: 191 }).primaryKey(),
+  questionnaireId: varchar('questionnaire_id', { length: 191 }).notNull().references(() => questionnaires.id, { onDelete: 'cascade' }),
+  responseId: varchar('response_id', { length: 191 }).references(() => questionnaireResponses.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id', { length: 191 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  action: varchar('action', { length: 100 }).notNull(),
+  notes: text('notes'),
+  createdAt: datetime('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+})
+
+// Feedback/Comments
+export const questionnaireFeedback = mysqlTable('questionnaire_feedback', {
+  id: varchar('id', { length: 191 }).primaryKey(),
+  responseId: varchar('response_id', { length: 191 }).notNull().references(() => questionnaireResponses.id, { onDelete: 'cascade' }),
+  questionId: varchar('question_id', { length: 191 }).references(() => questionnaireQuestions.id, { onDelete: 'set null' }),
+  fromUserId: varchar('from_user_id', { length: 191 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  message: text('message').notNull(),
+  isCritical: boolean('is_critical').notNull().default(false),
+  createdAt: datetime('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
 })
