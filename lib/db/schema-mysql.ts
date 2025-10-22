@@ -205,6 +205,30 @@ export const timesheetEntries = mysqlTable('timesheet_entries', {
   id: varchar('id', { length: 191 }).primaryKey(),
   timesheetId: varchar('timesheet_id', { length: 191 }).notNull().references(() => timesheets.id),
   date: varchar('date', { length: 10 }).notNull(), // YYYY-MM-DD
-  hours: decimal('hours', { precision: 5, scale: 2 }).notNull().default(0),
+  hours: decimal('hours', { precision: 5, scale: 2 }).notNull().default('0'),
   note: text('note'),
+})
+
+// Project Notes (workspace collaboration)
+export const projectNotes = mysqlTable('project_notes', {
+  id: varchar('id', { length: 191 }).primaryKey(),
+  projectId: varchar('project_id', { length: 191 }).notNull().references(() => projects.id),
+  title: varchar('title', { length: 500 }).notNull(),
+  content: text('content').notNull(),
+  isPinned: boolean('is_pinned').notNull().default(false),
+  createdById: varchar('created_by_id', { length: 191 }).notNull().references(() => users.id),
+  createdAt: datetime('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: datetime('updated_at'),
+})
+
+// Project Documents (workspace file sharing)
+export const projectDocuments = mysqlTable('project_documents', {
+  id: varchar('id', { length: 191 }).primaryKey(),
+  projectId: varchar('project_id', { length: 191 }).notNull().references(() => projects.id),
+  name: varchar('name', { length: 500 }).notNull(),
+  size: int('size').notNull(), // in bytes
+  type: varchar('type', { length: 100 }).notNull(), // MIME type
+  url: varchar('url', { length: 1000 }).notNull(),
+  uploadedById: varchar('uploaded_by_id', { length: 191 }).notNull().references(() => users.id),
+  uploadedAt: datetime('uploaded_at').notNull().default(sql`CURRENT_TIMESTAMP`),
 })

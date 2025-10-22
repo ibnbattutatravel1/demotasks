@@ -201,3 +201,27 @@ export const timesheetEntries = sqliteTable('timesheet_entries', {
   hours: real('hours').notNull().default(0),
   note: text('note'),
 })
+
+// Project Notes (workspace collaboration)
+export const projectNotes = sqliteTable('project_notes', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id),
+  title: text('title').notNull(),
+  content: text('content').notNull(),
+  isPinned: integer('is_pinned', { mode: 'boolean' }).notNull().default(false),
+  createdById: text('created_by_id').notNull().references(() => users.id),
+  createdAt: text('created_at').notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  updatedAt: text('updated_at'),
+})
+
+// Project Documents (workspace file sharing)
+export const projectDocuments = sqliteTable('project_documents', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id),
+  name: text('name').notNull(),
+  size: integer('size').notNull(), // in bytes
+  type: text('type').notNull(), // MIME type
+  url: text('url').notNull(),
+  uploadedById: text('uploaded_by_id').notNull().references(() => users.id),
+  uploadedAt: text('uploaded_at').notNull().default(sql`(CURRENT_TIMESTAMP)`),
+})

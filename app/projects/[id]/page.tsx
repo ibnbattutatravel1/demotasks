@@ -28,6 +28,7 @@ import {
   Edit,
   Copy,
   Trash2,
+  FileText,
 } from "lucide-react"
 import type { Project, Task, TeamMember } from "@/lib/types"
 import { formatDate } from "@/lib/format-date"
@@ -283,6 +284,13 @@ export default function ProjectDetailPage() {
                 <DropdownMenuItem onClick={() => setPriorityFilter("low")}>Low Priority</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/projects/${projectId}/workspace`)}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Workspace
+            </Button>
             <Button
               className="bg-indigo-500 hover:bg-indigo-600"
               onClick={() => router.push(`/projects/${projectId}/tasks/new`)}
