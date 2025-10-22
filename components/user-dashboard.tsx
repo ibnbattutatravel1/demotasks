@@ -406,6 +406,16 @@ export function UserDashboard() {
                 </Badge>
               )}
             </button>
+            <button
+              onClick={() => handleNavigation("/communities")}
+              className="flex items-center gap-2 mb-3 w-full text-left hover:bg-slate-50 rounded-lg px-2 py-1.5 transition-colors"
+            >
+              <Users className="h-4 w-4 text-slate-600" />
+              <span className="text-sm font-medium text-slate-900">Communities</span>
+              <Badge variant="outline" className="ml-auto text-xs bg-purple-50 text-purple-600 border-purple-200">
+                New
+              </Badge>
+            </button>
           </div>
 
           <div className="border-t border-slate-200 pt-4">
