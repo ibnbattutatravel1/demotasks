@@ -66,6 +66,7 @@ export function UserDashboard() {
   // notifications for unread comment counts
   const [notifications, setNotifications] = useState<any[]>([])
   const [query, setQuery] = useState("")
+  const [questionnairesCount, setQuestionnairesCount] = useState(0)
   const router = useRouter()
   const { toast } = useToast()
   const { user, logout } = useAuth()
@@ -148,6 +149,25 @@ export function UserDashboard() {
       ignore = true
       window.clearInterval(interval)
     }
+  }, [])
+
+  // Load questionnaires count
+  useEffect(() => {
+    let ignore = false
+    const load = async () => {
+      try {
+        const res = await fetch('/api/questionnaires')
+        const json = await res.json()
+        if (!ignore && res.ok && json.success) {
+          const pending = json.data?.filter((q: any) => q.status === 'pending').length || 0
+          setQuestionnairesCount(pending)
+        }
+      } catch (e) {
+        console.error('Failed to load questionnaires count', e)
+      }
+    }
+    load()
+    return () => { ignore = true }
   }, [])
 
   const handleTaskClick = (taskId: string) => {
@@ -380,6 +400,11 @@ export function UserDashboard() {
             >
               <FileText className="h-4 w-4 text-slate-600" />
               <span className="text-sm font-medium text-slate-900">Questionnaires</span>
+              {questionnairesCount > 0 && (
+                <Badge variant="outline" className="ml-auto text-xs bg-amber-50 text-amber-700 border-amber-200">
+                  {questionnairesCount}
+                </Badge>
+              )}
             </button>
           </div>
 

@@ -18,6 +18,7 @@ import {
   Filter,
   ChevronDown,
   AlertTriangle,
+  ArrowLeft,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -126,11 +127,8 @@ export default function UserQuestionnairesPage() {
   }
 
   const handleNavigate = (q: UserQuestionnaire) => {
-    if (q.status === 'pending' || q.status === 'returned') {
-      router.push(`/questionnaires/${q.id}`)
-    } else {
-      router.push(`/questionnaires/responses/${q.id}`)
-    }
+    // Always navigate to fill/view page
+    router.push(`/questionnaires/${q.id}`)
   }
 
   return (
@@ -138,6 +136,16 @@ export default function UserQuestionnairesPage() {
       {/* Header */}
       <div className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className="flex items-center gap-4 mb-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/')}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+          </div>
           <div>
             <h1 className="text-3xl font-bold text-slate-900 mb-2">My Questionnaires</h1>
             <p className="text-slate-600">Complete required surveys and questionnaires</p>

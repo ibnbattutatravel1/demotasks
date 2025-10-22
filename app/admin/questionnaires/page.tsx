@@ -21,6 +21,7 @@ import {
   Trash2,
   Send,
   ChevronDown,
+  ArrowLeft,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -162,6 +163,16 @@ export default function AdminQuestionnairesPage() {
       {/* Header */}
       <div className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className="flex items-center gap-4 mb-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/admin')}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+          </div>
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-slate-900 mb-2">Questionnaires</h1>

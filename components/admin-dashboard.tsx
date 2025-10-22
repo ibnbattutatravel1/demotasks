@@ -63,6 +63,7 @@ export function AdminDashboard() {
   const [query, setQuery] = useState("")
   const [submittedTimesheetsCount, setSubmittedTimesheetsCount] = useState(0)
   const [notifications, setNotifications] = useState<any[]>([])
+  const [questionnairesCount, setQuestionnairesCount] = useState(0)
   const router = useRouter()
   const { toast } = useToast()
   const { user, logout } = useAuth()
@@ -192,6 +193,25 @@ export function AdminDashboard() {
     }
     load()
     return () => { abort = true }
+  }, [])
+
+  // Load questionnaires count for admin
+  useEffect(() => {
+    let ignore = false
+    const load = async () => {
+      try {
+        const res = await fetch('/api/admin/questionnaires')
+        const json = await res.json()
+        if (!ignore && res.ok && json.success) {
+          const submitted = json.data?.filter((q: any) => q.submittedCount > 0).length || 0
+          setQuestionnairesCount(submitted)
+        }
+      } catch (e) {
+        console.error('Failed to load questionnaires count', e)
+      }
+    }
+    load()
+    return () => { ignore = true }
   }, [])
 
   const handleProjectClick = (projectId: string) => {
@@ -442,9 +462,15 @@ export function AdminDashboard() {
             >
               <FileText className="h-4 w-4 text-slate-600" />
               <span className="text-sm font-medium text-slate-900">Questionnaires</span>
-              <Badge variant="outline" className="ml-auto text-xs bg-red-50 text-red-600 border-red-200">
-                New
-              </Badge>
+              {questionnairesCount > 0 ? (
+                <Badge variant="outline" className="ml-auto text-xs bg-blue-50 text-blue-700 border-blue-200">
+                  {questionnairesCount}
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="ml-auto text-xs bg-red-50 text-red-600 border-red-200">
+                  New
+                </Badge>
+              )}
             </button>
           </div>
         </div>
