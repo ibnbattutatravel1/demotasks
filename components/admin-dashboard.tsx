@@ -817,6 +817,10 @@ export function AdminDashboard() {
                           <Eye className="h-3 w-3 mr-1" />
                           View
                         </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleNavigation(`/projects/${project.id}/workspace`)}>
+                          <FolderOpen className="h-3 w-3 mr-1" />
+                          Workspace
+                        </Button>
                       </div>
                     </div>
                   </CardHeader>

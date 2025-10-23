@@ -49,6 +49,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useAuth } from "@/contexts/auth-context"
+import { formatDateOnly } from "@/lib/format-date"
 
 // All data is fetched from APIs at runtime; removed all mock arrays
 
@@ -753,7 +754,7 @@ export function UserDashboard() {
                         </div>
                         <p className="text-sm text-slate-600 mb-3 ml-8">{project.description}</p>
                         <div className="flex items-center gap-4 text-xs text-slate-500 ml-8">
-                          <span>Due: {project.dueDate}</span>
+                          <span>Due: {formatDateOnly(project.dueDate)}</span>
                           <span>Lead: {project.owner.name}</span>
                           <span>{myTasksInProject.length} assigned to me</span>
                         </div>
@@ -766,6 +767,10 @@ export function UserDashboard() {
                         <Button size="sm" variant="outline" onClick={() => handleProjectClick(project.id)}>
                           <Eye className="h-3 w-3 mr-1" />
                           View
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleNavigation(`/projects/${project.id}/workspace`)}>
+                          <FolderOpen className="h-3 w-3 mr-1" />
+                          Workspace
                         </Button>
                       </div>
                     </div>
@@ -828,7 +833,7 @@ export function UserDashboard() {
                                     })()}
                                   </div>
                                   <div className="flex items-center gap-4 text-xs text-slate-500 mb-2">
-                                    <span>Due: {task.dueDate}</span>
+                                    <span>Due: {formatDateOnly(task.dueDate)}</span>
                                     <span>
                                       {task.subtasksCompleted}/{task.totalSubtasks} subtasks
                                     </span>
