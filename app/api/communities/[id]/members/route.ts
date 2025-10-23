@@ -70,7 +70,7 @@ export async function POST(
     }
 
     const body = await req.json()
-    const { user_id, role = 'viewer' } = body
+    const { user_id, role = 'contributor' } = body
 
     if (!user_id) {
       return NextResponse.json({ success: false, error: 'User ID required' }, { status: 400 })

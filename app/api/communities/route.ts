@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
           await db.execute(sql`
             INSERT INTO community_members (
               id, community_id, user_id, role, joined_at
-            ) VALUES (${newMemberId}, ${communityId}, ${memberId}, 'viewer', NOW())
+            ) VALUES (${newMemberId}, ${communityId}, ${memberId}, 'contributor', NOW())
           `)
 
           // Create notification

@@ -59,7 +59,7 @@ export function CommunityMembersManager({
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedUserId, setSelectedUserId] = useState('')
-  const [selectedRole, setSelectedRole] = useState('viewer')
+  const [selectedRole, setSelectedRole] = useState('contributor')
 
   const canManageMembers = ['owner', 'admin'].includes(currentUserRole)
 
@@ -118,7 +118,7 @@ export function CommunityMembersManager({
         toast({ title: 'Success', description: 'Member added successfully' })
         setDialogOpen(false)
         setSelectedUserId('')
-        setSelectedRole('viewer')
+        setSelectedRole('contributor')
         setSearchTerm('')
         setUsers([])
         onMembersUpdate()
