@@ -26,6 +26,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   User,
+  Users,
   Star,
   FolderOpen,
   ChevronUp,
