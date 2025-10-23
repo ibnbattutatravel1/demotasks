@@ -149,7 +149,7 @@ export const notifications = sqliteTable('notifications', {
   createdAt: text('created_at').notNull().default(sql`(CURRENT_TIMESTAMP)`),
   userId: text('user_id').notNull().references(() => users.id),
   relatedId: text('related_id'),
-  relatedType: text('related_type'), // 'task' | 'project' | 'subtask'
+  relatedType: text('related_type'), // 'task' | 'project' | 'subtask' | 'meeting'
 })
 
 // User notification settings
@@ -161,6 +161,8 @@ export const userSettings = sqliteTable('user_settings', {
   pushNotifications: integer('push_notifications', { mode: 'boolean' }).notNull().default(false),
   taskReminders: integer('task_reminders', { mode: 'boolean' }).notNull().default(true),
   projectUpdates: integer('project_updates', { mode: 'boolean' }).notNull().default(true),
+  meetingReminders: integer('meeting_reminders', { mode: 'boolean' }).notNull().default(true),
+  meetingUpdates: integer('meeting_updates', { mode: 'boolean' }).notNull().default(true),
   // Appearance
   timezone: text('timezone').notNull().default('UTC'),
   // Timestamps
@@ -224,4 +226,47 @@ export const projectDocuments = sqliteTable('project_documents', {
   url: text('url').notNull(),
   uploadedById: text('uploaded_by_id').notNull().references(() => users.id),
   uploadedAt: text('uploaded_at').notNull().default(sql`(CURRENT_TIMESTAMP)`),
+})
+
+// Meetings
+export const meetings = sqliteTable('meetings', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  meetingLink: text('meeting_link').notNull(), // Zoom, Google Meet, Teams, etc.
+  meetingType: text('meeting_type', { length: 32 }).notNull().default('zoom'), // 'zoom' | 'google-meet' | 'teams' | 'other'
+  startTime: text('start_time').notNull(), // ISO timestamp
+  endTime: text('end_time').notNull(), // ISO timestamp
+  timezone: text('timezone').notNull().default('UTC'),
+  status: text('status', { length: 16 }).notNull().default('scheduled'), // 'scheduled' | 'in-progress' | 'completed' | 'cancelled'
+  createdById: text('created_by_id').notNull().references(() => users.id),
+  createdAt: text('created_at').notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  updatedAt: text('updated_at'),
+  // Optional project association
+  projectId: text('project_id').references(() => projects.id),
+  // Reminder settings
+  reminderMinutes: integer('reminder_minutes').default(15), // remind X minutes before
+  // Meeting notes/agenda
+  agenda: text('agenda'),
+  notes: text('notes'),
+  // Recording info
+  recordingUrl: text('recording_url'),
+  // Recurrence
+  isRecurring: integer('is_recurring', { mode: 'boolean' }).notNull().default(false),
+  recurrencePattern: text('recurrence_pattern'), // 'daily' | 'weekly' | 'monthly'
+  recurrenceEndDate: text('recurrence_end_date'),
+})
+
+// Meeting Attendees (many-to-many with additional fields)
+export const meetingAttendees = sqliteTable('meeting_attendees', {
+  id: text('id').primaryKey(),
+  meetingId: text('meeting_id').notNull().references(() => meetings.id),
+  userId: text('user_id').notNull().references(() => users.id),
+  role: text('role', { length: 16 }).notNull().default('attendee'), // 'organizer' | 'required' | 'optional' | 'attendee'
+  status: text('status', { length: 16 }).notNull().default('pending'), // 'pending' | 'accepted' | 'declined' | 'tentative'
+  responseAt: text('response_at'),
+  addedAt: text('added_at').notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  // Notification preferences for this specific meeting
+  notificationSent: integer('notification_sent', { mode: 'boolean' }).notNull().default(false),
+  reminderSent: integer('reminder_sent', { mode: 'boolean' }).notNull().default(false),
 })

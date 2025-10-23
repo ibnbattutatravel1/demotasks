@@ -17,19 +17,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-// Derived events from real backend tasks/projects
+// Derived events from real backend tasks/projects/meetings
 type CalendarEvent = {
   id: string
   title: string
   time?: string
   date: string
   createdDate?: string
-  type: "task"
+  type: "task" | "meeting"
   assignee?: { name: string; avatar?: string }
   color: string // tailwind color token, e.g., 'indigo'
   subtasks?: Array<{ id: string; title: string; date: string; time?: string; completed?: boolean }>
-  projectId: string
+  projectId?: string
   approvalStatus?: 'pending' | 'approved' | 'rejected'
+  meetingLink?: string
+  meetingType?: string
+  endTime?: string
 }
 
 function normalizeColor(color?: string) {
@@ -79,12 +82,14 @@ export default function CalendarPage() {
       try {
         setLoading(true)
         setError(null)
-        const [tasksRes, projectsRes] = await Promise.all([
+        const [tasksRes, projectsRes, meetingsRes] = await Promise.all([
           fetch('/api/tasks'),
           fetch('/api/projects'),
+          fetch('/api/meetings'),
         ])
         const tasksJson = await tasksRes.json()
         const projectsJson = await projectsRes.json()
+        const meetingsJson = await meetingsRes.json()
         if (!tasksRes.ok || !tasksJson?.success) throw new Error(tasksJson?.error || 'Failed to fetch tasks')
         if (!projectsRes.ok || !projectsJson?.success) throw new Error(projectsJson?.error || 'Failed to fetch projects')
 
@@ -92,7 +97,8 @@ export default function CalendarPage() {
         const projList = (projectsJson.data || []).map((p: any) => ({ id: p.id, name: p.name, color: normalizeColor(p.color) }))
         projList.forEach((p: any) => projectColors.set(p.id, p.color))
 
-        const evts: CalendarEvent[] = (tasksJson.data || []).map((t: any) => {
+        // Task events
+        const taskEvts: CalendarEvent[] = (tasksJson.data || []).map((t: any) => {
           const color = projectColors.get(t.projectId) || 'indigo'
           const firstAssignee = (t.assignees && t.assignees[0]) ? { name: t.assignees[0].name, avatar: t.assignees[0].avatar } : undefined
           const subs = (t.subtasks || []).map((st: any) => ({
@@ -107,7 +113,7 @@ export default function CalendarPage() {
             title: t.title,
             date: t.dueDate || t.startDate,
             createdDate: t.createdAt,
-            type: 'task',
+            type: 'task' as const,
             assignee: firstAssignee,
             color,
             subtasks: subs,
@@ -116,8 +122,25 @@ export default function CalendarPage() {
           }
         })
 
+        // Meeting events
+        const meetingEvts: CalendarEvent[] = (meetingsJson.success ? meetingsJson.data || [] : []).map((m: any) => {
+          const color = m.projectId ? (projectColors.get(m.projectId) || 'blue') : 'blue'
+          return {
+            id: m.id,
+            title: m.title,
+            date: m.startTime,
+            time: new Date(m.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            endTime: m.endTime,
+            type: 'meeting' as const,
+            color,
+            projectId: m.projectId,
+            meetingLink: m.meetingLink,
+            meetingType: m.meetingType,
+          }
+        })
+
         if (!abort) {
-          setEvents(evts)
+          setEvents([...taskEvts, ...meetingEvts])
           setProjects(projList)
         }
       } catch (e: any) {
@@ -215,8 +238,8 @@ export default function CalendarPage() {
       // Navigate to task detail page
       router.push(`/tasks/${item.id}`)
     } else if (item.type === "meeting") {
-      // For meetings, you could navigate to a meeting detail page or show a modal
-      console.log("[v0] Meeting clicked:", item.title)
+      // Navigate to meeting detail page
+      router.push(`/meetings/${item.id}`)
     }
   }
 
