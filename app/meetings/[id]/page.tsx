@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { use, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -62,8 +62,9 @@ interface Meeting {
   }
 }
 
-export default function MeetingDetailPage({ params }: { params: { id: string } }) {
+export default function MeetingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
+  const resolvedParams = use(params)
   const [meeting, setMeeting] = useState<Meeting | null>(null)
   const [loading, setLoading] = useState(true)
   const [showEditForm, setShowEditForm] = useState(false)
@@ -72,12 +73,12 @@ export default function MeetingDetailPage({ params }: { params: { id: string } }
 
   useEffect(() => {
     loadMeeting()
-  }, [params.id])
+  }, [resolvedParams.id])
 
   const loadMeeting = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/meetings/${params.id}`)
+      const response = await fetch(`/api/meetings/${resolvedParams.id}`)
       const result = await response.json()
 
       if (result.success) {
@@ -99,7 +100,7 @@ export default function MeetingDetailPage({ params }: { params: { id: string } }
     if (!confirm('Are you sure you want to cancel this meeting?')) return
 
     try {
-      const response = await fetch(`/api/meetings/${params.id}`, {
+      const response = await fetch(`/api/meetings/${resolvedParams.id}`, {
         method: 'DELETE',
       })
 
@@ -118,7 +119,7 @@ export default function MeetingDetailPage({ params }: { params: { id: string } }
 
   const handleResponse = async (status: 'accepted' | 'declined' | 'tentative') => {
     try {
-      const response = await fetch(`/api/meetings/${params.id}/respond`, {
+      const response = await fetch(`/api/meetings/${resolvedParams.id}/respond`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
@@ -140,7 +141,7 @@ export default function MeetingDetailPage({ params }: { params: { id: string } }
   const handleSaveNotes = async () => {
     try {
       setSavingNotes(true)
-      const response = await fetch(`/api/meetings/${params.id}`, {
+      const response = await fetch(`/api/meetings/${resolvedParams.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notes }),

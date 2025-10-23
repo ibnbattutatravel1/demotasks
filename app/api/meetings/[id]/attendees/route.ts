@@ -12,7 +12,7 @@ import { notifyAttendeeAdded, notifyAttendeeRemoved } from '@/lib/meeting-notifi
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = req.cookies.get(AUTH_COOKIE)?.value
@@ -23,7 +23,8 @@ export async function POST(
 
     const userId = payload.sub
     const isAdmin = payload.role === 'admin'
-    const meetingId = params.id
+    const resolvedParams = await params
+    const meetingId = resolvedParams.id
     const body = await req.json()
 
     if (!body.userIds || !Array.isArray(body.userIds) || body.userIds.length === 0) {
@@ -139,7 +140,7 @@ export async function POST(
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = req.cookies.get(AUTH_COOKIE)?.value
@@ -150,7 +151,8 @@ export async function DELETE(
 
     const userId = payload.sub
     const isAdmin = payload.role === 'admin'
-    const meetingId = params.id
+    const resolvedParams = await params
+    const meetingId = resolvedParams.id
     
     // Get userId from query params
     const { searchParams } = new URL(req.url)

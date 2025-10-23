@@ -10,7 +10,7 @@ import { notifyMeetingUpdated, notifyMeetingCancelled } from '@/lib/meeting-noti
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = req.cookies.get(AUTH_COOKIE)?.value
@@ -21,7 +21,8 @@ export async function GET(
 
     const userId = payload.sub
     const isAdmin = payload.role === 'admin'
-    const meetingId = params.id
+    const resolvedParams = await params
+    const meetingId = resolvedParams.id
 
     // Get meeting
     const meetings = await db
@@ -135,7 +136,7 @@ export async function GET(
  */
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = req.cookies.get(AUTH_COOKIE)?.value
@@ -146,7 +147,8 @@ export async function PUT(
 
     const userId = payload.sub
     const isAdmin = payload.role === 'admin'
-    const meetingId = params.id
+    const resolvedParams = await params
+    const meetingId = resolvedParams.id
     const body = await req.json()
 
     // Get meeting
@@ -257,7 +259,7 @@ export async function PUT(
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = req.cookies.get(AUTH_COOKIE)?.value
@@ -268,7 +270,8 @@ export async function DELETE(
 
     const userId = payload.sub
     const isAdmin = payload.role === 'admin'
-    const meetingId = params.id
+    const resolvedParams = await params
+    const meetingId = resolvedParams.id
 
     // Get meeting
     const meetings = await db

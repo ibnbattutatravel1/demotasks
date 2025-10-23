@@ -153,7 +153,7 @@ export const notifications = mysqlTable('notifications', {
   title: varchar('title', { length: 255 }).notNull(),
   message: text('message').notNull(),
   read: boolean('read').notNull().default(false),
-  createdAt: datetime('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  createdAt: datetime('created_at', { mode: 'string' }).notNull().default(sql`CURRENT_TIMESTAMP`),
   userId: varchar('user_id', { length: 191 }).notNull().references(() => users.id),
   relatedId: varchar('related_id', { length: 191 }),
   relatedType: varchar('related_type', { length: 16 }), // 'task' | 'project' | 'subtask' | 'meeting'

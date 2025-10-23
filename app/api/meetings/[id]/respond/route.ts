@@ -11,7 +11,7 @@ import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = req.cookies.get(AUTH_COOKIE)?.value
@@ -21,7 +21,8 @@ export async function POST(
     if (!payload?.sub) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
     const userId = payload.sub
-    const meetingId = params.id
+    const resolvedParams = await params
+    const meetingId = resolvedParams.id
     const body = await req.json()
 
     if (!body.status || !['accepted', 'declined', 'tentative'].includes(body.status)) {
