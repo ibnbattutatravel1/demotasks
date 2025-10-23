@@ -49,6 +49,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog"
 import { useAuth } from "@/contexts/auth-context"
 import { CreateProjectDialog } from "@/components/create-project-dialog"
+import { formatDateOnly } from "@/lib/format-date"
 
 type TeamStat = { name: string; tasksCreated: number; tasksCompleted: number; avatar?: string }
 
@@ -801,7 +802,7 @@ export function AdminDashboard() {
                         </div>
                         <p className="text-sm text-slate-600 mb-3 ml-8">{project.description}</p>
                         <div className="flex items-center gap-4 text-xs text-slate-500 ml-8">
-                          <span>Due: {project.dueDate}</span>
+                          <span>Due: {formatDateOnly(project.dueDate)}</span>
                           <span>Lead: {project.owner.name}</span>
                           <span>
                             {project.tasksCompleted}/{project.totalTasks} tasks completed
@@ -877,7 +878,7 @@ export function AdminDashboard() {
                                 })()}
                               </div>
                               <div className="flex items-center gap-4 text-xs text-slate-500">
-                                <span>Due: {task.dueDate}</span>
+                                <span>Due: {formatDateOnly(task.dueDate)}</span>
                                 <span>Progress: {task.progress}%</span>
                                 <span>
                                   {task.subtasksCompleted}/{task.totalSubtasks} subtasks
