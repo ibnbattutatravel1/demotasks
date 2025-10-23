@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { formatDate } from '@/lib/format-date'
+import { CommunityMembersManager } from '@/components/community-members-manager'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
@@ -44,6 +46,7 @@ export default function CommunitySettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [community, setCommunity] = useState<Community | null>(null)
+  const [members, setMembers] = useState<any[]>([])
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -54,10 +57,6 @@ export default function CommunitySettingsPage() {
     allow_reactions: true,
     require_approval: false,
   })
-
-  useEffect(() => {
-    fetchCommunity()
-  }, [communityId])
 
   const fetchCommunity = async () => {
     try {
@@ -90,6 +89,23 @@ export default function CommunitySettingsPage() {
       setLoading(false)
     }
   }
+
+  const fetchMembers = async () => {
+    try {
+      const res = await fetch(`/api/communities/${communityId}/members`)
+      const data = await res.json()
+      if (data.success) {
+        setMembers(data.data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching members:', error)
+    }
+  }
+
+  useEffect(() => {
+    fetchCommunity()
+    fetchMembers()
+  }, [communityId])
 
   const handleSave = async () => {
     setSaving(true)
@@ -369,6 +385,22 @@ export default function CommunitySettingsPage() {
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? 'Saving...' : 'Save Changes'}
                 </Button>
+              </CardContent>
+            </Card>
+
+            {/* Members Management */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Members Management</CardTitle>
+                <CardDescription>Add or remove members from this community</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CommunityMembersManager
+                  communityId={communityId}
+                  members={members}
+                  onMembersUpdate={fetchMembers}
+                  currentUserRole="owner"
+                />
               </CardContent>
             </Card>
           </div>

@@ -46,6 +46,12 @@ export async function GET(
     const userRows = await db.select().from(dbSchema.users).where(eq(dbSchema.users.id, userId))
     const user = userRows[0]
     
+    // System admins have full access and are treated as owners
+    if (user?.role === 'admin' && !community.user_role) {
+      community.user_role = 'admin'
+      community.user_joined_at = community.created_at
+    }
+    
     const hasAccess = 
       community.visibility === 'public' ||
       community.user_role ||

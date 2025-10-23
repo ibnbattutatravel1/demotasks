@@ -57,6 +57,23 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Content is required' }, { status: 400 })
     }
 
+    // Check if user is member
+    const memberResult = await db.execute(sql`SELECT role FROM community_members WHERE community_id = ${id} AND user_id = ${userId}`)
+    const member = Array.isArray(memberResult[0]) ? memberResult[0][0] : memberResult.rows?.[0] || memberResult[0]
+
+    if (!member) {
+      return NextResponse.json({ success: false, error: 'Not a member' }, { status: 403 })
+    }
+
+    // Get community settings to check if comments are allowed
+    const communityResult = await db.execute(sql`SELECT settings FROM communities WHERE id = ${id}`)
+    const community = Array.isArray(communityResult[0]) ? communityResult[0][0] : communityResult.rows?.[0] || communityResult[0]
+    const settings = community?.settings ? (typeof community.settings === 'string' ? JSON.parse(community.settings) : community.settings) : {}
+
+    if (settings.allow_comments === false) {
+      return NextResponse.json({ success: false, error: 'Comments are disabled for this community' }, { status: 403 })
+    }
+
     const commentId = `comm_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
     await db.execute(sql`

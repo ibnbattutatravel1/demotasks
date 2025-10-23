@@ -32,6 +32,7 @@ import { VoiceInput } from "@/components/voice-input"
 import { useToast } from "@/hooks/use-toast"
 import { formatDate } from "@/lib/format-date"
 import { CommunityFiles } from "@/components/community-files"
+import { PostReactions } from "@/components/post-reactions"
 
 interface Post {
   id: string
@@ -217,10 +218,13 @@ export default function CommunityViewPage() {
                 </div>
                 <p className="text-slate-600 mb-2">{community.description}</p>
                 <div className="flex items-center gap-4 text-sm text-slate-500">
-                  <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => router.push(`/communities/${communityId}/members`)}
+                    className="flex items-center gap-1 hover:text-blue-600 transition-colors"
+                  >
                     <Users className="h-4 w-4" />
                     <span>{community.members_count || 0} members</span>
-                  </div>
+                  </button>
                   <div className="flex items-center gap-1">
                     <MessageSquare className="h-4 w-4" />
                     <span>{community.posts_count || 0} posts</span>
@@ -414,19 +418,25 @@ export default function CommunityViewPage() {
                         {post.content}
                       </p>
                       
-                      <div className="flex items-center gap-4 text-sm text-slate-500">
-                        <div className="flex items-center gap-1">
-                          <MessageSquare className="h-4 w-4" />
-                          <span>{post.comments_count || 0}</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4 text-sm text-slate-500">
+                          {(post.comments_count || 0) > 0 && (
+                            <div className="flex items-center gap-1">
+                              <MessageSquare className="h-4 w-4" />
+                              <span>{post.comments_count}</span>
+                            </div>
+                          )}
+                          {(post.views_count || 0) > 0 && (
+                            <div className="flex items-center gap-1">
+                              <Eye className="h-4 w-4" />
+                              <span>{post.views_count}</span>
+                            </div>
+                          )}
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Eye className="h-4 w-4" />
-                          <span>{post.views_count || 0}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Heart className="h-4 w-4" />
-                          <span>{Object.keys(post.reactions || {}).length}</span>
-                        </div>
+                        <PostReactions 
+                          communityId={communityId} 
+                          postId={post.id}
+                        />
                       </div>
                     </div>
                   </div>
