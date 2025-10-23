@@ -122,7 +122,11 @@ export default function CommunityViewPage() {
     }
   }
 
-  const canPost = community?.user_role && community.user_role !== 'viewer'
+  // In public communities, any authenticated user can post
+  // In private communities, only members with contributor+ role can post
+  const canPost = community?.visibility === 'public' 
+    ? true 
+    : (community?.user_role && community.user_role !== 'viewer')
 
   // Apply filters
   let filteredPosts = [...posts]
