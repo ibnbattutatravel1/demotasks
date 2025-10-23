@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS communities (
   icon VARCHAR(100),
   color VARCHAR(20) DEFAULT '#6366f1',
   
-  visibility ENUM('public', 'private', 'secret') DEFAULT 'private',
+  visibility ENUM('public', 'private') DEFAULT 'private',
   
   created_by VARCHAR(50),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

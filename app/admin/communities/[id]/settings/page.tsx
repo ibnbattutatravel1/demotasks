@@ -32,7 +32,7 @@ interface Community {
   description: string
   icon: string
   color: string
-  visibility: 'public' | 'private' | 'hidden'
+  visibility: 'public' | 'private'
   is_archived: boolean
   settings: any
 }
@@ -52,7 +52,7 @@ export default function CommunitySettingsPage() {
     description: '',
     icon: '',
     color: '#6366f1',
-    visibility: 'public' as 'public' | 'private' | 'hidden',
+    visibility: 'public' as 'public' | 'private',
     allow_comments: true,
     allow_reactions: true,
     require_approval: false,
@@ -303,19 +303,13 @@ export default function CommunitySettingsPage() {
                       <SelectItem value="public">
                         <div className="flex items-center gap-2">
                           <Globe className="h-4 w-4" />
-                          Public - Anyone can join
+                          Public - Any user can share and write
                         </div>
                       </SelectItem>
                       <SelectItem value="private">
                         <div className="flex items-center gap-2">
                           <Lock className="h-4 w-4" />
-                          Private - Invite only
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="hidden">
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4" />
-                          Hidden - Members only
+                          Private - Only chosen members can participate
                         </div>
                       </SelectItem>
                     </SelectContent>

@@ -57,17 +57,24 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Content is required' }, { status: 400 })
     }
 
-    // Check if user is member
-    const memberResult = await db.execute(sql`SELECT role FROM community_members WHERE community_id = ${id} AND user_id = ${userId}`)
-    const member = Array.isArray(memberResult[0]) ? memberResult[0][0] : memberResult.rows?.[0] || memberResult[0]
-
-    if (!member) {
-      return NextResponse.json({ success: false, error: 'Not a member' }, { status: 403 })
+    // Get community settings and visibility to check if comments are allowed
+    const communityResult = await db.execute(sql`SELECT visibility, settings FROM communities WHERE id = ${id} AND is_archived = FALSE`)
+    const community = Array.isArray(communityResult[0]) ? communityResult[0][0] : communityResult.rows?.[0] || communityResult[0]
+    
+    if (!community) {
+      return NextResponse.json({ success: false, error: 'Community not found' }, { status: 404 })
     }
 
-    // Get community settings to check if comments are allowed
-    const communityResult = await db.execute(sql`SELECT settings FROM communities WHERE id = ${id}`)
-    const community = Array.isArray(communityResult[0]) ? communityResult[0][0] : communityResult.rows?.[0] || communityResult[0]
+    // For private communities, check membership
+    if (community.visibility === 'private') {
+      const memberResult = await db.execute(sql`SELECT role FROM community_members WHERE community_id = ${id} AND user_id = ${userId}`)
+      const member = Array.isArray(memberResult[0]) ? memberResult[0][0] : memberResult.rows?.[0] || memberResult[0]
+
+      if (!member) {
+        return NextResponse.json({ success: false, error: 'Only members can comment in private communities' }, { status: 403 })
+      }
+    }
+    // For public communities, any authenticated user can comment
     const settings = community?.settings ? (typeof community.settings === 'string' ? JSON.parse(community.settings) : community.settings) : {}
 
     if (settings.allow_comments === false) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,11 +22,21 @@ import {
 interface Member {
   id: string
   user_id: string
-  user_name: string
-  user_email: string
-  user_avatar?: string
+  name: string
+  email: string
+  avatar?: string
+  initials?: string
   role: string
   joined_at: string
+}
+
+interface User {
+  id: string
+  name: string
+  email: string
+  avatar?: string
+  initials: string
+  role: string
 }
 
 interface MembersManagerProps {
@@ -45,16 +55,50 @@ export function CommunityMembersManager({
   const { toast } = useToast()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [adding, setAdding] = useState(false)
-  const [newMember, setNewMember] = useState({
-    email: '',
-    role: 'viewer' as string,
-  })
+  const [users, setUsers] = useState<User[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedUserId, setSelectedUserId] = useState('')
+  const [selectedRole, setSelectedRole] = useState('viewer')
 
   const canManageMembers = ['owner', 'admin'].includes(currentUserRole)
 
+  // Load users when dialog opens
+  useEffect(() => {
+    if (dialogOpen && users.length === 0) {
+      loadUsers()
+    }
+  }, [dialogOpen])
+
+  const loadUsers = async () => {
+    try {
+      setLoadingUsers(true)
+      const res = await fetch('/api/users')
+      const json = await res.json()
+      if (json.success) {
+        // Filter out users who are already members
+        const memberUserIds = members.map(m => m.user_id)
+        const availableUsers = (json.data || []).filter(
+          (u: User) => !memberUserIds.includes(u.id) && u.role !== 'admin'
+        )
+        setUsers(availableUsers)
+      }
+    } catch (e) {
+      console.error('Failed to load users:', e)
+    } finally {
+      setLoadingUsers(false)
+    }
+  }
+
+  // Filter users based on search
+  const filteredUsers = users.filter(u => 
+    u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.email.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
   const handleAddMember = async () => {
-    if (!newMember.email.trim()) {
-      toast({ title: 'Error', description: 'Please enter an email', variant: 'destructive' })
+    if (!selectedUserId) {
+      toast({ title: 'Error', description: 'Please select a user', variant: 'destructive' })
       return
     }
 
@@ -64,8 +108,8 @@ export function CommunityMembersManager({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: newMember.email,
-          role: newMember.role,
+          user_id: selectedUserId,
+          role: selectedRole,
         }),
       })
 
@@ -73,7 +117,10 @@ export function CommunityMembersManager({
       if (json.success) {
         toast({ title: 'Success', description: 'Member added successfully' })
         setDialogOpen(false)
-        setNewMember({ email: '', role: 'viewer' })
+        setSelectedUserId('')
+        setSelectedRole('viewer')
+        setSearchTerm('')
+        setUsers([])
         onMembersUpdate()
       } else {
         throw new Error(json.error)
@@ -86,7 +133,7 @@ export function CommunityMembersManager({
   }
 
   const handleRemoveMember = async (memberId: string, memberName: string) => {
-    if (!confirm(`Are you sure you want to remove ${memberName} from this community?`)) {
+    if (!confirm(`Are you sure you want to remove ${memberName || 'this member'} from this community?`)) {
       return
     }
 
@@ -165,30 +212,65 @@ export function CommunityMembersManager({
                     Add Member
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Add Member</DialogTitle>
                     <DialogDescription>
-                      Invite a user to join this community by their email address
+                      Select a user from your website to add to this community
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>
-                      <Label htmlFor="email">Email Address</Label>
+                      <Label htmlFor="search">Search Users</Label>
                       <Input
-                        id="email"
-                        type="email"
-                        placeholder="user@example.com"
-                        value={newMember.email}
-                        onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+                        id="search"
+                        placeholder="Search by name or email..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
                       />
                     </div>
+
+                    <div>
+                      <Label>Select User</Label>
+                      {loadingUsers ? (
+                        <div className="text-center py-8 text-slate-500">Loading users...</div>
+                      ) : filteredUsers.length === 0 ? (
+                        <div className="text-center py-8 text-slate-500">
+                          {searchTerm ? 'No users found matching your search' : 'No available users to add'}
+                        </div>
+                      ) : (
+                        <div className="border rounded-lg max-h-64 overflow-y-auto">
+                          {filteredUsers.map((user) => (
+                            <div
+                              key={user.id}
+                              onClick={() => setSelectedUserId(user.id)}
+                              className={`p-3 border-b last:border-b-0 cursor-pointer transition-colors ${
+                                selectedUserId === user.id
+                                  ? 'bg-indigo-50 border-indigo-200'
+                                  : 'hover:bg-slate-50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-medium">
+                                  {user.initials}
+                                </div>
+                                <div className="flex-1">
+                                  <div className="font-medium text-slate-900">{user.name}</div>
+                                  <div className="text-sm text-slate-500">{user.email}</div>
+                                </div>
+                                {selectedUserId === user.id && (
+                                  <Badge className="bg-indigo-500">Selected</Badge>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     <div>
                       <Label htmlFor="role">Role</Label>
-                      <Select
-                        value={newMember.role}
-                        onValueChange={(value) => setNewMember({ ...newMember, role: value })}
-                      >
+                      <Select value={selectedRole} onValueChange={setSelectedRole}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -203,9 +285,10 @@ export function CommunityMembersManager({
                         </SelectContent>
                       </Select>
                     </div>
+
                     <Button
                       onClick={handleAddMember}
-                      disabled={adding || !newMember.email.trim()}
+                      disabled={adding || !selectedUserId}
                       className="w-full"
                     >
                       {adding ? 'Adding...' : 'Add Member'}
@@ -225,9 +308,12 @@ export function CommunityMembersManager({
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-slate-400" />
-                    <span className="font-medium text-slate-900">{member.user_name || member.user_email}</span>
+                  <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-medium">
+                    {member.initials || member.name?.substring(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="font-medium text-slate-900">{member.name || 'Unknown User'}</div>
+                    <div className="text-sm text-slate-500">{member.email || 'No email'}</div>
                   </div>
                 </div>
                 
@@ -236,7 +322,7 @@ export function CommunityMembersManager({
                     <>
                       <Select
                         value={member.role}
-                        onValueChange={(value) => handleRoleChange(member.id, value, member.user_name)}
+                        onValueChange={(value) => handleRoleChange(member.id, value, member.name)}
                       >
                         <SelectTrigger className="w-[140px]">
                           <div className="flex items-center gap-2">
@@ -257,7 +343,7 @@ export function CommunityMembersManager({
                       <Button
                         variant="destructive"
                         size="sm"
-                        onClick={() => handleRemoveMember(member.id, member.user_name)}
+                        onClick={() => handleRemoveMember(member.id, member.name)}
                       >
                         <UserMinus className="h-4 w-4" />
                       </Button>

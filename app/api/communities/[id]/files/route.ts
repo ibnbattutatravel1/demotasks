@@ -53,17 +53,28 @@ export async function POST(
 
     const userId = payload.sub
 
-    // Check member permissions
-    const memberResult = await db.execute(sql`SELECT role FROM community_members WHERE community_id = ${id} AND user_id = ${userId}`)
-    const member = Array.isArray(memberResult[0]) ? memberResult[0][0] : memberResult.rows?.[0] || memberResult[0]
+    // Check community visibility
+    const communityResult = await db.execute(sql`SELECT visibility FROM communities WHERE id = ${id} AND is_archived = FALSE`)
+    const community = Array.isArray(communityResult[0]) ? communityResult[0][0] : communityResult.rows?.[0] || communityResult[0]
 
-    if (!member) {
-      return NextResponse.json({ success: false, error: 'Not a member' }, { status: 403 })
+    if (!community) {
+      return NextResponse.json({ success: false, error: 'Community not found' }, { status: 404 })
     }
 
-    if (member.role === 'viewer') {
-      return NextResponse.json({ success: false, error: 'Viewers cannot upload files' }, { status: 403 })
+    // For private communities, check member permissions
+    if (community.visibility === 'private') {
+      const memberResult = await db.execute(sql`SELECT role FROM community_members WHERE community_id = ${id} AND user_id = ${userId}`)
+      const member = Array.isArray(memberResult[0]) ? memberResult[0][0] : memberResult.rows?.[0] || memberResult[0]
+
+      if (!member) {
+        return NextResponse.json({ success: false, error: 'Only members can upload files in private communities' }, { status: 403 })
+      }
+
+      if (member.role === 'viewer') {
+        return NextResponse.json({ success: false, error: 'Viewers cannot upload files' }, { status: 403 })
+      }
     }
+    // For public communities, any authenticated user can upload files
 
     const formData = await req.formData()
     const file = formData.get('file') as File

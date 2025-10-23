@@ -150,45 +150,22 @@ export async function PATCH(
     const body = await req.json()
     const { name, description, icon, color, visibility, settings } = body
 
-    // Build update query dynamically
-    const updates: string[] = []
-    const values: any[] = []
-
-    if (name !== undefined) {
-      updates.push('name = ?')
-      values.push(name)
-    }
-    if (description !== undefined) {
-      updates.push('description = ?')
-      values.push(description)
-    }
-    if (icon !== undefined) {
-      updates.push('icon = ?')
-      values.push(icon)
-    }
-    if (color !== undefined) {
-      updates.push('color = ?')
-      values.push(color)
-    }
-    if (visibility !== undefined) {
-      updates.push('visibility = ?')
-      values.push(visibility)
-    }
-    if (settings !== undefined) {
-      updates.push('settings = ?')
-      values.push(JSON.stringify(settings))
-    }
-
-    if (updates.length === 0) {
+    // Build update query dynamically using sql template
+    if (!name && !description && icon === undefined && color === undefined && visibility === undefined && settings === undefined) {
       return NextResponse.json({ success: false, error: 'No fields to update' }, { status: 400 })
     }
 
-    updates.push('updated_at = NOW()')
-    values.push(id)
-
-    // Execute update using sql template literal
-    const updateSQL = `UPDATE communities SET ${updates.join(', ')} WHERE id = '${id}'`
-    await db.execute(sql.raw(updateSQL))
+    await db.execute(sql`
+      UPDATE communities SET
+        name = ${name !== undefined ? name : sql`name`},
+        description = ${description !== undefined ? description : sql`description`},
+        icon = ${icon !== undefined ? icon : sql`icon`},
+        color = ${color !== undefined ? color : sql`color`},
+        visibility = ${visibility !== undefined ? visibility : sql`visibility`},
+        settings = ${settings !== undefined ? JSON.stringify(settings) : sql`settings`},
+        updated_at = NOW()
+      WHERE id = ${id}
+    `)
 
     // Log activity
     try {

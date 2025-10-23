@@ -252,7 +252,7 @@ export default function AdminCommunitiesPage() {
               <Card
                 key={community.id}
                 className="hover:shadow-lg transition-shadow cursor-pointer group"
-                onClick={() => router.push(`/admin/communities/${community.id}`)}
+                onClick={() => router.push(`/communities/${community.id}`)}
               >
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-4">
@@ -271,7 +271,7 @@ export default function AdminCommunitiesPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={(e) => {
                           e.stopPropagation()
-                          router.push(`/admin/communities/${community.id}`)
+                          router.push(`/communities/${community.id}`)
                         }}>
                           <Eye className="h-4 w-4 mr-2" />
                           View

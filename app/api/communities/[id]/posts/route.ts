@@ -78,18 +78,29 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Content is required' }, { status: 400 })
     }
 
-    // Check if user is member
-    const memberResult = await db.execute(sql`SELECT role FROM community_members WHERE community_id = ${id} AND user_id = ${userId}`)
-    const member = Array.isArray(memberResult[0]) ? memberResult[0][0] : memberResult.rows?.[0] || memberResult[0]
+    // Check community visibility
+    const communityResult = await db.execute(sql`SELECT visibility FROM communities WHERE id = ${id} AND is_archived = FALSE`)
+    const community = Array.isArray(communityResult[0]) ? communityResult[0][0] : communityResult.rows?.[0] || communityResult[0]
 
-    if (!member) {
-      return NextResponse.json({ success: false, error: 'Not a member' }, { status: 403 })
+    if (!community) {
+      return NextResponse.json({ success: false, error: 'Community not found' }, { status: 404 })
     }
 
-    // Check permissions (viewer cannot post)
-    if (member.role === 'viewer') {
-      return NextResponse.json({ success: false, error: 'Viewers cannot create posts' }, { status: 403 })
+    // For private communities, check membership
+    if (community.visibility === 'private') {
+      const memberResult = await db.execute(sql`SELECT role FROM community_members WHERE community_id = ${id} AND user_id = ${userId}`)
+      const member = Array.isArray(memberResult[0]) ? memberResult[0][0] : memberResult.rows?.[0] || memberResult[0]
+
+      if (!member) {
+        return NextResponse.json({ success: false, error: 'Only members can post in private communities' }, { status: 403 })
+      }
+
+      // Check permissions (viewer cannot post)
+      if (member.role === 'viewer') {
+        return NextResponse.json({ success: false, error: 'Viewers cannot create posts' }, { status: 403 })
+      }
     }
+    // For public communities, any authenticated user can post
 
     const postId = `post_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 

@@ -23,7 +23,6 @@ import {
   Users,
   Globe,
   Lock,
-  EyeOff,
   X,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
@@ -40,7 +39,7 @@ export default function CreateCommunityPage() {
   const [description, setDescription] = useState("")
   const [icon, setIcon] = useState('🏘️')
   const [color, setColor] = useState('#6366f1')
-  const [visibility, setVisibility] = useState<'public' | 'private' | 'secret'>('private')
+  const [visibility, setVisibility] = useState<'public' | 'private'>('private')
   const [selectedMembers, setSelectedMembers] = useState<string[]>([])
   const [users, setUsers] = useState<any[]>([])
   const [creating, setCreating] = useState(false)
@@ -222,7 +221,7 @@ export default function CreateCommunityPage() {
             <CardContent className="space-y-4">
               <div>
                 <Label>Who can see this community?</Label>
-                <div className="grid grid-cols-3 gap-3 mt-2">
+                <div className="grid grid-cols-2 gap-3 mt-2">
                   <button
                     onClick={() => setVisibility('public')}
                     className={`p-4 rounded-lg border-2 text-left transition-all ${
@@ -233,7 +232,7 @@ export default function CreateCommunityPage() {
                   >
                     <Globe className="h-5 w-5 text-emerald-600 mb-2" />
                     <div className="font-medium text-slate-900">Public</div>
-                    <div className="text-xs text-slate-600">Anyone can view</div>
+                    <div className="text-xs text-slate-600">Any user can share and write</div>
                   </button>
 
                   <button
@@ -246,20 +245,7 @@ export default function CreateCommunityPage() {
                   >
                     <Lock className="h-5 w-5 text-amber-600 mb-2" />
                     <div className="font-medium text-slate-900">Private</div>
-                    <div className="text-xs text-slate-600">Members only</div>
-                  </button>
-
-                  <button
-                    onClick={() => setVisibility('secret')}
-                    className={`p-4 rounded-lg border-2 text-left transition-all ${
-                      visibility === 'secret'
-                        ? 'border-slate-500 bg-slate-50'
-                        : 'border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <EyeOff className="h-5 w-5 text-slate-600 mb-2" />
-                    <div className="font-medium text-slate-900">Secret</div>
-                    <div className="text-xs text-slate-600">Invite only</div>
+                    <div className="text-xs text-slate-600">Only chosen members can participate</div>
                   </button>
                 </div>
               </div>
