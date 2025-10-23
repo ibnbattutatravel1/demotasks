@@ -32,6 +32,7 @@ export function PostReactions({ communityId, postId, className }: PostReactionsP
       }
     } catch (error) {
       console.error('Failed to load reactions:', error)
+      // Silently fail if table doesn't exist yet
     }
   }
 

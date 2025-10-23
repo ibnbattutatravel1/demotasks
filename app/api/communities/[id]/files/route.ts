@@ -68,7 +68,7 @@ export async function POST(
     const formData = await req.formData()
     const file = formData.get('file') as File
     const description = formData.get('description') as string
-    const notes = formData.get('notes') as string
+    // const notes = formData.get('notes') as string  // Temporarily disabled until DB updated
     const postId = formData.get('post_id') as string
 
     if (!file) {
@@ -99,7 +99,7 @@ export async function POST(
     await db.execute(sql`
       INSERT INTO community_files (
         id, community_id, post_id, file_name, file_path, file_type, 
-        file_size, mime_type, uploaded_by, description, notes, uploaded_at
+        file_size, mime_type, uploaded_by, description, uploaded_at
       ) VALUES (
         ${fileId},
         ${id},
@@ -111,7 +111,6 @@ export async function POST(
         ${file.type},
         ${userId},
         ${description || null},
-        ${notes || null},
         NOW()
       )
     `)

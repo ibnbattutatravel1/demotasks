@@ -55,7 +55,7 @@ export function CommunityFiles({ communityId, canUpload }: CommunityFilesProps) 
   const [uploadForm, setUploadForm] = useState({
     file: null as File | null,
     description: '',
-    notes: '',
+    // notes: '',  // Temporarily disabled until DB updated
   })
 
   useEffect(() => {
@@ -95,7 +95,7 @@ export function CommunityFiles({ communityId, canUpload }: CommunityFilesProps) 
       const formData = new FormData()
       formData.append('file', uploadForm.file)
       formData.append('description', uploadForm.description)
-      formData.append('notes', uploadForm.notes)
+      // formData.append('notes', uploadForm.notes)  // Temporarily disabled
 
       const res = await fetch(`/api/communities/${communityId}/files`, {
         method: 'POST',
@@ -106,7 +106,7 @@ export function CommunityFiles({ communityId, canUpload }: CommunityFilesProps) 
       if (json.success) {
         toast({ title: 'Success', description: 'File uploaded successfully' })
         setDialogOpen(false)
-        setUploadForm({ file: null, description: '', notes: '' })
+        setUploadForm({ file: null, description: '' })
         loadFiles()
       } else {
         throw new Error(json.error)
@@ -177,7 +177,7 @@ export function CommunityFiles({ communityId, canUpload }: CommunityFilesProps) 
                   <DialogHeader>
                     <DialogTitle>Upload File</DialogTitle>
                     <DialogDescription>
-                      Share a file with the community. Add notes to provide context.
+                      Share a file with the community.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
@@ -201,16 +201,6 @@ export function CommunityFiles({ communityId, canUpload }: CommunityFilesProps) 
                         placeholder="Brief description of the file"
                         value={uploadForm.description}
                         onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="notes">Notes (Optional)</Label>
-                      <Textarea
-                        id="notes"
-                        placeholder="Additional notes or context about this file..."
-                        value={uploadForm.notes}
-                        onChange={(e) => setUploadForm({ ...uploadForm, notes: e.target.value })}
-                        rows={4}
                       />
                     </div>
                     <Button
@@ -289,17 +279,7 @@ export function CommunityFiles({ communityId, canUpload }: CommunityFilesProps) 
                       <p className="text-sm text-slate-700 mb-2">{file.description}</p>
                     )}
 
-                    {file.notes && (
-                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
-                        <div className="flex items-start gap-2">
-                          <StickyNote className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-xs font-medium text-amber-900 mb-1">Notes</p>
-                            <p className="text-sm text-amber-800 whitespace-pre-wrap">{file.notes}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                    {/* Notes feature temporarily disabled until DB updated */}
                   </div>
                 </div>
               </CardContent>

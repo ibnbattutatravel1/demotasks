@@ -28,7 +28,6 @@ export async function GET(
     const isModerator = member && ['owner', 'admin', 'moderator'].includes(member.role)
 
     // Get posts with author info and comment counts
-    // Moderators see all posts, users see only approved posts
     const result = await db.execute(sql`
       SELECT 
         p.*,
@@ -41,7 +40,6 @@ export async function GET(
       WHERE p.community_id = ${id} 
         AND p.is_deleted = FALSE 
         AND p.is_draft = FALSE
-        AND (${isModerator} = TRUE OR p.is_approved = TRUE)
       ORDER BY p.is_pinned DESC, p.created_at DESC
       LIMIT ${limit} OFFSET ${offset}
     `)
@@ -93,20 +91,12 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Viewers cannot create posts' }, { status: 403 })
     }
 
-    // Get community settings
-    const communityResult = await db.execute(sql`SELECT settings FROM communities WHERE id = ${id}`)
-    const community = Array.isArray(communityResult[0]) ? communityResult[0][0] : communityResult.rows?.[0] || communityResult[0]
-    const settings = community?.settings ? (typeof community.settings === 'string' ? JSON.parse(community.settings) : community.settings) : {}
-
-    // Check if posts require approval
-    const requiresApproval = settings.require_approval === true && !['owner', 'admin', 'moderator'].includes(member.role)
-
     const postId = `post_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
     await db.execute(sql`
       INSERT INTO community_posts (
         id, community_id, title, content, content_type, author_id,
-        is_draft, is_approved, tags, mentioned_users, created_at, updated_at
+        is_draft, tags, mentioned_users, created_at, updated_at
       ) VALUES (
         ${postId},
         ${id},
@@ -115,7 +105,6 @@ export async function POST(
         ${content_type || 'markdown'},
         ${userId},
         ${is_draft || false},
-        ${requiresApproval ? false : true},
         ${tags ? JSON.stringify(tags) : null},
         ${mentioned_users ? JSON.stringify(mentioned_users) : null},
         NOW(),
