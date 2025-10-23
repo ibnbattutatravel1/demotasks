@@ -246,13 +246,13 @@ export const meetings = mysqlTable('meetings', {
   description: text('description').notNull(),
   meetingLink: varchar('meeting_link', { length: 1000 }).notNull(), // Zoom, Google Meet, Teams, etc.
   meetingType: varchar('meeting_type', { length: 32 }).notNull().default('zoom'), // 'zoom' | 'google-meet' | 'teams' | 'other'
-  startTime: datetime('start_time').notNull(), // ISO timestamp
-  endTime: datetime('end_time').notNull(), // ISO timestamp
+  startTime: datetime('start_time', { mode: 'string' }).notNull(), // ISO timestamp
+  endTime: datetime('end_time', { mode: 'string' }).notNull(), // ISO timestamp
   timezone: varchar('timezone', { length: 100 }).notNull().default('UTC'),
   status: varchar('status', { length: 16 }).notNull().default('scheduled'), // 'scheduled' | 'in-progress' | 'completed' | 'cancelled'
   createdById: varchar('created_by_id', { length: 191 }).notNull().references(() => users.id),
-  createdAt: datetime('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: datetime('updated_at'),
+  createdAt: datetime('created_at', { mode: 'string' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: datetime('updated_at', { mode: 'string' }),
   // Optional project association
   projectId: varchar('project_id', { length: 191 }).references(() => projects.id),
   // Reminder settings
@@ -265,7 +265,7 @@ export const meetings = mysqlTable('meetings', {
   // Recurrence
   isRecurring: boolean('is_recurring').notNull().default(false),
   recurrencePattern: varchar('recurrence_pattern', { length: 50 }), // 'daily' | 'weekly' | 'monthly'
-  recurrenceEndDate: datetime('recurrence_end_date'),
+  recurrenceEndDate: datetime('recurrence_end_date', { mode: 'string' }),
 })
 
 // Meeting Attendees (many-to-many with additional fields)
@@ -275,8 +275,8 @@ export const meetingAttendees = mysqlTable('meeting_attendees', {
   userId: varchar('user_id', { length: 191 }).notNull().references(() => users.id),
   role: varchar('role', { length: 16 }).notNull().default('attendee'), // 'organizer' | 'required' | 'optional' | 'attendee'
   status: varchar('status', { length: 16 }).notNull().default('pending'), // 'pending' | 'accepted' | 'declined' | 'tentative'
-  responseAt: datetime('response_at'),
-  addedAt: datetime('added_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  responseAt: datetime('response_at', { mode: 'string' }),
+  addedAt: datetime('added_at', { mode: 'string' }).notNull().default(sql`CURRENT_TIMESTAMP`),
   // Notification preferences for this specific meeting
   notificationSent: boolean('notification_sent').notNull().default(false),
   reminderSent: boolean('reminder_sent').notNull().default(false),
