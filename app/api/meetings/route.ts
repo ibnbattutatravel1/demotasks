@@ -189,7 +189,12 @@ export async function POST(req: NextRequest) {
 
     // Create meeting
     const meetingId = crypto.randomUUID()
-    const now = new Date().toISOString()
+    const now = new Date()
+
+    // Ensure proper date formatting for database
+    const startTimeISO = new Date(body.startTime).toISOString()
+    const endTimeISO = new Date(body.endTime).toISOString()
+    const recurrenceEndDateISO = body.recurrenceEndDate ? new Date(body.recurrenceEndDate).toISOString() : null
 
     await db.insert(dbSchema.meetings).values({
       id: meetingId,
@@ -197,12 +202,12 @@ export async function POST(req: NextRequest) {
       description: body.description,
       meetingLink: body.meetingLink,
       meetingType: body.meetingType || 'zoom',
-      startTime: body.startTime,
-      endTime: body.endTime,
+      startTime: startTimeISO,
+      endTime: endTimeISO,
       timezone: body.timezone || 'UTC',
       status: 'scheduled',
       createdById: userId,
-      createdAt: now,
+      createdAt: now.toISOString(),
       projectId: body.projectId || null,
       reminderMinutes: body.reminderMinutes || 15,
       agenda: body.agenda || null,
@@ -210,7 +215,7 @@ export async function POST(req: NextRequest) {
       recordingUrl: null,
       isRecurring: body.isRecurring || false,
       recurrencePattern: body.recurrencePattern || null,
-      recurrenceEndDate: body.recurrenceEndDate || null,
+      recurrenceEndDate: recurrenceEndDateISO,
     })
 
     // Add organizer as attendee with 'organizer' role
@@ -220,7 +225,7 @@ export async function POST(req: NextRequest) {
       userId,
       role: 'organizer',
       status: 'accepted',
-      addedAt: now,
+      addedAt: now.toISOString(),
       notificationSent: false,
       reminderSent: false,
     })
@@ -235,7 +240,7 @@ export async function POST(req: NextRequest) {
           userId: attendeeId,
           role: 'attendee',
           status: 'pending',
-          addedAt: now,
+          addedAt: now.toISOString(),
           notificationSent: false,
           reminderSent: false,
         })
@@ -262,8 +267,8 @@ export async function POST(req: NextRequest) {
         description: body.description,
         meetingLink: body.meetingLink,
         meetingType: body.meetingType || 'zoom',
-        startTime: body.startTime,
-        endTime: body.endTime,
+        startTime: startTimeISO,
+        endTime: endTimeISO,
         timezone: body.timezone || 'UTC',
         createdById: userId,
         projectId: body.projectId,

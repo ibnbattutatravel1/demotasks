@@ -56,7 +56,7 @@ export function MeetingForm({ isOpen, onClose, onSuccess, meeting, mode = 'creat
     meetingType: 'zoom',
     startTime: '',
     endTime: '',
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timezone: 'UTC',
     projectId: '',
     agenda: '',
     reminderMinutes: 15,
@@ -74,7 +74,7 @@ export function MeetingForm({ isOpen, onClose, onSuccess, meeting, mode = 'creat
           meetingType: meeting.meetingType || 'zoom',
           startTime: meeting.startTime ? new Date(meeting.startTime).toISOString().slice(0, 16) : '',
           endTime: meeting.endTime ? new Date(meeting.endTime).toISOString().slice(0, 16) : '',
-          timezone: meeting.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+          timezone: meeting.timezone || 'UTC',
           projectId: meeting.projectId || '',
           agenda: meeting.agenda || '',
           reminderMinutes: meeting.reminderMinutes || 15,
@@ -89,7 +89,7 @@ export function MeetingForm({ isOpen, onClose, onSuccess, meeting, mode = 'creat
           meetingType: 'zoom',
           startTime: '',
           endTime: '',
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          timezone: 'UTC',
           projectId: '',
           agenda: '',
           reminderMinutes: 15,
@@ -269,27 +269,72 @@ export function MeetingForm({ isOpen, onClose, onSuccess, meeting, mode = 'creat
           {/* Timezone */}
           <div className="space-y-2">
             <Label htmlFor="timezone">Timezone</Label>
-            <Input
-              id="timezone"
+            <Select
               value={formData.timezone}
-              onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
-            />
+              onValueChange={(value) => setFormData({ ...formData, timezone: value })}
+            >
+              <SelectTrigger id="timezone">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px]">
+                <SelectItem value="UTC">🌍 UTC (Greenwich Mean Time)</SelectItem>
+                <SelectItem value="America/New_York">🇺🇸 Eastern Time (ET)</SelectItem>
+                <SelectItem value="America/Chicago">🇺🇸 Central Time (CT)</SelectItem>
+                <SelectItem value="America/Denver">🇺🇸 Mountain Time (MT)</SelectItem>
+                <SelectItem value="America/Los_Angeles">🇺🇸 Pacific Time (PT)</SelectItem>
+                <SelectItem value="Europe/London">🇬🇧 London (GMT/BST)</SelectItem>
+                <SelectItem value="Europe/Paris">🇫🇷 Paris (CET/CEST)</SelectItem>
+                <SelectItem value="Europe/Berlin">🇩🇪 Berlin (CET/CEST)</SelectItem>
+                <SelectItem value="Europe/Rome">🇮🇹 Rome (CET/CEST)</SelectItem>
+                <SelectItem value="Europe/Moscow">🇷🇺 Moscow (MSK)</SelectItem>
+                <SelectItem value="Asia/Dubai">🇦🇪 Dubai (GST)</SelectItem>
+                <SelectItem value="Asia/Riyadh">🇸🇦 Riyadh (AST)</SelectItem>
+                <SelectItem value="Asia/Kuwait">🇰🇼 Kuwait (AST)</SelectItem>
+                <SelectItem value="Asia/Bahrain">🇧🇭 Bahrain (AST)</SelectItem>
+                <SelectItem value="Asia/Qatar">🇶🇦 Qatar (AST)</SelectItem>
+                <SelectItem value="Asia/Kolkata">🇮🇳 India (IST)</SelectItem>
+                <SelectItem value="Asia/Shanghai">🇨🇳 China (CST)</SelectItem>
+                <SelectItem value="Asia/Tokyo">🇯🇵 Tokyo (JST)</SelectItem>
+                <SelectItem value="Asia/Seoul">🇰🇷 Seoul (KST)</SelectItem>
+                <SelectItem value="Asia/Singapore">🇸🇬 Singapore (SGT)</SelectItem>
+                <SelectItem value="Australia/Sydney">🇦🇺 Sydney (AEDT/AEST)</SelectItem>
+                <SelectItem value="Pacific/Auckland">🇳🇿 Auckland (NZDT/NZST)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Attendees */}
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Attendees * (Select participants)
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Attendees * (Select participants)
+              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (formData.attendeeIds.length === users.length) {
+                    // Deselect all
+                    setFormData({ ...formData, attendeeIds: [] })
+                  } else {
+                    // Select all
+                    setFormData({ ...formData, attendeeIds: users.map(u => u.id) })
+                  }
+                }}
+              >
+                {formData.attendeeIds.length === users.length ? 'Deselect All' : 'Select All Users'}
+              </Button>
+            </div>
             <MultiSelect
               options={userOptions}
               selected={formData.attendeeIds}
-              onChange={(selected) => setFormData({ ...formData, attendeeIds: selected })}
+              onChange={(selected: string[]) => setFormData({ ...formData, attendeeIds: selected })}
               placeholder="Select attendees..."
             />
             <p className="text-xs text-muted-foreground">
-              {formData.attendeeIds.length} attendee(s) selected
+              {formData.attendeeIds.length} of {users.length} user(s) selected
             </p>
           </div>
 
@@ -301,10 +346,9 @@ export function MeetingForm({ isOpen, onClose, onSuccess, meeting, mode = 'creat
               onValueChange={(value) => setFormData({ ...formData, projectId: value })}
             >
               <SelectTrigger id="projectId">
-                <SelectValue placeholder="Select project..." />
+                <SelectValue placeholder="No project selected" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
                 {projects.map((project) => (
                   <SelectItem key={project.id} value={project.id}>
                     {project.name}

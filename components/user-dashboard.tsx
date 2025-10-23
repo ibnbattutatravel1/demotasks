@@ -37,6 +37,7 @@ import {
   Bell,
   MessageSquare,
   FileText,
+  Video,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -69,6 +70,7 @@ export function UserDashboard() {
   const [notifications, setNotifications] = useState<any[]>([])
   const [query, setQuery] = useState("")
   const [questionnairesCount, setQuestionnairesCount] = useState(0)
+  const [upcomingMeetingsCount, setUpcomingMeetingsCount] = useState(0)
   const router = useRouter()
   const { toast } = useToast()
   const { user, logout } = useAuth()
@@ -158,14 +160,37 @@ export function UserDashboard() {
     let ignore = false
     const load = async () => {
       try {
-        const res = await fetch('/api/questionnaires')
+        const res = await fetch('/api/questionnaires/my-pending')
         const json = await res.json()
         if (!ignore && res.ok && json.success) {
-          const pending = json.data?.filter((q: any) => q.status === 'pending').length || 0
-          setQuestionnairesCount(pending)
+          setQuestionnairesCount(json.data?.length || 0)
         }
       } catch (e) {
         console.error('Failed to load questionnaires count', e)
+      }
+    }
+    load()
+    return () => { ignore = true }
+  }, [])
+
+  // Load upcoming meetings count
+  useEffect(() => {
+    let ignore = false
+    const load = async () => {
+      try {
+        const res = await fetch('/api/meetings')
+        const json = await res.json()
+        if (!ignore && res.ok && json.success) {
+          // Count upcoming meetings (not cancelled, not completed, and in future)
+          const now = new Date()
+          const upcoming = (json.data || []).filter((m: any) => {
+            const startTime = new Date(m.startTime)
+            return startTime > now && m.status === 'scheduled'
+          })
+          setUpcomingMeetingsCount(upcoming.length)
+        }
+      } catch (e) {
+        console.error('Failed to load meetings count', e)
       }
     }
     load()
@@ -388,6 +413,18 @@ export function UserDashboard() {
             >
               <Calendar className="h-4 w-4 text-slate-600" />
               <span className="text-sm font-medium text-slate-900">Calendar</span>
+            </button>
+            <button
+              onClick={() => handleNavigation("/meetings")}
+              className="flex items-center gap-2 mb-3 w-full text-left hover:bg-slate-50 rounded-lg px-2 py-1.5 transition-colors"
+            >
+              <Video className="h-4 w-4 text-slate-600" />
+              <span className="text-sm font-medium text-slate-900">Meetings</span>
+              {upcomingMeetingsCount > 0 && (
+                <Badge variant="default" className="ml-auto text-xs bg-blue-500">
+                  {upcomingMeetingsCount}
+                </Badge>
+              )}
             </button>
             <button
               onClick={() => handleNavigation("/timesheet")}
