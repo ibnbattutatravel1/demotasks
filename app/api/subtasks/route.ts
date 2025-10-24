@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { db, dbSchema } from '@/lib/db/client'
 import { eq } from 'drizzle-orm'
 import { toISOString, toISOStringOrUndefined } from '@/lib/date-utils'
+import { notifyUser } from '@/lib/notifications'
 
 async function recomputeTaskProgress(taskId: string) {
   const subtasks = await db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.taskId, taskId))
@@ -28,14 +29,14 @@ export async function POST(req: NextRequest) {
       taskId: string
       title: string
       description?: string
-      assigneeId?: string
+      assigneeIds?: string[]
       startDate?: string
       dueDate?: string
       priority?: 'low' | 'medium' | 'high'
       status?: 'todo' | 'in-progress' | 'review' | 'done'
     }
 
-    const { taskId, title, description = '', assigneeId = null, startDate = null, dueDate = null, priority = null, status = 'todo' } = body as any
+    const { taskId, title, description = '', assigneeIds = [], startDate = null, dueDate = null, priority = null, status = 'todo' } = body as any
 
     if (!taskId || !title) {
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 })
@@ -48,6 +49,7 @@ export async function POST(req: NextRequest) {
     const now = new Date()
     const id = (globalThis.crypto?.randomUUID?.() ?? randomUUID()) as string
 
+    // Insert subtask
     await db.insert(dbSchema.subtasks).values({
       id,
       taskId,
@@ -59,13 +61,48 @@ export async function POST(req: NextRequest) {
       dueDate: dueDate ? new Date(dueDate) : null,
       createdAt: now,
       updatedAt: now,
-      assigneeId,
       priority,
     })
+
+    // Insert assignee relationships
+    if (assigneeIds.length > 0) {
+      await db.insert(dbSchema.subtaskAssignees).values(
+        assigneeIds.map((userId: string) => ({
+          subtaskId: id,
+          userId
+        }))
+      )
+    }
 
     // rollups
     await recomputeTaskProgress(taskId)
     await recomputeProjectProgress(task[0].projectId)
+
+    // Send notifications to all assignees
+    if (assigneeIds.length > 0) {
+      try {
+        const parentProject = await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, task[0].projectId))
+        const notificationPromises = assigneeIds.map((assigneeId: string) =>
+          notifyUser({
+            userId: assigneeId,
+            type: 'task_assigned',
+            title: 'New Subtask Assigned',
+            message: `You have been assigned a new subtask: ${title}`,
+            relatedId: id,
+            relatedType: 'subtask',
+            topic: 'taskReminders',
+            metadata: {
+              taskTitle: title,
+              projectName: parentProject[0]?.name,
+              dueDate: dueDate
+            }
+          })
+        )
+        await Promise.all(notificationPromises)
+      } catch (notificationError) {
+        console.error('Failed to send subtask assignment notifications:', notificationError)
+      }
+    }
 
     const created = (await db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.id, id)))[0]
     return NextResponse.json({ 
@@ -77,6 +114,7 @@ export async function POST(req: NextRequest) {
         dueDate: toISOStringOrUndefined(created.dueDate),
         createdAt: toISOString(created.createdAt),
         updatedAt: toISOStringOrUndefined(created.updatedAt),
+        assigneeIds,
       } 
     }, { status: 201 })
   } catch (error) {

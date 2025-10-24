@@ -40,8 +40,8 @@ export interface Subtask {
   dueDate?: string
   createdAt: string
   updatedAt?: string
-  assigneeId?: string
-  assignee?: TeamMember
+  assigneeIds?: string[] // Multiple assignee IDs
+  assignees?: TeamMember[] // Multiple assignee objects
   comments: Comment[]
   priority?: "low" | "medium" | "high"
   tags: string[]

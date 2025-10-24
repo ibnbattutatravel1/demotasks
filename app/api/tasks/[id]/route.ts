@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
 import { db, dbSchema } from '@/lib/db/client'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, or } from 'drizzle-orm'
 import { notifyUser } from '@/lib/notifications'
 import { toISOString, toISOStringOrUndefined } from '@/lib/date-utils'
 
@@ -54,19 +54,22 @@ async function recomputeProjectProgress(projectId: string) {
   return avg
 }
 
-// Optimized version - fetches subtasks first, then their comments
+// Optimized version - fetches subtasks first, then their comments and assignees
 async function composeTask(task: any) {
   // First, get subtasks to know their IDs
   const subtasksData = await db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.taskId, task.id))
   const subtaskIds = subtasksData.map((st: any) => st.id)
   
   // Now fetch everything else in parallel
-  const [assignees, creatorRows, taskComments, subtaskComments] = await Promise.all([
+  const [assignees, creatorRows, taskComments, subtaskComments, subtaskAssigneeRelations] = await Promise.all([
     db.select().from(dbSchema.taskAssignees).where(eq(dbSchema.taskAssignees.taskId, task.id)).leftJoin(dbSchema.users, eq(dbSchema.taskAssignees.userId, dbSchema.users.id)),
     db.select().from(dbSchema.users).where(eq(dbSchema.users.id, task.createdById)),
     db.select().from(dbSchema.comments).where(and(eq(dbSchema.comments.entityType, 'task'), eq(dbSchema.comments.entityId, task.id))),
     subtaskIds.length > 0 
       ? db.select().from(dbSchema.comments).where(and(eq(dbSchema.comments.entityType, 'subtask'), inArray(dbSchema.comments.entityId, subtaskIds)))
+      : Promise.resolve([]),
+    subtaskIds.length > 0
+      ? db.select().from(dbSchema.subtaskAssignees).where(inArray(dbSchema.subtaskAssignees.subtaskId, subtaskIds))
       : Promise.resolve([])
   ])
   
@@ -78,30 +81,70 @@ async function composeTask(task: any) {
     commentsByEntity[key].push(c)
   }
   
+  // Build assignee relationships map for subtasks
+  const subtaskAssigneeMap: Record<string, string[]> = {}
+  for (const relation of subtaskAssigneeRelations) {
+    const key = relation.subtaskId
+    if (!subtaskAssigneeMap[key]) subtaskAssigneeMap[key] = []
+    subtaskAssigneeMap[key].push(relation.userId)
+  }
+  
+  // Get unique assignee IDs from subtasks
+  const subtaskAssigneeIds = [...new Set(subtaskAssigneeRelations.map((r: any) => r.userId).filter(Boolean))]
+  
+  // Fetch subtask assignees separately
+  let subtaskAssignees: any[] = []
+  if (subtaskAssigneeIds.length > 0) {
+    // Fetch each assignee individually to avoid complex type issues
+    const assigneePromises = subtaskAssigneeIds.map((id: any) => 
+      db.select().from(dbSchema.users).where(eq(dbSchema.users.id, id))
+    )
+    const assigneeResults = await Promise.all(assigneePromises)
+    subtaskAssignees = assigneeResults.flat()
+  }
+  
+  // Build assignee lookup map for subtasks
+  const assigneeMap: Record<string, any> = {}
+  for (const assignee of subtaskAssignees) {
+    assigneeMap[assignee.id] = {
+      id: assignee.id,
+      name: assignee.name,
+      email: assignee.email,
+      avatar: assignee.avatar,
+      initials: assignee.initials,
+    }
+  }
+  
   const assigneeUsers = assignees.map((row: any) => row.users).filter(Boolean)
-  const subtaskList = subtasksData.map((st: any) => ({
-    id: st.id,
-    taskId: st.taskId,
-    title: st.title,
-    description: st.description,
-    status: st.status,
-    completed: !!st.completed,
-    startDate: toISOStringOrUndefined(st.startDate),
-    dueDate: toISOStringOrUndefined(st.dueDate),
-    createdAt: toISOString(st.createdAt),
-    updatedAt: toISOStringOrUndefined(st.updatedAt),
-    assigneeId: st.assigneeId,
-    priority: st.priority,
-    comments: (commentsByEntity[st.id] || []).map((c: any) => ({
-      id: c.id,
-      userId: c.userId,
-      user: c.userName,
-      avatar: c.avatar || undefined,
-      content: c.content,
-      createdAt: toISOString(c.createdAt),
-      updatedAt: toISOStringOrUndefined(c.updatedAt),
-    })),
-  }))
+  const subtaskList = subtasksData.map((st: any) => {
+    const assigneeIds = subtaskAssigneeMap[st.id] || []
+    const assignees = assigneeIds.map((id: string) => assigneeMap[id]).filter(Boolean)
+    
+    return {
+      id: st.id,
+      taskId: st.taskId,
+      title: st.title,
+      description: st.description,
+      status: st.status,
+      completed: !!st.completed,
+      startDate: toISOStringOrUndefined(st.startDate),
+      dueDate: toISOStringOrUndefined(st.dueDate),
+      createdAt: toISOString(st.createdAt),
+      updatedAt: toISOStringOrUndefined(st.updatedAt),
+      assigneeIds,
+      assignees,
+      priority: st.priority,
+      comments: (commentsByEntity[st.id] || []).map((c: any) => ({
+        id: c.id,
+        userId: c.userId,
+        user: c.userName,
+        avatar: c.avatar || undefined,
+        content: c.content,
+        createdAt: toISOString(c.createdAt),
+        updatedAt: toISOStringOrUndefined(c.updatedAt),
+      })),
+    }
+  })
   
   const subtasksCompleted = subtaskList.filter((s: any) => s.completed).length
   const totalSubtasks = subtaskList.length

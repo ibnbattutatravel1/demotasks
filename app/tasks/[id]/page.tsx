@@ -1,6 +1,6 @@
 "use client"
 
-import type React from "react"
+import React, { type ReactNode } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useState, useCallback } from "react"
 import { useAuth } from "@/contexts/auth-context"
@@ -116,11 +116,13 @@ export default function TaskDetailPage() {
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("")
   const [newSubtaskDueDate, setNewSubtaskDueDate] = useState("")
   const [newSubtaskStatus, setNewSubtaskStatus] = useState<"todo" | "in-progress" | "review" | "done">("todo")
+  const [newSubtaskAssigneeIds, setNewSubtaskAssigneeIds] = useState<string[]>([])
   const [expandedSubtasks, setExpandedSubtasks] = useState<Record<string, boolean>>({})
   const [subtaskComments, setSubtaskComments] = useState<Record<string, string>>({})
   const [editingSubtask, setEditingSubtask] = useState<string | null>(null)
   const [editSubtaskTitle, setEditSubtaskTitle] = useState("")
   const [editSubtaskDueDate, setEditSubtaskDueDate] = useState("")
+  const [editSubtaskAssigneeIds, setEditSubtaskAssigneeIds] = useState<string[]>([])
   const [attachments, setAttachments] = useState<any[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [loadingAttachments, setLoadingAttachments] = useState(true)
@@ -406,13 +408,20 @@ export default function TaskDetailPage() {
         const res = await fetch('/api/subtasks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ taskId: task.id, title: newSubtaskTitle.trim(), dueDate: newSubtaskDueDate, status: newSubtaskStatus }),
+          body: JSON.stringify({ 
+            taskId: task.id, 
+            title: newSubtaskTitle.trim(), 
+            dueDate: newSubtaskDueDate, 
+            status: newSubtaskStatus,
+            assigneeIds: newSubtaskAssigneeIds
+          }),
         })
         if (res.ok) {
           await refreshTask()
           setNewSubtaskTitle("")
           setNewSubtaskDueDate("")
           setNewSubtaskStatus("todo")
+          setNewSubtaskAssigneeIds([])
           setShowAddSubtask(false)
         }
       } catch (e) {
@@ -513,6 +522,7 @@ export default function TaskDetailPage() {
     setEditingSubtask(subtask.id)
     setEditSubtaskTitle(subtask.title)
     setEditSubtaskDueDate(subtask.dueDate || "")
+    setEditSubtaskAssigneeIds(subtask.assigneeIds || [])
   }
 
   const handleSaveSubtaskEdit = async (subtaskId: string) => {
@@ -521,11 +531,16 @@ export default function TaskDetailPage() {
       await fetch(`/api/subtasks/${subtaskId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: editSubtaskTitle.trim(), dueDate: editSubtaskDueDate || null }),
+        body: JSON.stringify({ 
+          title: editSubtaskTitle.trim(), 
+          dueDate: editSubtaskDueDate || null,
+          assigneeIds: editSubtaskAssigneeIds
+        }),
       })
       setEditingSubtask(null)
       setEditSubtaskTitle("")
       setEditSubtaskDueDate("")
+      setEditSubtaskAssigneeIds([])
       await refreshTask()
     } catch (e) {
       console.error('Save subtask edit failed', e)
@@ -536,6 +551,7 @@ export default function TaskDetailPage() {
     setEditingSubtask(null)
     setEditSubtaskTitle("")
     setEditSubtaskDueDate("")
+    setEditSubtaskAssigneeIds([])
   }
 
   const handleDeleteSubtask = async (subtaskId: string) => {
@@ -860,7 +876,7 @@ export default function TaskDetailPage() {
               <div className="h-6 w-px bg-slate-300" />
               <div>
                 {editingTask ? (
-                  <div className="space-y-2">
+                  <React.Fragment>
                     <Input
                       value={editTaskTitle}
                       onChange={(e) => setEditTaskTitle(e.target.value)}
@@ -875,7 +891,7 @@ export default function TaskDetailPage() {
                         Cancel
                       </Button>
                     </div>
-                  </div>
+                  </React.Fragment>
                 ) : (
                   <>
                     <h1 className="text-2xl font-bold text-slate-900">{task?.title || "Task"}</h1>
@@ -1173,6 +1189,83 @@ export default function TaskDetailPage() {
                       className="bg-white"
                     />
                     <div className="flex items-center gap-2">
+                      <UserIcon className="h-4 w-4 text-slate-500" />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className="w-full justify-between bg-white"
+                          >
+                            {newSubtaskAssigneeIds.length > 0
+                              ? `${newSubtaskAssigneeIds.length} assignee${newSubtaskAssigneeIds.length > 1 ? 's' : ''} selected`
+                              : "Select assignees..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px] p-0">
+                          <Command>
+                            <CommandInput placeholder="Search users..." />
+                            <CommandEmpty>No users found.</CommandEmpty>
+                            <CommandGroup className="max-h-[200px] overflow-y-auto">
+                              {availableUsers.map((user) => (
+                                <CommandItem
+                                  key={user.id}
+                                  onSelect={() => {
+                                    setNewSubtaskAssigneeIds(prev =>
+                                      prev.includes(user.id)
+                                        ? prev.filter(id => id !== user.id)
+                                        : [...prev, user.id]
+                                    )
+                                  }}
+                                >
+                                  <div className="flex items-center gap-2 w-full">
+                                    <Check
+                                      className={cn(
+                                        "h-4 w-4",
+                                        newSubtaskAssigneeIds.includes(user.id) ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    <Avatar className="h-6 w-6">
+                                      <AvatarImage src={user.avatar || "/placeholder.svg"} />
+                                      <AvatarFallback className="text-xs">
+                                        {user.initials}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <span className="flex-1">{user.name}</span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    {newSubtaskAssigneeIds.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {newSubtaskAssigneeIds.map(id => {
+                          const user = availableUsers.find(u => u.id === id)
+                          return user ? (
+                            <div key={id} className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                              <Avatar className="h-4 w-4">
+                                <AvatarImage src={user.avatar || "/placeholder.svg"} />
+                                <AvatarFallback className="text-[10px]">
+                                  {user.initials}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span>{user.name}</span>
+                              <button
+                                onClick={() => setNewSubtaskAssigneeIds(prev => prev.filter(assigneeId => assigneeId !== id))}
+                                className="ml-1 hover:text-blue-600"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ) : null
+                        })}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-slate-500" />
                       <Input
                         type="date"
@@ -1210,6 +1303,7 @@ export default function TaskDetailPage() {
                           setNewSubtaskTitle("")
                           setNewSubtaskDueDate("")
                           setNewSubtaskStatus("todo")
+                          setNewSubtaskAssigneeIds([])
                         }}
                       >
                         <X className="h-4 w-4" />
@@ -1237,6 +1331,84 @@ export default function TaskDetailPage() {
                               className="text-sm"
                               autoFocus
                             />
+                            <div className="flex items-center gap-2">
+                              <UserIcon className="h-4 w-4 text-slate-500" />
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    className="w-full justify-between bg-white text-sm"
+                                  >
+                                    {editSubtaskAssigneeIds.length > 0
+                                      ? `${editSubtaskAssigneeIds.length} assignee${editSubtaskAssigneeIds.length > 1 ? 's' : ''} selected`
+                                      : "Select assignees..."
+                                    }
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[300px] p-0">
+                                  <Command>
+                                    <CommandInput placeholder="Search users..." />
+                                    <CommandEmpty>No users found.</CommandEmpty>
+                                    <CommandGroup className="max-h-[200px] overflow-y-auto">
+                                      {availableUsers.map((user) => (
+                                        <CommandItem
+                                          key={user.id}
+                                          onSelect={() => {
+                                            setEditSubtaskAssigneeIds(prev =>
+                                              prev.includes(user.id)
+                                                ? prev.filter(id => id !== user.id)
+                                                : [...prev, user.id]
+                                            )
+                                          }}
+                                        >
+                                          <div className="flex items-center gap-2 w-full">
+                                            <Check
+                                              className={cn(
+                                                "h-4 w-4",
+                                                editSubtaskAssigneeIds.includes(user.id) ? "opacity-100" : "opacity-0"
+                                              )}
+                                            />
+                                            <Avatar className="h-6 w-6">
+                                              <AvatarImage src={user.avatar || "/placeholder.svg"} />
+                                              <AvatarFallback className="text-xs">
+                                                {user.initials}
+                                              </AvatarFallback>
+                                            </Avatar>
+                                            <span className="flex-1">{user.name}</span>
+                                          </div>
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                            {editSubtaskAssigneeIds.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {editSubtaskAssigneeIds.map(id => {
+                                  const user = availableUsers.find(u => u.id === id)
+                                  return user ? (
+                                    <div key={id} className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                                      <Avatar className="h-4 w-4">
+                                        <AvatarImage src={user.avatar || "/placeholder.svg"} />
+                                        <AvatarFallback className="text-[10px]">
+                                          {user.initials}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <span>{user.name}</span>
+                                      <button
+                                        onClick={() => setEditSubtaskAssigneeIds(prev => prev.filter(assigneeId => assigneeId !== id))}
+                                        className="ml-1 hover:text-blue-600"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  ) : null
+                                })}
+                              </div>
+                            )}
                             <div className="flex items-center gap-2">
                               <Calendar className="h-4 w-4 text-slate-500" />
                               <Input
@@ -1301,10 +1473,20 @@ export default function TaskDetailPage() {
                                   Overdue
                                 </Badge>
                               )}
-                              {subtask.assignee && (
+                              {subtask.assignees && subtask.assignees.length > 0 && (
                                 <div className="flex items-center gap-1 ml-2">
                                   <UserIcon className="h-3 w-3 text-slate-400" />
-                                  <span className="text-xs text-slate-500">{subtask.assignee.name}</span>
+                                  <div className="flex items-center gap-1">
+                                    {subtask.assignees.slice(0, 3).map((assignee, index) => (
+                                      <React.Fragment key={assignee.id}>
+                                        {index > 0 && <span className="text-xs text-slate-400">,</span>}
+                                        <span className="text-xs text-slate-500">{assignee.name}</span>
+                                      </React.Fragment>
+                                    ))}
+                                    {subtask.assignees.length > 3 && (
+                                      <span className="text-xs text-slate-400">+{subtask.assignees.length - 3} more</span>
+                                    )}
+                                  </div>
                                 </div>
                               )}
                             </div>

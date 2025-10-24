@@ -119,6 +119,16 @@ export const subtaskTags = mysqlTable(
   (t) => ({ pk: primaryKey({ columns: [t.subtaskId, t.tag] }) })
 )
 
+// Subtask assignees (many-to-many)
+export const subtaskAssignees = mysqlTable(
+  'subtask_assignees',
+  {
+    subtaskId: varchar('subtask_id', { length: 191 }).notNull().references(() => subtasks.id),
+    userId: varchar('user_id', { length: 191 }).notNull().references(() => users.id),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.subtaskId, t.userId] }) })
+)
+
 // Comments (polymorphic: task | subtask)
 export const comments = mysqlTable('comments', {
   id: varchar('id', { length: 191 }).primaryKey(),
