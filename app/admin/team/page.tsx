@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { EditUserDialog } from "@/components/edit-user-dialog"
 
 interface TeamMember {
@@ -31,7 +32,7 @@ export default function TeamManagementPage() {
   const [selectedUser, setSelectedUser] = useState<TeamMember | null>(null)
   const [newMemberName, setNewMemberName] = useState("")
   const [newMemberEmail, setNewMemberEmail] = useState("")
-  const [newMemberRole, setNewMemberRole] = useState("")
+  const [newMemberRole, setNewMemberRole] = useState<"admin" | "user">("user")
   const [newMemberPassword, setNewMemberPassword] = useState("")
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
@@ -330,11 +331,15 @@ export default function TeamManagementPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                <Input
-                  value={newMemberRole}
-                  onChange={(e) => setNewMemberRole(e.target.value)}
-                  placeholder="Enter role (e.g., Developer, Designer)"
-                />
+                <Select value={newMemberRole} onValueChange={(value: "admin" | "user") => setNewMemberRole(value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Password (optional)</label>
@@ -354,7 +359,7 @@ export default function TeamManagementPage() {
                   setShowAddMemberModal(false)
                   setNewMemberName("")
                   setNewMemberEmail("")
-                  setNewMemberRole("")
+                  setNewMemberRole("user")
                 }}
                 className="flex-1"
               >
@@ -367,8 +372,7 @@ export default function TeamManagementPage() {
                       name: newMemberName.trim(),
                       email: newMemberEmail.trim(),
                     }
-                    const roleLower = newMemberRole.trim().toLowerCase()
-                    if (roleLower === 'admin' || roleLower === 'user') body.role = roleLower
+                    body.role = newMemberRole
                     const pwd = newMemberPassword.trim()
                     if (pwd) {
                       if (pwd.length < 8) {
@@ -401,7 +405,7 @@ export default function TeamManagementPage() {
                     setShowAddMemberModal(false)
                     setNewMemberName("")
                     setNewMemberEmail("")
-                    setNewMemberRole("")
+                    setNewMemberRole("user")
                     setNewMemberPassword("")
                   } catch (e: any) {
                     alert(e?.message || 'Failed to add member')
