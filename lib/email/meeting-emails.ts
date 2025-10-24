@@ -1,7 +1,10 @@
 /**
  * Meeting Email Notifications
  * Beautiful HTML templates for all meeting events
+ * Now supports Gmail SMTP
  */
+
+import nodemailer from 'nodemailer'
 
 interface MeetingEmailData {
   to: string
@@ -19,6 +22,28 @@ interface MeetingEmailData {
   detailsLink?: string
 }
 
+// Create SMTP transporter
+function createTransporter() {
+  const smtpHost = process.env.SMTP_HOST
+  const smtpPort = parseInt(process.env.SMTP_PORT || '587')
+  const smtpUser = process.env.SMTP_USER
+  const smtpPass = process.env.SMTP_PASS
+
+  if (!smtpHost || !smtpUser || !smtpPass) {
+    return null
+  }
+
+  return nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpPort === 465, // true for 465, false for other ports
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
+  })
+}
+
 export async function sendMeetingEmail(
   type: 
     | 'meeting_created' 
@@ -31,34 +56,31 @@ export async function sendMeetingEmail(
   data: MeetingEmailData
 ) {
   try {
-    if (!process.env.RESEND_API_KEY) {
-      console.warn('Email service not configured')
+    const transporter = createTransporter()
+    
+    if (!transporter) {
+      console.warn('Email service not configured - missing SMTP credentials')
       return { success: false, reason: 'Email service not configured' }
     }
 
     const { subject, html } = getMeetingEmailTemplate(type, data)
 
-    // Uncomment when ready:
-    /*
-    const { Resend } = require('resend')
-    const resend = new Resend(process.env.RESEND_API_KEY)
+    const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER
+    const fromName = 'Taskara Meetings'
 
-    const result = await resend.emails.send({
-      from: 'Taskara Meetings <meetings@taskara.com>',
+    const result = await transporter.sendMail({
+      from: `${fromName} <${fromEmail}>`,
       to: data.to,
       subject,
       html,
     })
 
+    console.log('✅ Email sent successfully:', { to: data.to, subject, messageId: result.messageId })
     return { success: true, data: result }
-    */
 
-    console.log('📧 Meeting Email:', { to: data.to, subject, type })
-    return { success: true, reason: 'Logged (service not configured)' }
-
-  } catch (error) {
-    console.error('Failed to send meeting email:', error)
-    return { success: false, error }
+  } catch (error: any) {
+    console.error('❌ Failed to send meeting email:', error)
+    return { success: false, error: error.message }
   }
 }
 
