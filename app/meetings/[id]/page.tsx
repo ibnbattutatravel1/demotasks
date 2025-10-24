@@ -68,8 +68,6 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
   const [meeting, setMeeting] = useState<Meeting | null>(null)
   const [loading, setLoading] = useState(true)
   const [showEditForm, setShowEditForm] = useState(false)
-  const [notes, setNotes] = useState("")
-  const [savingNotes, setSavingNotes] = useState(false)
 
   useEffect(() => {
     loadMeeting()
@@ -83,7 +81,6 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
 
       if (result.success) {
         setMeeting(result.data)
-        setNotes(result.data.notes || "")
       } else {
         alert(result.error || 'Failed to load meeting')
         router.push('/meetings')
@@ -135,30 +132,6 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
     } catch (error) {
       console.error('Failed to respond:', error)
       alert('Failed to respond')
-    }
-  }
-
-  const handleSaveNotes = async () => {
-    try {
-      setSavingNotes(true)
-      const response = await fetch(`/api/meetings/${resolvedParams.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes }),
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        setMeeting(result.data)
-      } else {
-        alert(result.error || 'Failed to save notes')
-      }
-    } catch (error) {
-      console.error('Failed to save notes:', error)
-      alert('Failed to save notes')
-    } finally {
-      setSavingNotes(false)
     }
   }
 
@@ -379,29 +352,6 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Notes */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Meeting Notes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add meeting notes here..."
-              rows={6}
-              className="mb-3"
-            />
-            <Button onClick={handleSaveNotes} disabled={savingNotes}>
-              {savingNotes && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Notes
-            </Button>
           </CardContent>
         </Card>
 
