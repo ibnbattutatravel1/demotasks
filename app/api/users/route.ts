@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db, dbSchema } from '@/lib/db/client'
-import { randomUUID } from 'node:crypto'
-import { eq } from 'drizzle-orm'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
+import { db, dbSchema } from '@/lib/db/client'
+import { eq } from 'drizzle-orm'
+import { randomUUID, randomBytes } from 'node:crypto'
+import { sendUserWelcomeEmail } from '@/lib/email/user-welcome-email'
 
 export async function GET() {
   try {
@@ -73,15 +74,22 @@ export async function POST(req: NextRequest) {
     const id = (globalThis.crypto?.randomUUID?.() ?? randomUUID()) as string
     const initials = name.split(/\s+/).map(p => p[0]?.toUpperCase() ?? '').slice(0, 2).join('') || name[0]?.toUpperCase() || 'U'
 
-    let passwordHash: string | null = null
-    if (typeof body.password === 'string' && body.password.trim()) {
-      const pwd = body.password.trim()
-      if (pwd.length < 8) {
-        return NextResponse.json({ success: false, error: 'Password must be at least 8 characters' }, { status: 400 })
-      }
-      const { hashSync } = await import('bcryptjs')
-      passwordHash = hashSync(pwd, 10)
+    const providedPassword = typeof body.password === 'string' ? body.password.trim() : ''
+    let plainPassword = providedPassword
+
+    if (plainPassword && plainPassword.length < 8) {
+      return NextResponse.json({ success: false, error: 'Password must be at least 8 characters' }, { status: 400 })
     }
+
+    if (!plainPassword) {
+      // Generate a secure temporary password (12 characters, mixed set)
+      const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*'
+      const randomBuffer = randomBytes(12)
+      plainPassword = Array.from(randomBuffer, (byte) => alphabet[byte % alphabet.length]).join('')
+    }
+
+    const { hashSync } = await import('bcryptjs')
+    const passwordHash = hashSync(plainPassword, 10)
 
     await db.insert(dbSchema.users).values({
       id,
@@ -94,7 +102,7 @@ export async function POST(req: NextRequest) {
       passwordHash,
     })
 
-    const created = await db.select({
+    const createdRows = await db.select({
       id: dbSchema.users.id,
       name: dbSchema.users.name,
       email: dbSchema.users.email,
@@ -104,7 +112,18 @@ export async function POST(req: NextRequest) {
       status: dbSchema.users.status,
     }).from(dbSchema.users).where(eq(dbSchema.users.id, id))
 
-    return NextResponse.json({ success: true, data: created[0] }, { status: 201 })
+    const createdUser = createdRows[0]
+
+    // Fire-and-forget welcome email (log failures but do not block response)
+    sendUserWelcomeEmail({
+      to: createdUser.email,
+      name: createdUser.name,
+      tempPassword: plainPassword,
+    }).catch((error) => {
+      console.error('Failed to send welcome email:', error)
+    })
+
+    return NextResponse.json({ success: true, data: createdUser }, { status: 201 })
   } catch (error) {
     console.error('Failed to create user', error)
     return NextResponse.json(
