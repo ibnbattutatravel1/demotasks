@@ -18,7 +18,7 @@ echo ""
 # Database credentials
 REMOTE_HOST="srv557.hstgr.io"
 REMOTE_USER="u744630877_tasks"
-REMOTE_PASS="###Taskstasks123"
+REMOTE_PASS='###Taskstasks123'
 REMOTE_DB="u744630877_tasks"
 
 LOCAL_HOST="mysql"
@@ -28,9 +28,9 @@ LOCAL_DB="u744630877_tasks"
 
 # Step 1: Export remote schema
 echo -e "${YELLOW}📥 Exporting remote database schema...${NC}"
-mysqldump -h "$REMOTE_HOST" -u "$REMOTE_USER" -p"$REMOTE_PASS" \
+MYSQL_PWD="$REMOTE_PASS" mysqldump -h "$REMOTE_HOST" -u "$REMOTE_USER" \
   --no-data --routines --triggers --skip-comments \
-  "$REMOTE_DB" > remote-schema.sql 2>/dev/null
+  "$REMOTE_DB" > remote-schema.sql 2>&1
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ Remote schema exported: remote-schema.sql${NC}"
@@ -100,8 +100,8 @@ echo ""
 echo -e "${BLUE}💾 Creating backup of remote database...${NC}"
 BACKUP_FILE="backup-remote-$(date +%Y%m%d-%H%M%S).sql"
 
-mysqldump -h "$REMOTE_HOST" -u "$REMOTE_USER" -p"$REMOTE_PASS" \
-  "$REMOTE_DB" > "$BACKUP_FILE" 2>/dev/null
+MYSQL_PWD="$REMOTE_PASS" mysqldump -h "$REMOTE_HOST" -u "$REMOTE_USER" \
+  "$REMOTE_DB" > "$BACKUP_FILE" 2>&1
 
 if [ $? -eq 0 ]; then
     BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
@@ -118,15 +118,15 @@ echo -e "${YELLOW}Method: Drop all tables and recreate from local schema${NC}"
 echo ""
 
 # Get list of tables to drop
-TABLES=$(mysql -h "$REMOTE_HOST" -u "$REMOTE_USER" -p"$REMOTE_PASS" \
+TABLES=$(MYSQL_PWD="$REMOTE_PASS" mysql -h "$REMOTE_HOST" -u "$REMOTE_USER" \
   -N -B -e "SELECT GROUP_CONCAT(table_name) FROM information_schema.tables \
-  WHERE table_schema='$REMOTE_DB'" "$REMOTE_DB" 2>/dev/null)
+  WHERE table_schema='$REMOTE_DB'" "$REMOTE_DB" 2>&1)
 
 if [ ! -z "$TABLES" ]; then
     echo -e "${YELLOW}Dropping existing tables...${NC}"
-    mysql -h "$REMOTE_HOST" -u "$REMOTE_USER" -p"$REMOTE_PASS" \
+    MYSQL_PWD="$REMOTE_PASS" mysql -h "$REMOTE_HOST" -u "$REMOTE_USER" \
       -e "SET FOREIGN_KEY_CHECKS=0; DROP TABLE IF EXISTS $TABLES; SET FOREIGN_KEY_CHECKS=1;" \
-      "$REMOTE_DB" 2>/dev/null
+      "$REMOTE_DB" 2>&1
     
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✅ Tables dropped${NC}"
@@ -138,8 +138,8 @@ fi
 
 # Apply local schema to remote
 echo -e "${YELLOW}Applying local schema to remote...${NC}"
-mysql -h "$REMOTE_HOST" -u "$REMOTE_USER" -p"$REMOTE_PASS" \
-  "$REMOTE_DB" < local-schema.sql 2>/dev/null
+MYSQL_PWD="$REMOTE_PASS" mysql -h "$REMOTE_HOST" -u "$REMOTE_USER" \
+  "$REMOTE_DB" < local-schema.sql 2>&1
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ Schema applied successfully${NC}"
@@ -154,9 +154,9 @@ fi
 echo ""
 echo -e "${BLUE}🔍 Verifying synchronization...${NC}"
 
-mysqldump -h "$REMOTE_HOST" -u "$REMOTE_USER" -p"$REMOTE_PASS" \
+MYSQL_PWD="$REMOTE_PASS" mysqldump -h "$REMOTE_HOST" -u "$REMOTE_USER" \
   --no-data --routines --triggers --skip-comments \
-  "$REMOTE_DB" > remote-schema-after.sql 2>/dev/null
+  "$REMOTE_DB" > remote-schema-after.sql 2>&1
 
 if diff -q local-schema.sql remote-schema-after.sql > /dev/null; then
     echo -e "${GREEN}✅ Schemas are now identical!${NC}"
