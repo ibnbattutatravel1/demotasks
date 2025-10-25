@@ -41,9 +41,9 @@ fi
 
 # Step 2: Export local schema (from Docker MySQL)
 echo -e "${YELLOW}📥 Exporting local database schema...${NC}"
-docker exec mysql mysqldump -h localhost -u "$LOCAL_USER" -p"$LOCAL_PASS" \
+docker exec mysql sh -c "mysqldump -h localhost -u $LOCAL_USER -p$LOCAL_PASS \
   --no-data --routines --triggers --skip-comments \
-  "$LOCAL_DB" > local-schema.sql 2>/dev/null
+  $LOCAL_DB 2>/dev/null" > local-schema.sql
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ Local schema exported: local-schema.sql${NC}"
