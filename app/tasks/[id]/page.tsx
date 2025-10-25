@@ -856,6 +856,104 @@ export default function TaskDetailPage() {
     }
   }
 
+  // Approval workflow helper functions
+  const canEditTask = () => {
+    if (!task || !user) return false
+    // Admins can always edit
+    if (user.role === 'admin') return true
+    // Project leads can edit their project tasks
+    if (project?.ownerId === user.id) return true
+    // Task creators can edit only if approved
+    if (task.createdById === user.id && task.approvalStatus === 'approved') return true
+    return false
+  }
+
+  const canApproveRejectTask = () => {
+    if (!task || !user) return false
+    // Admins can approve/reject any pending task
+    if (user.role === 'admin' && task.approvalStatus === 'pending') return true
+    // Project leads can approve/reject pending tasks in their projects
+    if (project?.ownerId === user.id && task.approvalStatus === 'pending') return true
+    return false
+  }
+
+  const isTaskPending = () => {
+    return task?.approvalStatus === 'pending'
+  }
+
+  const handleApproveTask = async () => {
+    if (!task || !user) return
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          approvedById: user.id,
+          approvedByName: user.name,
+        }),
+      })
+      
+      const json = await res.json()
+      if (json.success) {
+        toast({
+          title: "Task approved",
+          description: "The task has been approved and is now active.",
+        })
+        await refreshTask()
+      } else {
+        throw new Error(json.error || 'Failed to approve task')
+      }
+    } catch (error: any) {
+      toast({
+        title: "Approval failed",
+        description: error.message || "Failed to approve task. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleRejectTask = async () => {
+    if (!task || !user) return
+    const reason = prompt("Please provide a reason for rejection:")
+    if (!reason || !reason.trim()) {
+      toast({
+        title: "Reason required",
+        description: "Please provide a reason for rejecting this task.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          approvedById: user.id,
+          approvedByName: user.name,
+          rejectionReason: reason.trim(),
+        }),
+      })
+      
+      const json = await res.json()
+      if (json.success) {
+        toast({
+          title: "Task rejected",
+          description: "The task has been rejected.",
+        })
+        await refreshTask()
+      } else {
+        throw new Error(json.error || 'Failed to reject task')
+      }
+    } catch (error: any) {
+      toast({
+        title: "Rejection failed",
+        description: error.message || "Failed to reject task. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
@@ -907,12 +1005,29 @@ export default function TaskDetailPage() {
                       >
                         {task?.priority}
                       </Badge>
+                      <Badge
+                        variant={
+                          task?.approvalStatus === 'pending' ? 'outline' :
+                          task?.approvalStatus === 'rejected' ? 'destructive' :
+                          task?.approvalStatus === 'approved' ? 'default' : 'secondary'
+                        }
+                        className={
+                          task?.approvalStatus === 'pending' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                          task?.approvalStatus === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+                          task?.approvalStatus === 'approved' ? 'bg-green-50 text-green-700 border-green-200' : ''
+                        }
+                      >
+                        {task?.approvalStatus === 'pending' ? '⏳ Pending' :
+                         task?.approvalStatus === 'rejected' ? '❌ Rejected' :
+                         task?.approvalStatus === 'approved' ? '✅ Approved' : 'Unknown'}
+                      </Badge>
                       <div className="flex items-center gap-1">
                         <span className="text-xs text-slate-500">Status:</span>
                         <select
                           className="h-7 text-xs border border-slate-300 rounded-md px-2 bg-white"
                           value={task?.status || 'todo'}
                           onChange={(e) => handleChangeTaskStatus(e.target.value as any)}
+                          disabled={isTaskPending() || !canEditTask()}
                         >
                           <option value="planning">Planning</option>
                           <option value="todo">To Do</option>
@@ -934,6 +1049,11 @@ export default function TaskDetailPage() {
                           <span>{task?.createdAt ? formatTimeAgo(task.createdAt) : ''}</span>
                         </div>
                       )}
+                      {task?.approvalStatus === 'rejected' && task?.rejectionReason && (
+                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                          <strong>Rejection reason:</strong> {task.rejectionReason}
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
@@ -942,10 +1062,34 @@ export default function TaskDetailPage() {
             <div className="flex items-center gap-2">
               {!editingTask && (
                 <>
-                  <Button variant="outline" size="sm" onClick={handleEditTask}>
-                    <Edit3 className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
+                  {canEditTask() && (
+                    <Button variant="outline" size="sm" onClick={handleEditTask}>
+                      <Edit3 className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                  )}
+                  {canApproveRejectTask() && (
+                    <>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleApproveTask}
+                        className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                      >
+                        <Check className="h-4 w-4 mr-2" />
+                        Approve
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleRejectTask}
+                        className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Reject
+                      </Button>
+                    </>
+                  )}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm">
@@ -953,14 +1097,29 @@ export default function TaskDetailPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem onClick={() => setEditingTask(true)}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit Task
-                      </DropdownMenuItem>
+                      {canEditTask() && (
+                        <DropdownMenuItem onClick={() => setEditingTask(true)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Task
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={handleDuplicateTask}>
                         <Copy className="h-4 w-4 mr-2" />
                         Duplicate Task
                       </DropdownMenuItem>
+                      {canApproveRejectTask() && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={handleApproveTask} className="text-green-600 focus:text-green-600">
+                            <Check className="h-4 w-4 mr-2" />
+                            Approve Task
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={handleRejectTask} className="text-red-600 focus:text-red-600">
+                            <X className="h-4 w-4 mr-2" />
+                            Reject Task
+                          </DropdownMenuItem>
+                        </>
+                      )}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={handleDeleteTask} className="text-red-600 focus:text-red-600">
                         <Trash2 className="h-4 w-4 mr-2" />
@@ -1074,6 +1233,13 @@ export default function TaskDetailPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {isTaskPending() && (
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                    <p className="text-sm text-yellow-800">
+                      ⏳ <strong>Task is pending approval.</strong> Comments and contributions are disabled until the task is approved.
+                    </p>
+                  </div>
+                )}
                 <div className="space-y-4">
                   {taskComments.length === 0 && (
                     <p className="text-sm text-slate-500">No comments yet.</p>
@@ -1100,71 +1266,73 @@ export default function TaskDetailPage() {
                   ))}
                 </div>
 
-                <div className="flex items-start gap-3">
-                  <Avatar className="h-6 w-6">
-                    <AvatarFallback className="text-xs">{(user?.name || 'U').split(' ').map((n) => n[0]).join('').toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 space-y-2 relative">
-                    <div className="relative">
-                      <Textarea
-                        placeholder="Write a comment..."
-                        value={newTaskComment}
-                        onChange={(e) => {
-                          const val = e.target.value
-                          setNewTaskComment(val)
-                          const q = detectMentionQuery(val)
-                          setTaskMentionQuery(q)
-                          setTaskMentionOpen(!!q)
-                        }}
-                        className="min-h-[60px] pr-12"
-                      />
-                      <div className="absolute right-2 top-2">
-                        <VoiceInput onTranscript={(text) => {
-                          const newText = newTaskComment ? `${newTaskComment} ${text}` : text
-                          setNewTaskComment(newText)
-                        }} />
-                      </div>
-                    </div>
-                    {taskMentionOpen && taskMentionQuery && (
-                      <div className="absolute z-10 left-0 right-0 bottom-full mb-2 bg-white border border-slate-200 rounded-md shadow-md max-h-56 overflow-auto">
-                        <div className="p-2 text-xs text-slate-500">Mention someone</div>
-                        <div>
-                          {availableUsers
-                            .filter((u) =>
-                              (u.name || '').toLowerCase().includes(taskMentionQuery.toLowerCase()) ||
-                              (u.email || '').toLowerCase().includes(taskMentionQuery.toLowerCase())
-                            )
-                            .slice(0, 8)
-                            .map((u) => (
-                              <button
-                                key={u.id}
-                                type="button"
-                                onClick={() => {
-                                  setNewTaskComment((prev) => applyMentionToText(prev, taskMentionQuery, u.name || u.email || 'user'))
-                                  setTaskMentionIds((prev) => (prev.includes(u.id) ? prev : [...prev, u.id]))
-                                  setTaskMentionOpen(false)
-                                  setTaskMentionQuery("")
-                                }}
-                                className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2"
-                              >
-                                <Avatar className="h-5 w-5">
-                                  <AvatarImage src={u.avatar || '/placeholder.svg'} />
-                                  <AvatarFallback className="text-[10px]">{u.initials}</AvatarFallback>
-                                </Avatar>
-                                <span className="text-sm">{u.name}</span>
-                                <span className="text-xs text-slate-500 ml-2">@{u.email}</span>
-                              </button>
-                            ))}
+                {!isTaskPending() && (
+                  <div className="flex items-start gap-3">
+                    <Avatar className="h-6 w-6">
+                      <AvatarFallback className="text-xs">{(user?.name || 'U').split(' ').map((n) => n[0]).join('').toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 space-y-2 relative">
+                      <div className="relative">
+                        <Textarea
+                          placeholder="Write a comment..."
+                          value={newTaskComment}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setNewTaskComment(val)
+                            const q = detectMentionQuery(val)
+                            setTaskMentionQuery(q)
+                            setTaskMentionOpen(!!q)
+                          }}
+                          className="min-h-[60px] pr-12"
+                        />
+                        <div className="absolute right-2 top-2">
+                          <VoiceInput onTranscript={(text) => {
+                            const newText = newTaskComment ? `${newTaskComment} ${text}` : text
+                            setNewTaskComment(newText)
+                          }} />
                         </div>
                       </div>
-                    )}
-                    <div className="flex justify-end">
-                      <Button size="sm" onClick={handleAddTaskComment} disabled={!newTaskComment.trim()}>
-                        Add Comment
-                      </Button>
+                      {taskMentionOpen && taskMentionQuery && (
+                        <div className="absolute z-10 left-0 right-0 bottom-full mb-2 bg-white border border-slate-200 rounded-md shadow-md max-h-56 overflow-auto">
+                          <div className="p-2 text-xs text-slate-500">Mention someone</div>
+                          <div>
+                            {availableUsers
+                              .filter((u) =>
+                                (u.name || '').toLowerCase().includes(taskMentionQuery.toLowerCase()) ||
+                                (u.email || '').toLowerCase().includes(taskMentionQuery.toLowerCase())
+                              )
+                              .slice(0, 8)
+                              .map((u) => (
+                                <button
+                                  key={u.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setNewTaskComment((prev) => applyMentionToText(prev, taskMentionQuery, u.name || u.email || 'user'))
+                                    setTaskMentionIds((prev) => (prev.includes(u.id) ? prev : [...prev, u.id]))
+                                    setTaskMentionOpen(false)
+                                    setTaskMentionQuery("")
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2"
+                                >
+                                  <Avatar className="h-5 w-5">
+                                    <AvatarImage src={u.avatar || '/placeholder.svg'} />
+                                    <AvatarFallback className="text-[10px]">{u.initials}</AvatarFallback>
+                                  </Avatar>
+                                  <span className="text-sm">{u.name}</span>
+                                  <span className="text-xs text-slate-500 ml-2">@{u.email}</span>
+                                </button>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex justify-end">
+                        <Button size="sm" onClick={handleAddTaskComment} disabled={!newTaskComment.trim()}>
+                          Add Comment
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
 
@@ -1173,14 +1341,23 @@ export default function TaskDetailPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">Subtasks</CardTitle>
-                  <Button variant="outline" size="sm" onClick={() => setShowAddSubtask(!showAddSubtask)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add
-                  </Button>
+                  {!isTaskPending() && (
+                    <Button variant="outline" size="sm" onClick={() => setShowAddSubtask(!showAddSubtask)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Subtask
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                {showAddSubtask && (
+                {isTaskPending() && (
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                    <p className="text-sm text-yellow-800">
+                      ⏳ <strong>Subtasks cannot be added or modified</strong> while the task is pending approval.
+                    </p>
+                  </div>
+                )}
+                {showAddSubtask && !isTaskPending() && (
                   <div className="p-4 border border-slate-200 rounded-lg bg-slate-50 space-y-3">
                     <Input
                       placeholder="Enter subtask title..."
@@ -1311,11 +1488,14 @@ export default function TaskDetailPage() {
                     </div>
                   </div>
                 )}
-
                 {subtasks.map((subtask) => (
                   <div key={subtask.id} className="border border-slate-200 rounded-lg">
                     <div className="flex items-center gap-3 p-3 hover:bg-slate-50">
-                      <button onClick={() => toggleSubtaskCompletion(subtask.id, !subtask.completed)}>
+                      <button 
+                        onClick={() => !isTaskPending() && toggleSubtaskCompletion(subtask.id, !subtask.completed)}
+                        disabled={isTaskPending()}
+                        className={isTaskPending() ? "cursor-not-allowed opacity-50" : ""}
+                      >
                         {subtask.completed ? (
                           <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                         ) : (
@@ -1495,42 +1675,46 @@ export default function TaskDetailPage() {
                       </div>
                       {editingSubtask !== subtask.id && (
                         <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toggleSubtaskComments(subtask.id)}
-                            className="flex items-center gap-1"
-                          >
-                            <MessageSquare className="h-4 w-4" />
-                            <span className="text-xs">{subtask.comments?.length || 0}</span>
-                            {expandedSubtasks[subtask.id] ? (
-                              <ChevronDown className="h-3 w-3" />
-                            ) : (
-                              <ChevronRight className="h-3 w-3" />
-                            )}
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
+                          {!isTaskPending() && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleSubtaskComments(subtask.id)}
+                                className="flex items-center gap-1"
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                                <span className="text-xs">{subtask.comments?.length || 0}</span>
+                                {expandedSubtasks[subtask.id] ? (
+                                  <ChevronDown className="h-3 w-3" />
+                                ) : (
+                                  <ChevronRight className="h-3 w-3" />
+                                )}
                               </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                              <DropdownMenuItem onClick={() => handleEditSubtask(subtask)}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit subtask
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDuplicateSubtask(subtask)}>
-                                <Plus className="h-4 w-4 mr-2" />
-                                Duplicate
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleDeleteSubtask(subtask.id)} variant="destructive">
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete subtask
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                  <DropdownMenuItem onClick={() => handleEditSubtask(subtask)}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit subtask
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleDuplicateSubtask(subtask)}>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Duplicate
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => handleDeleteSubtask(subtask.id)} variant="destructive">
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete subtask
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </>
+                          )}
                         </>
                       )}
                     </div>
@@ -1639,14 +1823,11 @@ export default function TaskDetailPage() {
                 ))}
               </CardContent>
             </Card>
-          </div>
 
-          {/* Sidebar - Details and Attachments */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Details */}
+            {/* Task Details Sidebar */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Details</CardTitle>
+                <CardTitle className="text-lg">Task Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-3">

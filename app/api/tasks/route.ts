@@ -316,17 +316,30 @@ export async function POST(req: NextRequest) {
         })
       }
 
-      // Notify admins so they can act on pending approvals
+      // Notify admins and project leads so they can act on pending approvals
       if (approvalStatus === 'pending') {
+        // Get admins
         const admins = await db
           .select({ id: dbSchema.users.id })
           .from(dbSchema.users)
           .where(eq(dbSchema.users.role, 'admin'))
 
+        // Get project owner (project lead)
+        const projectLead = await db
+          .select({ id: dbSchema.users.id })
+          .from(dbSchema.projects)
+          .leftJoin(dbSchema.users, eq(dbSchema.projects.ownerId, dbSchema.users.id))
+          .where(eq(dbSchema.projects.id, projectId))
+
         const adminRecipients = admins
           .map((row: { id: string }) => row.id)
           .filter((uid: string) => uid !== createdById)
 
+        const projectLeadRecipients = projectLead
+          .filter((row: any) => row.id && row.id !== createdById)
+          .map((row: any) => row.id)
+
+        // Notify admins
         if (adminRecipients.length) {
           const adminMessage = `${title} is awaiting approval.`
           await Promise.all(
@@ -336,6 +349,24 @@ export async function POST(req: NextRequest) {
                 type: 'task_pending_review',
                 title,
                 message: adminMessage,
+                relatedId: id,
+                relatedType: 'task',
+                topic: 'projectUpdates',
+              }),
+            ),
+          )
+        }
+
+        // Notify project leads
+        if (projectLeadRecipients.length) {
+          const leadMessage = `New task "${title}" in your project needs approval.`
+          await Promise.all(
+            projectLeadRecipients.map((uid: string) =>
+              notifyUser({
+                userId: uid,
+                type: 'task_pending_approval',
+                title,
+                message: leadMessage,
                 relatedId: id,
                 relatedType: 'task',
                 topic: 'projectUpdates',
