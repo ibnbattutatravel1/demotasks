@@ -21,7 +21,9 @@
     "migrate:mysql:all": "npm run migrate:mysql:setup && npm run migrate:mysql:export && npm run migrate:mysql:import && npm run migrate:mysql:verify",
     "db:studio:mysql": "drizzle-kit studio --config=drizzle.config.mysql.ts",
     "test:mysql": "tsx scripts/test-mysql-connection.ts",
-    "create:admin:mysql": "tsx scripts/create-admin-mysql.ts"
+    "create:admin:mysql": "tsx scripts/create-admin-mysql.ts",
+    "db:compare": "tsx scripts/db-schema-compare.ts",
+    "db:sync": "tsx scripts/db-schema-compare.ts && echo 'Review scripts/migration-sync.sql before applying!'"
   },
   "engines": {
     "node": ">=18",
