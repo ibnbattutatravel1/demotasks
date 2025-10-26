@@ -1,4 +1,4 @@
-import { mysqlTable, varchar, int, decimal, text, boolean, datetime, primaryKey, json } from 'drizzle-orm/mysql-core'
+import { mysqlTable, varchar, int, decimal, text, boolean, datetime, primaryKey, json, bigint } from 'drizzle-orm/mysql-core'
 import { sql } from 'drizzle-orm'
 
 // Users
@@ -392,5 +392,168 @@ export const questionnaireFeedback = mysqlTable('questionnaire_feedback', {
   fromUserId: varchar('from_user_id', { length: 191 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
   message: text('message').notNull(),
   isCritical: boolean('is_critical').notNull().default(false),
+  createdAt: datetime('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+})
+
+// ====================================
+// COMMUNITIES SYSTEM
+// ====================================
+
+// Communities
+export const communities = mysqlTable('communities', {
+  id: varchar('id', { length: 50 }).primaryKey(),
+  name: varchar('name', { length: 200 }).notNull(),
+  description: text('description'),
+  icon: varchar('icon', { length: 100 }),
+  color: varchar('color', { length: 20 }).default('#6366f1'),
+  visibility: varchar('visibility', { length: 10 }).default('private'), // 'public' | 'private'
+  createdBy: varchar('created_by', { length: 191 }).references(() => users.id, { onDelete: 'set null' }),
+  createdAt: datetime('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: datetime('updated_at').default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`),
+  isArchived: boolean('is_archived').notNull().default(false),
+  archivedAt: datetime('archived_at'),
+  settings: json('settings'),
+  membersCount: int('members_count').default(0),
+  postsCount: int('posts_count').default(0),
+})
+
+// Community Members
+export const communityMembers = mysqlTable('community_members', {
+  id: varchar('id', { length: 50 }).primaryKey(),
+  communityId: varchar('community_id', { length: 50 }).notNull().references(() => communities.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id', { length: 191 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  role: varchar('role', { length: 20 }).default('viewer'), // 'owner' | 'admin' | 'moderator' | 'editor' | 'contributor' | 'viewer'
+  customPermissions: json('custom_permissions'),
+  joinedAt: datetime('joined_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  lastActiveAt: datetime('last_active_at'),
+  isMuted: boolean('is_muted').notNull().default(false),
+})
+
+// Community Posts
+export const communityPosts = mysqlTable('community_posts', {
+  id: varchar('id', { length: 50 }).primaryKey(),
+  communityId: varchar('community_id', { length: 50 }).notNull().references(() => communities.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 300 }),
+  content: text('content'),
+  contentType: varchar('content_type', { length: 20 }).default('markdown'), // 'markdown' | 'rich_text' | 'plain_text'
+  authorId: varchar('author_id', { length: 191 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: datetime('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: datetime('updated_at').default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`),
+  editedAt: datetime('edited_at'),
+  isPinned: boolean('is_pinned').notNull().default(false),
+  isFeatured: boolean('is_featured').notNull().default(false),
+  isDraft: boolean('is_draft').notNull().default(false),
+  isDeleted: boolean('is_deleted').notNull().default(false),
+  viewsCount: int('views_count').default(0),
+  reactions: json('reactions'),
+  tags: json('tags'),
+  mentionedUsers: json('mentioned_users'),
+  parentPostId: varchar('parent_post_id', { length: 50 }).references(() => communityPosts.id, { onDelete: 'cascade' }),
+  categoryId: varchar('category_id', { length: 50 }),
+})
+
+// Community Comments
+export const communityComments = mysqlTable('community_comments', {
+  id: varchar('id', { length: 50 }).primaryKey(),
+  postId: varchar('post_id', { length: 50 }).notNull().references(() => communityPosts.id, { onDelete: 'cascade' }),
+  content: text('content').notNull(),
+  authorId: varchar('author_id', { length: 191 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  parentCommentId: varchar('parent_comment_id', { length: 50 }).references(() => communityComments.id, { onDelete: 'cascade' }),
+  createdAt: datetime('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: datetime('updated_at').default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`),
+  editedAt: datetime('edited_at'),
+  reactions: json('reactions'),
+  mentionedUsers: json('mentioned_users'),
+  isDeleted: boolean('is_deleted').notNull().default(false),
+})
+
+// Community Files
+export const communityFiles = mysqlTable('community_files', {
+  id: varchar('id', { length: 50 }).primaryKey(),
+  communityId: varchar('community_id', { length: 50 }).notNull().references(() => communities.id, { onDelete: 'cascade' }),
+  postId: varchar('post_id', { length: 50 }).references(() => communityPosts.id, { onDelete: 'set null' }),
+  fileName: varchar('file_name', { length: 500 }).notNull(),
+  filePath: varchar('file_path', { length: 1000 }).notNull(),
+  fileType: varchar('file_type', { length: 100 }),
+  fileSize: bigint('file_size', { mode: 'number' }),
+  mimeType: varchar('mime_type', { length: 100 }),
+  uploadedBy: varchar('uploaded_by', { length: 191 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  uploadedAt: datetime('uploaded_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  description: text('description'),
+  tags: json('tags'),
+  downloadsCount: int('downloads_count').default(0),
+  isPublic: boolean('is_public').notNull().default(false),
+  thumbnailPath: varchar('thumbnail_path', { length: 1000 }),
+})
+
+// Community Vault
+export const communityVault = mysqlTable('community_vault', {
+  id: varchar('id', { length: 50 }).primaryKey(),
+  communityId: varchar('community_id', { length: 50 }).notNull().references(() => communities.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 300 }).notNull(),
+  itemType: varchar('item_type', { length: 20 }).notNull(), // 'api_key' | 'password' | 'secret' | 'certificate' | 'token' | 'credentials' | 'other'
+  encryptedContent: text('encrypted_content').notNull(),
+  encryptionIv: varchar('encryption_iv', { length: 100 }).notNull(),
+  encryptionTag: varchar('encryption_tag', { length: 100 }),
+  description: text('description'),
+  tags: json('tags'),
+  createdBy: varchar('created_by', { length: 191 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: datetime('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: datetime('updated_at').default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`),
+  expiresAt: datetime('expires_at'),
+  accessCount: int('access_count').default(0),
+  lastAccessedAt: datetime('last_accessed_at'),
+  lastAccessedBy: varchar('last_accessed_by', { length: 191 }),
+  allowedRoles: json('allowed_roles'),
+  allowedUsers: json('allowed_users'),
+})
+
+// Community Vault Access Log
+export const communityVaultAccessLog = mysqlTable('community_vault_access_log', {
+  id: varchar('id', { length: 50 }).primaryKey(),
+  vaultItemId: varchar('vault_item_id', { length: 50 }).notNull().references(() => communityVault.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id', { length: 191 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  action: varchar('action', { length: 20 }).notNull(), // 'view' | 'copy' | 'edit' | 'delete' | 'decrypt'
+  ipAddress: varchar('ip_address', { length: 50 }),
+  userAgent: text('user_agent'),
+  accessedAt: datetime('accessed_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+})
+
+// Community Voice Notes
+export const communityVoiceNotes = mysqlTable('community_voice_notes', {
+  id: varchar('id', { length: 50 }).primaryKey(),
+  postId: varchar('post_id', { length: 50 }).references(() => communityPosts.id, { onDelete: 'cascade' }),
+  commentId: varchar('comment_id', { length: 50 }).references(() => communityComments.id, { onDelete: 'cascade' }),
+  filePath: varchar('file_path', { length: 1000 }).notNull(),
+  duration: int('duration'),
+  fileSize: bigint('file_size', { mode: 'number' }),
+  transcription: text('transcription'),
+  transcriptionStatus: varchar('transcription_status', { length: 20 }).default('pending'), // 'pending' | 'processing' | 'completed' | 'failed'
+  createdBy: varchar('created_by', { length: 191 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: datetime('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+})
+
+// Community Categories
+export const communityCategories = mysqlTable('community_categories', {
+  id: varchar('id', { length: 50 }).primaryKey(),
+  communityId: varchar('community_id', { length: 50 }).notNull().references(() => communities.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 200 }).notNull(),
+  description: text('description'),
+  color: varchar('color', { length: 20 }),
+  icon: varchar('icon', { length: 50 }),
+  parentCategoryId: varchar('parent_category_id', { length: 50 }).references(() => communityCategories.id, { onDelete: 'cascade' }),
+  displayOrder: int('display_order').default(0),
+  createdAt: datetime('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+})
+
+// Community Activity Log
+export const communityActivity = mysqlTable('community_activity', {
+  id: varchar('id', { length: 50 }).primaryKey(),
+  communityId: varchar('community_id', { length: 50 }).notNull().references(() => communities.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id', { length: 191 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  action: varchar('action', { length: 20 }).notNull(), // 'created' | 'updated' | 'deleted' | 'commented' | 'reacted' | 'joined' | 'left' | 'shared' | 'mentioned' | 'pinned' | 'archived'
+  targetType: varchar('target_type', { length: 20 }).notNull(), // 'post' | 'comment' | 'file' | 'vault_item' | 'member' | 'community' | 'category'
+  targetId: varchar('target_id', { length: 50 }),
+  metadata: json('metadata'),
   createdAt: datetime('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
 })
