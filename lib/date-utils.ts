@@ -75,6 +75,55 @@ export function toDateString(value: any): string {
 }
 
 /**
+ * تحويل ISO string إلى تنسيق MySQL datetime (YYYY-MM-DD HH:MM:SS)
+ * MySQL datetime لا يقبل التنسيق ISO مع Z و milliseconds
+ */
+export function toMySQLDatetime(value: any): string {
+  if (!value) {
+    return toMySQLDatetime(new Date())
+  }
+  
+  let date: Date
+  
+  if (typeof value === 'string') {
+    date = new Date(value)
+  } else if (value instanceof Date) {
+    date = value
+  } else {
+    try {
+      date = new Date(value)
+    } catch {
+      date = new Date()
+    }
+  }
+  
+  // تحويل إلى تنسيق YYYY-MM-DD HH:MM:SS
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
+  const hours = String(date.getUTCHours()).padStart(2, '0')
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0')
+  const seconds = String(date.getUTCSeconds()).padStart(2, '0')
+  
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+}
+
+/**
+ * تحويل ISO string إلى تنسيق MySQL datetime أو null
+ */
+export function toMySQLDatetimeOrNull(value: any): string | null {
+  if (!value) {
+    return null
+  }
+  
+  try {
+    return toMySQLDatetime(value)
+  } catch {
+    return null
+  }
+}
+
+/**
  * تحويل كائن من قاعدة البيانات بتحويل جميع التواريخ
  */
 export function normalizeDates<T extends Record<string, any>>(obj: T): T {

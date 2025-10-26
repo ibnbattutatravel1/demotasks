@@ -3,6 +3,7 @@ import { db, dbSchema } from '@/lib/db/client'
 import { eq, and } from 'drizzle-orm'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 import { notifyMeetingUpdated, notifyMeetingCancelled } from '@/lib/meeting-notifications'
+import { toMySQLDatetime, toMySQLDatetimeOrNull } from '@/lib/date-utils'
 
 /**
  * GET /api/meetings/[id]
@@ -181,15 +182,15 @@ export async function PUT(
 
     // Update meeting
     const updateData: any = {
-      updatedAt: new Date().toISOString(),
+      updatedAt: toMySQLDatetime(new Date()),
     }
 
     if (body.title) updateData.title = body.title
     if (body.description !== undefined) updateData.description = body.description
     if (body.meetingLink) updateData.meetingLink = body.meetingLink
     if (body.meetingType) updateData.meetingType = body.meetingType
-    if (body.startTime) updateData.startTime = body.startTime
-    if (body.endTime) updateData.endTime = body.endTime
+    if (body.startTime) updateData.startTime = toMySQLDatetime(body.startTime)
+    if (body.endTime) updateData.endTime = toMySQLDatetime(body.endTime)
     if (body.timezone) updateData.timezone = body.timezone
     if (body.status) updateData.status = body.status
     if (body.projectId !== undefined) updateData.projectId = body.projectId
@@ -199,7 +200,7 @@ export async function PUT(
     if (body.recordingUrl !== undefined) updateData.recordingUrl = body.recordingUrl
     if (body.isRecurring !== undefined) updateData.isRecurring = body.isRecurring
     if (body.recurrencePattern !== undefined) updateData.recurrencePattern = body.recurrencePattern
-    if (body.recurrenceEndDate !== undefined) updateData.recurrenceEndDate = body.recurrenceEndDate
+    if (body.recurrenceEndDate !== undefined) updateData.recurrenceEndDate = toMySQLDatetimeOrNull(body.recurrenceEndDate)
 
     await db
       .update(dbSchema.meetings)

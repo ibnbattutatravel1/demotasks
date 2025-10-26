@@ -3,6 +3,7 @@ import { db, dbSchema } from '@/lib/db/client'
 import { eq, and, or, gte, lte } from 'drizzle-orm'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 import { notifyMeetingCreated, notifyAttendeeAdded } from '@/lib/meeting-notifications'
+import { toMySQLDatetime, toMySQLDatetimeOrNull } from '@/lib/date-utils'
 
 /**
  * GET /api/meetings
@@ -191,10 +192,10 @@ export async function POST(req: NextRequest) {
     const meetingId = crypto.randomUUID()
     const now = new Date()
 
-    // Ensure proper date formatting for database
-    const startTimeISO = new Date(body.startTime).toISOString()
-    const endTimeISO = new Date(body.endTime).toISOString()
-    const recurrenceEndDateISO = body.recurrenceEndDate ? new Date(body.recurrenceEndDate).toISOString() : null
+    // Convert to MySQL datetime format (YYYY-MM-DD HH:MM:SS)
+    const startTimeFormatted = toMySQLDatetime(body.startTime)
+    const endTimeFormatted = toMySQLDatetime(body.endTime)
+    const recurrenceEndDateFormatted = toMySQLDatetimeOrNull(body.recurrenceEndDate)
 
     await db.insert(dbSchema.meetings).values({
       id: meetingId,
@@ -202,12 +203,12 @@ export async function POST(req: NextRequest) {
       description: body.description,
       meetingLink: body.meetingLink,
       meetingType: body.meetingType || 'zoom',
-      startTime: startTimeISO,
-      endTime: endTimeISO,
+      startTime: startTimeFormatted,
+      endTime: endTimeFormatted,
       timezone: body.timezone || 'UTC',
       status: 'scheduled',
       createdById: userId,
-      createdAt: now.toISOString(),
+      createdAt: toMySQLDatetime(now),
       projectId: body.projectId || null,
       reminderMinutes: body.reminderMinutes || 15,
       agenda: body.agenda || null,
@@ -215,7 +216,7 @@ export async function POST(req: NextRequest) {
       recordingUrl: null,
       isRecurring: body.isRecurring || false,
       recurrencePattern: body.recurrencePattern || null,
-      recurrenceEndDate: recurrenceEndDateISO,
+      recurrenceEndDate: recurrenceEndDateFormatted,
     })
 
     // Add organizer as attendee with 'organizer' role
@@ -267,8 +268,8 @@ export async function POST(req: NextRequest) {
         description: body.description,
         meetingLink: body.meetingLink,
         meetingType: body.meetingType || 'zoom',
-        startTime: startTimeISO,
-        endTime: endTimeISO,
+        startTime: body.startTime,
+        endTime: body.endTime,
         timezone: body.timezone || 'UTC',
         createdById: userId,
         projectId: body.projectId,
