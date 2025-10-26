@@ -134,7 +134,7 @@ export default function AdminCommunitiesPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push('/admin')}
+              onClick={() => router.push('/')}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
