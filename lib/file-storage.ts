@@ -12,6 +12,9 @@ async function ensureUploadDirs() {
     UPLOADS_DIR,
     path.join(UPLOADS_DIR, 'avatars'),
     path.join(UPLOADS_DIR, 'attachments'),
+    path.join(UPLOADS_DIR, 'projects'),
+    path.join(UPLOADS_DIR, 'communities'),
+    path.join(UPLOADS_DIR, 'questionnaires'),
   ]
 
   for (const dir of dirs) {
@@ -24,10 +27,13 @@ async function ensureUploadDirs() {
 /**
  * حفظ ملف في file system
  * @param file - الملف المراد حفظه
- * @param type - نوع الملف (avatar, attachment)
+ * @param type - نوع الملف (avatar, attachment, project, community, questionnaire)
  * @returns رابط الملف
  */
-export async function saveFile(file: File, type: 'avatar' | 'attachment'): Promise<string> {
+export async function saveFile(
+  file: File, 
+  type: 'avatar' | 'attachment' | 'project' | 'community' | 'questionnaire'
+): Promise<string> {
   await ensureUploadDirs()
 
   // إنشاء اسم فريد للملف
@@ -35,7 +41,14 @@ export async function saveFile(file: File, type: 'avatar' | 'attachment'): Promi
   const filename = `${randomUUID()}.${ext}`
   
   // تحديد المجلد حسب النوع
-  const subdir = type === 'avatar' ? 'avatars' : 'attachments'
+  const subdirMap = {
+    avatar: 'avatars',
+    attachment: 'attachments',
+    project: 'projects',
+    community: 'communities',
+    questionnaire: 'questionnaires',
+  }
+  const subdir = subdirMap[type]
   const filepath = path.join(UPLOADS_DIR, subdir, filename)
   
   // حفظ الملف
