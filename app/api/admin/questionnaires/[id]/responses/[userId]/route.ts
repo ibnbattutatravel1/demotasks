@@ -67,6 +67,21 @@ export async function GET(
     // Combine questions with answers
     const questionsAnswers = questions.map(q => {
       const answer = answers.find(a => a.questionId === q.id)
+      // Safely parse answerOptions
+      let parsedAnswerOptions = undefined
+      if (answer?.answerOptions) {
+        try {
+          if (Array.isArray(answer.answerOptions)) {
+            parsedAnswerOptions = answer.answerOptions
+          } else if (typeof answer.answerOptions === 'string') {
+            const parsed = JSON.parse(answer.answerOptions)
+            parsedAnswerOptions = Array.isArray(parsed) ? parsed : undefined
+          }
+        } catch (e) {
+          console.error('Failed to parse answerOptions:', e)
+        }
+      }
+
       return {
         questionId: q.id,
         questionText: q.questionText,
@@ -75,7 +90,7 @@ export async function GET(
         answerValue: answer?.answerValue,
         answerText: answer?.answerText,
         answerNumber: answer?.answerNumber,
-        answerOptions: answer?.answerOptions ? JSON.parse(answer.answerOptions as string) : undefined,
+        answerOptions: parsedAnswerOptions,
         answerFile: answer?.answerFile,
         answerDate: answer?.answerDate,
       }

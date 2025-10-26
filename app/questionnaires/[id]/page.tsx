@@ -387,7 +387,7 @@ export default function FillQuestionnairePage() {
                     value={answers[q.id]?.answerValue || ''}
                     onValueChange={(value) => updateAnswer(q.id, { answerValue: value })}
                   >
-                    {q.options?.map((opt, idx) => (
+                    {Array.isArray(q.options) && q.options.map((opt, idx) => (
                       <div key={idx} className="flex items-center space-x-2 mb-2">
                         <RadioGroupItem value={opt} id={`${q.id}_${idx}`} />
                         <Label htmlFor={`${q.id}_${idx}`} className="cursor-pointer">{opt}</Label>
@@ -399,7 +399,7 @@ export default function FillQuestionnairePage() {
                 {/* Multiple Choice / Checkbox */}
                 {(q.questionType === 'multiple_choice' || q.questionType === 'checkbox') && (
                   <div className="space-y-2">
-                    {q.options?.map((opt, idx) => (
+                    {Array.isArray(q.options) && q.options.map((opt, idx) => (
                       <div key={idx} className="flex items-center space-x-2">
                         <Checkbox
                           id={`${q.id}_${idx}`}

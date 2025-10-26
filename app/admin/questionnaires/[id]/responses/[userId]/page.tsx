@@ -285,12 +285,12 @@ export default function ReviewResponsePage() {
                   
                   {(item.questionType === 'multiple_choice' || item.questionType === 'checkbox') && (
                     <div className="flex flex-wrap gap-2">
-                      {item.answerOptions && item.answerOptions.length > 0 ? (
+                      {Array.isArray(item.answerOptions) && item.answerOptions.length > 0 ? (
                         item.answerOptions.map((opt, idx) => (
                           <Badge key={idx} variant="secondary">{opt}</Badge>
                         ))
                       ) : (
-                        <span className="text-slate-400">No answer</span>
+                        <p className="text-slate-500 italic">No options selected</p>
                       )}
                     </div>
                   )}

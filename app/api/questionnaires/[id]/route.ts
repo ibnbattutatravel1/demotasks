@@ -50,11 +50,29 @@ export async function GET(
       .where(eq(dbSchema.questionnaireQuestions.questionnaireId, id))
       .orderBy(dbSchema.questionnaireQuestions.displayOrder)
 
-    // Parse options JSON
-    const questionsWithOptions = questions.map(q => ({
-      ...q,
-      options: q.options ? JSON.parse(q.options as string) : undefined
-    }))
+    // Parse options JSON safely
+    const questionsWithOptions = questions.map(q => {
+      let parsedOptions = undefined
+      if (q.options) {
+        try {
+          // If already an array, use it directly
+          if (Array.isArray(q.options)) {
+            parsedOptions = q.options
+          } else if (typeof q.options === 'string') {
+            // Try to parse string
+            const parsed = JSON.parse(q.options)
+            parsedOptions = Array.isArray(parsed) ? parsed : undefined
+          }
+        } catch (e) {
+          console.error('Failed to parse options:', e)
+          parsedOptions = undefined
+        }
+      }
+      return {
+        ...q,
+        options: parsedOptions
+      }
+    })
 
     // Get existing answers if any
     const answers = await db
