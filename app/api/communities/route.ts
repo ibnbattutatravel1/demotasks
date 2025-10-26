@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
     const communities = await db.execute(sql`
       SELECT DISTINCT
         c.*,
+        cm.user_id,
         cm.role as user_role,
         cm.joined_at as user_joined_at,
         u.name as creator_name,
