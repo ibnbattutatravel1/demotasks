@@ -25,9 +25,41 @@ async function ensureUsers(ids: string[]) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const rows = await db.select().from(dbSchema.projects)
+    // Get current user from auth token
+    const token = req.cookies.get(AUTH_COOKIE)?.value
+    if (!token) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const payload = await verifyAuthToken(token).catch(() => null)
+    if (!payload?.sub) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const currentUserId = payload.sub
+
+    // Get all projects where user is owner or team member
+    const allProjects = await db.select().from(dbSchema.projects)
+    const allTeamRows = await db.select().from(dbSchema.projectTeam)
+    
+    // Filter projects: user is owner OR user is in project team
+    const userProjectIds = new Set<string>()
+    
+    // Add projects where user is owner
+    allProjects.forEach((p) => {
+      if (p.ownerId === currentUserId) {
+        userProjectIds.add(p.id)
+      }
+    })
+    
+    // Add projects where user is team member
+    allTeamRows.forEach((t) => {
+      if (t.userId === currentUserId) {
+        userProjectIds.add(t.projectId)
+      }
+    })
+    
+    // Filter to only user's projects
+    const rows = allProjects.filter((p) => userProjectIds.has(p.id))
+    
     if (rows.length === 0) {
       return NextResponse.json({ success: true, data: [] }, { status: 200 })
     }
