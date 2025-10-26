@@ -105,7 +105,7 @@ export async function POST(
 
     // Save to database
     const fileId = `file_${timestamp}_${Math.random().toString(36).substr(2, 9)}`
-    const relativePath = `/uploads/communities/${id}/${filename}`
+    const relativePath = `/api/uploads/communities/${id}/${filename}`
 
     await db.execute(sql`
       INSERT INTO community_files (

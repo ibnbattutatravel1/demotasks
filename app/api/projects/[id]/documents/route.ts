@@ -41,7 +41,7 @@ export async function GET(
       .where(eq(dbSchema.projectDocuments.projectId, projectId))
       .orderBy(desc(dbSchema.projectDocuments.uploadedAt))
 
-    const formattedDocuments = documents.map((doc) => ({
+    const formattedDocuments = documents.map((doc: typeof documents[0]) => ({
       id: doc.id,
       projectId: doc.projectId,
       name: doc.name,
@@ -136,7 +136,7 @@ export async function POST(
 
       // Save to database
       const docId = `doc_${timestamp}_${randomStr}`
-      const url = `/uploads/projects/${projectId}/${filename}`
+      const url = `/api/uploads/projects/${projectId}/${filename}`
 
       await db.insert(dbSchema.projectDocuments).values({
         id: docId,

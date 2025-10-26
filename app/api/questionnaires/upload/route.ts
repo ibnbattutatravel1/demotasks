@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     await writeFile(filepath, buffer)
 
     // Return relative path
-    const relativePath = `/uploads/questionnaires/${questionnaireId}/${filename}`
+    const relativePath = `/api/uploads/questionnaires/${questionnaireId}/${filename}`
 
     return NextResponse.json({
       success: true,
