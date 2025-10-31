@@ -6,6 +6,7 @@
 import { db, dbSchema } from './db/client'
 import { eq, and } from 'drizzle-orm'
 import { sendMeetingEmail } from './email/meeting-emails'
+import { toMySQLDatetime } from './date-utils'
 
 interface Meeting {
   id: string
@@ -56,7 +57,7 @@ async function createInAppNotification(
       read: false,
       relatedId,
       relatedType,
-      createdAt: new Date().toISOString(),
+      createdAt: toMySQLDatetime(new Date()),
     })
   } catch (error) {
     console.error('Failed to create in-app notification:', error)

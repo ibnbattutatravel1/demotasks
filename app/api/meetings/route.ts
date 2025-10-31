@@ -226,7 +226,7 @@ export async function POST(req: NextRequest) {
       userId,
       role: 'organizer',
       status: 'accepted',
-      addedAt: now.toISOString(),
+      addedAt: toMySQLDatetime(now),
       notificationSent: false,
       reminderSent: false,
     })
@@ -241,7 +241,7 @@ export async function POST(req: NextRequest) {
           userId: attendeeId,
           role: 'attendee',
           status: 'pending',
-          addedAt: now.toISOString(),
+          addedAt: toMySQLDatetime(now),
           notificationSent: false,
           reminderSent: false,
         })

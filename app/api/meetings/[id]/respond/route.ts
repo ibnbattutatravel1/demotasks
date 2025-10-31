@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db, dbSchema } from '@/lib/db/client'
 import { eq, and } from 'drizzle-orm'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
+import { toMySQLDatetime } from '@/lib/date-utils'
 
 /**
  * POST /api/meetings/[id]/respond
@@ -56,7 +57,7 @@ export async function POST(
       .update(dbSchema.meetingAttendees)
       .set({ 
         status: body.status,
-        responseAt: new Date().toISOString()
+        responseAt: toMySQLDatetime(new Date())
       })
       .where(eq(dbSchema.meetingAttendees.id, attendees[0].id))
 
@@ -85,7 +86,7 @@ export async function POST(
           read: false,
           relatedId: meetingId,
           relatedType: 'meeting',
-          createdAt: new Date().toISOString(),
+          createdAt: toMySQLDatetime(new Date()),
         })
       }
     }

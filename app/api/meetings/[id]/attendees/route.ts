@@ -3,6 +3,7 @@ import { db, dbSchema } from '@/lib/db/client'
 import { eq, and } from 'drizzle-orm'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 import { notifyAttendeeAdded, notifyAttendeeRemoved } from '@/lib/meeting-notifications'
+import { toMySQLDatetime } from '@/lib/date-utils'
 
 /**
  * POST /api/meetings/[id]/attendees
@@ -86,7 +87,7 @@ export async function POST(
     }
 
     // Add new attendees
-    const now = new Date().toISOString()
+    const now = new Date()
     const addPromises = newUserIds.map(async (attendeeId: string) => {
       await db.insert(dbSchema.meetingAttendees).values({
         id: crypto.randomUUID(),
@@ -94,7 +95,7 @@ export async function POST(
         userId: attendeeId,
         role: 'attendee',
         status: 'pending',
-        addedAt: now,
+        addedAt: toMySQLDatetime(now),
         notificationSent: false,
         reminderSent: false,
       })
