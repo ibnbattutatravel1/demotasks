@@ -4,6 +4,7 @@ import { db, dbSchema } from '@/lib/db/client'
 import { eq } from 'drizzle-orm'
 import { toISOString, toISOStringOrUndefined } from '@/lib/date-utils'
 import { notifyUser } from '@/lib/notifications'
+import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 
 async function recomputeTaskProgress(taskId: string) {
   const subtasks = await db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.taskId, taskId))
@@ -25,6 +26,16 @@ async function recomputeProjectProgress(projectId: string) {
 
 export async function POST(req: NextRequest) {
   try {
+    // Authenticate user
+    const token = req.cookies.get(AUTH_COOKIE)?.value
+    if (!token) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const payload = await verifyAuthToken(token).catch(() => null)
+    if (!payload?.sub) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const currentUserId = payload.sub
+    const isAdmin = payload.role === 'admin'
+
     const body = (await req.json()) as {
       taskId: string
       title: string
@@ -45,6 +56,31 @@ export async function POST(req: NextRequest) {
     const task = await db.select().from(dbSchema.tasks).where(eq(dbSchema.tasks.id, taskId))
     if (!task.length) {
       return NextResponse.json({ success: false, error: 'Task not found' }, { status: 404 })
+    }
+
+    // Check permissions: admin can create subtasks in any task, others must have access to project
+    if (!isAdmin) {
+      // Get the project to check access
+      const project = (await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, task[0].projectId)))[0]
+      if (!project) {
+        return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
+      }
+      
+      // Check if user is owner or team member of the project
+      let hasAccess = project.ownerId === currentUserId
+      
+      if (!hasAccess) {
+        const teamMembership = await db.select()
+          .from(dbSchema.projectTeam)
+          .where(eq(dbSchema.projectTeam.projectId, task[0].projectId))
+          .where(eq(dbSchema.projectTeam.userId, currentUserId))
+        
+        hasAccess = teamMembership.length > 0
+      }
+      
+      if (!hasAccess) {
+        return NextResponse.json({ success: false, error: 'Forbidden: You do not have access to this project' }, { status: 403 })
+      }
     }
     const now = new Date()
     const id = (globalThis.crypto?.randomUUID?.() ?? randomUUID()) as string

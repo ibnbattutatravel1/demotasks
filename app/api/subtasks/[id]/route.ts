@@ -3,6 +3,7 @@ import { db, dbSchema } from '@/lib/db/client'
 import { and, eq } from 'drizzle-orm'
 import { toISOString, toISOStringOrUndefined } from '@/lib/date-utils'
 import { notifyUser } from '@/lib/notifications'
+import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 
 async function recomputeTaskProgress(taskId: string) {
   const subtasks = await db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.taskId, taskId))
@@ -24,6 +25,16 @@ async function recomputeProjectProgress(projectId: string) {
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    // Authenticate user
+    const token = req.cookies.get(AUTH_COOKIE)?.value
+    if (!token) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const payload = await verifyAuthToken(token).catch(() => null)
+    if (!payload?.sub) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const currentUserId = payload.sub
+    const isAdmin = payload.role === 'admin'
+
     const { id } = await params
     const body = (await req.json()) as Partial<{
       title: string
@@ -41,6 +52,36 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ success: false, error: 'Subtask not found' }, { status: 404 })
     }
     const current = existing[0]
+
+    // Check permissions: admin can edit any subtask, others must have access to project
+    if (!isAdmin) {
+      // Get the parent task and project to check access
+      const parentTask = (await db.select().from(dbSchema.tasks).where(eq(dbSchema.tasks.id, current.taskId)))[0]
+      if (!parentTask) {
+        return NextResponse.json({ success: false, error: 'Parent task not found' }, { status: 404 })
+      }
+      
+      const project = (await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, parentTask.projectId)))[0]
+      if (!project) {
+        return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
+      }
+      
+      // Check if user is owner or team member of the project
+      let hasAccess = project.ownerId === currentUserId
+      
+      if (!hasAccess) {
+        const teamMembership = await db.select()
+          .from(dbSchema.projectTeam)
+          .where(eq(dbSchema.projectTeam.projectId, parentTask.projectId))
+          .where(eq(dbSchema.projectTeam.userId, currentUserId))
+        
+        hasAccess = teamMembership.length > 0
+      }
+      
+      if (!hasAccess) {
+        return NextResponse.json({ success: false, error: 'Forbidden: You do not have access to this project' }, { status: 403 })
+      }
+    }
 
     const update: any = { updatedAt: new Date() }
     for (const key of ['title','description','priority'] as const) {
@@ -142,12 +183,52 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    // Authenticate user
+    const token = _req.cookies.get(AUTH_COOKIE)?.value
+    if (!token) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const payload = await verifyAuthToken(token).catch(() => null)
+    if (!payload?.sub) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const currentUserId = payload.sub
+    const isAdmin = payload.role === 'admin'
+
     const { id } = await params
     const existing = await db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.id, id))
     if (!existing.length) {
       return NextResponse.json({ success: false, error: 'Subtask not found' }, { status: 404 })
     }
     const current = existing[0]
+
+    // Check permissions: admin can delete any subtask, others must have access to project
+    if (!isAdmin) {
+      // Get the parent task and project to check access
+      const parentTask = (await db.select().from(dbSchema.tasks).where(eq(dbSchema.tasks.id, current.taskId)))[0]
+      if (!parentTask) {
+        return NextResponse.json({ success: false, error: 'Parent task not found' }, { status: 404 })
+      }
+      
+      const project = (await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, parentTask.projectId)))[0]
+      if (!project) {
+        return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
+      }
+      
+      // Check if user is owner or team member of the project
+      let hasAccess = project.ownerId === currentUserId
+      
+      if (!hasAccess) {
+        const teamMembership = await db.select()
+          .from(dbSchema.projectTeam)
+          .where(eq(dbSchema.projectTeam.projectId, parentTask.projectId))
+          .where(eq(dbSchema.projectTeam.userId, currentUserId))
+        
+        hasAccess = teamMembership.length > 0
+      }
+      
+      if (!hasAccess) {
+        return NextResponse.json({ success: false, error: 'Forbidden: You do not have access to this project' }, { status: 403 })
+      }
+    }
 
     await db.delete(dbSchema.subtaskTags).where(eq(dbSchema.subtaskTags.subtaskId, id))
     await db.delete(dbSchema.comments).where(and(eq(dbSchema.comments.entityType, 'subtask'), eq(dbSchema.comments.entityId, id)))
