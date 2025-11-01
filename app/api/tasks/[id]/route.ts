@@ -4,6 +4,7 @@ import { db, dbSchema } from '@/lib/db/client'
 import { and, eq, inArray, or } from 'drizzle-orm'
 import { notifyUser } from '@/lib/notifications'
 import { toISOString, toISOStringOrUndefined } from '@/lib/date-utils'
+import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 
 async function recomputeTaskProgress(taskId: string) {
   const subtasks = await db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.taskId, taskId))
@@ -181,6 +182,16 @@ async function composeTask(task: any) {
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    // Authenticate user
+    const token = req.cookies.get(AUTH_COOKIE)?.value
+    if (!token) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const payload = await verifyAuthToken(token).catch(() => null)
+    if (!payload?.sub) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const currentUserId = payload.sub
+    const isAdmin = payload.role === 'admin'
+
     const { id } = await params
     const body = (await req.json()) as Partial<{
       title: string
@@ -203,22 +214,40 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     const current = existing[0]
 
+    // Check permissions: admin can edit any task, others must have access to project
+    if (!isAdmin) {
+      // Get the project to check access
+      const project = (await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, current.projectId)))[0]
+      if (!project) {
+        return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
+      }
+      
+      // Check if user is owner or team member of the project
+      let hasAccess = project.ownerId === currentUserId
+      
+      if (!hasAccess) {
+        const teamMembership = await db.select()
+          .from(dbSchema.projectTeam)
+          .where(eq(dbSchema.projectTeam.projectId, current.projectId))
+          .where(eq(dbSchema.projectTeam.userId, currentUserId))
+        
+        hasAccess = teamMembership.length > 0
+      }
+      
+      if (!hasAccess) {
+        return NextResponse.json({ success: false, error: 'Forbidden: You do not have access to this project' }, { status: 403 })
+      }
+    }
+
     // Check if task is rejected - prevent non-admin users from editing rejected tasks
     // (unless they're changing the approval status back to pending/approved)
     if (current.approvalStatus === 'rejected' && body.approvalStatus !== 'pending' && body.approvalStatus !== 'approved') {
-      // Get userId from request headers or body
-      const userIdFromBody = (body as any).userId
-      if (userIdFromBody) {
-        const userRows = await db.select().from(dbSchema.users).where(eq(dbSchema.users.id, userIdFromBody))
-        const user = userRows[0]
-        
-        // Only admin or task creator can modify rejected tasks
-        if (user && user.role !== 'admin' && current.createdById !== userIdFromBody) {
-          return NextResponse.json({ 
-            success: false, 
-            error: 'This task has been rejected and cannot be modified. Contact an admin for assistance.' 
-          }, { status: 403 })
-        }
+      // Only admin or task creator can modify rejected tasks
+      if (!isAdmin && current.createdById !== currentUserId) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'This task has been rejected and cannot be modified. Contact an admin for assistance.' 
+        }, { status: 403 })
       }
     }
 
@@ -403,6 +432,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    // Authenticate user
+    const token = req.cookies.get(AUTH_COOKIE)?.value
+    if (!token) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const payload = await verifyAuthToken(token).catch(() => null)
+    if (!payload?.sub) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const currentUserId = payload.sub
+    const isAdmin = payload.role === 'admin'
+
     const { id } = await params
     const existing = await db.select().from(dbSchema.tasks).where(eq(dbSchema.tasks.id, id))
     if (!existing.length) {
@@ -410,29 +449,33 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     }
     const current = existing[0]
 
-    // Check if user is admin or task creator
-    const { searchParams } = new URL(req.url)
-    const userId = searchParams.get('userId')
-    
-    if (!userId) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'User ID is required for delete operations' 
-      }, { status: 400 })
-    }
-    
-    const userRows = await db.select().from(dbSchema.users).where(eq(dbSchema.users.id, userId))
-    const user = userRows[0]
-    
-    if (!user) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'User not found' 
-      }, { status: 404 })
+    // Check permissions: admin can delete any task, others must have access to project
+    if (!isAdmin) {
+      // Get the project to check access
+      const project = (await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, current.projectId)))[0]
+      if (!project) {
+        return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
+      }
+      
+      // Check if user is owner or team member of the project
+      let hasAccess = project.ownerId === currentUserId
+      
+      if (!hasAccess) {
+        const teamMembership = await db.select()
+          .from(dbSchema.projectTeam)
+          .where(eq(dbSchema.projectTeam.projectId, current.projectId))
+          .where(eq(dbSchema.projectTeam.userId, currentUserId))
+        
+        hasAccess = teamMembership.length > 0
+      }
+      
+      if (!hasAccess) {
+        return NextResponse.json({ success: false, error: 'Forbidden: You do not have access to this project' }, { status: 403 })
+      }
     }
 
     // If user is not admin, notify admins about delete request
-    if (user.role !== 'admin') {
+    if (!isAdmin) {
       // Notify all admins about the delete request
       const admins = await db
         .select({ id: dbSchema.users.id })
@@ -440,7 +483,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         .where(eq(dbSchema.users.role, 'admin'))
 
       if (admins.length > 0) {
-        console.log(`[DELETE REQUEST] User ${user.name} (${user.id}) requesting to delete task "${current.title}" (${id})`)
+        console.log(`[DELETE REQUEST] User ${currentUserId} requesting to delete task "${current.title}" (${id})`)
         console.log(`[DELETE REQUEST] Notifying ${admins.length} admin(s)`)
         
         await Promise.all(
@@ -448,25 +491,19 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
             notifyUser({
               userId: admin.id,
               type: 'task_delete_request',
-              title: `Delete request for: ${current.title}`,
-              message: `${user.name} has requested to delete the task "${current.title}".`,
+              title: `Task Delete Request: ${current.title}`,
+              message: `User requested to delete task "${current.title}". Please review this request.`,
               relatedId: id,
               relatedType: 'task',
-              topic: 'projectUpdates',
+              topic: 'taskUpdates',
             })
           )
         )
-        
-        console.log(`[DELETE REQUEST] Notifications sent successfully to all admins`)
-      } else {
-        console.warn(`[DELETE REQUEST] No admins found to notify about delete request`)
       }
 
-      // Don't actually delete the task - just notify admins
       return NextResponse.json({ 
         success: true, 
-        message: 'Delete request sent to admin for approval.',
-        pending: true 
+        message: 'Delete request submitted for admin review' 
       })
     }
 

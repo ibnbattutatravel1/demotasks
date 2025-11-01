@@ -8,9 +8,36 @@ import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id: projectId } = await params
+    
+    // Authenticate user
+    const token = req.cookies.get(AUTH_COOKIE)?.value
+    if (!token) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const payload = await verifyAuthToken(token).catch(() => null)
+    if (!payload?.sub) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const currentUserId = payload.sub
+    const isAdmin = payload.role === 'admin'
+    
     const project = (await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, projectId)))[0]
     if (!project) {
       return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
+    }
+
+    // Check permissions: admin can see any project, others must be owner or team member
+    if (!isAdmin) {
+      // Check if user is owner
+      if (project.ownerId !== currentUserId) {
+        // Check if user is team member
+        const teamMembership = await db.select()
+          .from(dbSchema.projectTeam)
+          .where(eq(dbSchema.projectTeam.projectId, projectId))
+          .where(eq(dbSchema.projectTeam.userId, currentUserId))
+        
+        if (teamMembership.length === 0) {
+          return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+        }
+      }
     }
 
     // Optimized: Load all related data in parallel
@@ -185,10 +212,25 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   try {
     const { id: projectId } = await params
     
+    // Authenticate user
+    const token = req.cookies.get(AUTH_COOKIE)?.value
+    if (!token) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const payload = await verifyAuthToken(token).catch(() => null)
+    if (!payload?.sub) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const currentUserId = payload.sub
+    const isAdmin = payload.role === 'admin'
+    
     // Check if project exists
     const existing = (await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, projectId)))[0]
     if (!existing) {
       return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
+    }
+
+    // Check permissions: admin can delete any project, others must be owner
+    if (!isAdmin && existing.ownerId !== currentUserId) {
+      return NextResponse.json({ success: false, error: 'Only project owners or admins can delete projects' }, { status: 403 })
     }
 
     // Get all tasks for this project

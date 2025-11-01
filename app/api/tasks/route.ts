@@ -256,6 +256,16 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // Authenticate user
+    const token = req.cookies.get(AUTH_COOKIE)?.value
+    if (!token) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const payload = await verifyAuthToken(token).catch(() => null)
+    if (!payload?.sub) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const currentUserId = payload.sub
+    const isAdmin = payload.role === 'admin'
+
     const body = (await req.json()) as {
       projectId: string
       title: string
@@ -295,6 +305,33 @@ export async function POST(req: NextRequest) {
 
     if (!projectId || !title || !priority || !createdById) {
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // Check permissions: admin can create tasks in any project, others must have access to project
+    if (!isAdmin) {
+      // Check if user is owner or team member of the project
+      const project = (await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, projectId)))[0]
+      if (!project) {
+        return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
+      }
+      
+      // Check if user is owner
+      if (project.ownerId !== currentUserId) {
+        // Check if user is team member
+        const teamMembership = await db.select()
+          .from(dbSchema.projectTeam)
+          .where(eq(dbSchema.projectTeam.projectId, projectId))
+          .where(eq(dbSchema.projectTeam.userId, currentUserId))
+        
+        if (teamMembership.length === 0) {
+          return NextResponse.json({ success: false, error: 'Forbidden: You do not have access to this project' }, { status: 403 })
+        }
+      }
+      
+      // Non-admin users can only create tasks as themselves
+      if (createdById !== currentUserId) {
+        return NextResponse.json({ success: false, error: 'Forbidden: You can only create tasks as yourself' }, { status: 403 })
+      }
     }
 
     // التحقق من صحة المستخدمين
