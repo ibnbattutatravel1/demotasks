@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db, dbSchema } from '@/lib/db/client'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 import { eq } from 'drizzle-orm'
+import { toMySQLDatetime } from '@/lib/date-utils'
 
 export async function GET(req: NextRequest) {
   try {
@@ -61,7 +62,7 @@ export async function PUT(req: NextRequest) {
       taskReminders: body.notifications?.taskReminders ?? true,
       projectUpdates: body.notifications?.projectUpdates ?? true,
       timezone: body.appearance?.timezone || current?.timezone || 'UTC',
-      updatedAt: new Date().toISOString(),
+      updatedAt: toMySQLDatetime(new Date()),
     } as any
 
     if (existing.length) {

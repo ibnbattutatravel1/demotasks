@@ -3,7 +3,7 @@ import { db, dbSchema } from '@/lib/db/client'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 import { and, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
-import { toISOString, toISOStringOrUndefined } from '@/lib/date-utils'
+import { toISOString, toISOStringOrUndefined, toMySQLDatetime } from '@/lib/date-utils'
 
 // GET /api/timesheets?month=YYYY-MM -> returns current user's timesheet with entries
 export async function GET(req: NextRequest) {
@@ -22,8 +22,8 @@ export async function GET(req: NextRequest) {
       // Create draft if not exists
       const id = randomUUID()
       const now = new Date()
-      await db.insert(dbSchema.timesheets).values({ id, userId: payload.sub, month, status: 'draft', createdAt: now })
-      timesheet = { id, userId: payload.sub, month, status: 'draft', createdAt: now.toISOString() } as any
+      await db.insert(dbSchema.timesheets).values({ id, userId: payload.sub, month, status: 'draft', createdAt: toMySQLDatetime(now) })
+      timesheet = { id, userId: payload.sub, month, status: 'draft', createdAt: toMySQLDatetime(now) } as any
     } else {
       // تحويل التواريخ من DB
       timesheet = {
@@ -66,8 +66,8 @@ export async function POST(req: NextRequest) {
     if (!timesheet) {
       const id = randomUUID()
       const now = new Date()
-      await db.insert(dbSchema.timesheets).values({ id, userId: payload.sub, month, status: 'draft', createdAt: now })
-      timesheet = { id, userId: payload.sub, month, status: 'draft', createdAt: now.toISOString() } as any
+      await db.insert(dbSchema.timesheets).values({ id, userId: payload.sub, month, status: 'draft', createdAt: toMySQLDatetime(now) })
+      timesheet = { id, userId: payload.sub, month, status: 'draft', createdAt: toMySQLDatetime(now) } as any
     } else {
       timesheet = {
         ...timesheet,

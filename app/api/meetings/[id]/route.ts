@@ -305,7 +305,7 @@ export async function DELETE(
       .update(dbSchema.meetings)
       .set({ 
         status: 'cancelled',
-        updatedAt: new Date().toISOString()
+        updatedAt: toMySQLDatetime(new Date())
       })
       .where(eq(dbSchema.meetings.id, meetingId))
 
