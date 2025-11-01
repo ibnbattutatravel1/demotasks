@@ -4,6 +4,7 @@ import { db, dbSchema } from '@/lib/db/client'
 import { notifyUser } from '@/lib/notifications'
 import { and, eq, inArray } from 'drizzle-orm'
 import { toISOString, toISOStringOrUndefined } from '@/lib/date-utils'
+import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 
 // Validate that user records exist for provided IDs
 async function validateUsers(ids: string[]): Promise<string[]> {
@@ -131,6 +132,16 @@ async function composeTasksBatch(tasks: any[]) {
 
 export async function GET(req: NextRequest) {
   try {
+    // Authenticate user
+    const token = req.cookies.get(AUTH_COOKIE)?.value
+    if (!token) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const payload = await verifyAuthToken(token).catch(() => null)
+    if (!payload?.sub) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    
+    const currentUserId = payload.sub
+    const isAdmin = payload.role === 'admin'
+
     const { searchParams } = new URL(req.url)
     const projectId = searchParams.get('projectId')
     const assigneeId = searchParams.get('assigneeId')
@@ -139,25 +150,79 @@ export async function GET(req: NextRequest) {
     const includeRejected = searchParams.get('includeRejected') === 'true' // For admin views
 
     let where = undefined as any
-    if (projectId && assigneeId) {
-      // tasks in project assigned to user
-      const taskIdsForUser = await db.select({ taskId: dbSchema.taskAssignees.taskId })
-        .from(dbSchema.taskAssignees)
-        .where(eq(dbSchema.taskAssignees.userId, assigneeId))
-      const taskIds = taskIdsForUser.map((t: any) => t.taskId)
-      where = and(inArray(dbSchema.tasks.id, taskIds), eq(dbSchema.tasks.projectId, projectId))
-    } else if (projectId && createdById) {
-      where = and(eq(dbSchema.tasks.projectId, projectId), eq(dbSchema.tasks.createdById, createdById))
-    } else if (assigneeId) {
-      const taskIdsForUser = await db.select({ taskId: dbSchema.taskAssignees.taskId })
-        .from(dbSchema.taskAssignees)
-        .where(eq(dbSchema.taskAssignees.userId, assigneeId))
-      const taskIds = taskIdsForUser.map((t: any) => t.taskId)
-      where = inArray(dbSchema.tasks.id, taskIds)
-    } else if (projectId) {
-      where = eq(dbSchema.tasks.projectId, projectId)
-    } else if (createdById) {
-      where = eq(dbSchema.tasks.createdById, createdById)
+    
+    // If not admin, enforce user-specific filtering
+    if (!isAdmin) {
+      if (projectId && assigneeId) {
+        // tasks in project assigned to user
+        const taskIdsForUser = await db.select({ taskId: dbSchema.taskAssignees.taskId })
+          .from(dbSchema.taskAssignees)
+          .where(eq(dbSchema.taskAssignees.userId, currentUserId))
+        const taskIds = taskIdsForUser.map((t: any) => t.taskId)
+        where = and(inArray(dbSchema.tasks.id, taskIds), eq(dbSchema.tasks.projectId, projectId))
+      } else if (projectId && createdById) {
+        where = and(eq(dbSchema.tasks.projectId, projectId), eq(dbSchema.tasks.createdById, currentUserId))
+      } else if (assigneeId) {
+        // Only allow users to see their own assigned tasks
+        if (assigneeId !== currentUserId) {
+          return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+        }
+        const taskIdsForUser = await db.select({ taskId: dbSchema.taskAssignees.taskId })
+          .from(dbSchema.taskAssignees)
+          .where(eq(dbSchema.taskAssignees.userId, currentUserId))
+        const taskIds = taskIdsForUser.map((t: any) => t.taskId)
+        where = inArray(dbSchema.tasks.id, taskIds)
+      } else if (projectId) {
+        // Get projects where user is owner or team member
+        const userProjects = await db.select().from(dbSchema.projectTeam).where(eq(dbSchema.projectTeam.userId, currentUserId))
+        const userOwnedProjects = await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.ownerId, currentUserId))
+        const accessibleProjectIds = new Set([
+          ...userProjects.map(p => p.projectId),
+          ...userOwnedProjects.map(p => p.id)
+        ])
+        
+        if (!accessibleProjectIds.has(projectId)) {
+          return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+        }
+        where = eq(dbSchema.tasks.projectId, projectId)
+      } else if (createdById) {
+        // Only allow users to see their own created tasks
+        if (createdById !== currentUserId) {
+          return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+        }
+        where = eq(dbSchema.tasks.createdById, currentUserId)
+      } else {
+        // No specific filters - get all tasks from accessible projects
+        const userProjects = await db.select().from(dbSchema.projectTeam).where(eq(dbSchema.projectTeam.userId, currentUserId))
+        const userOwnedProjects = await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.ownerId, currentUserId))
+        const accessibleProjectIds = [
+          ...userProjects.map(p => p.projectId),
+          ...userOwnedProjects.map(p => p.id)
+        ]
+        where = inArray(dbSchema.tasks.projectId, accessibleProjectIds)
+      }
+    } else {
+      // Admin can access any tasks with provided filters
+      if (projectId && assigneeId) {
+        const taskIdsForUser = await db.select({ taskId: dbSchema.taskAssignees.taskId })
+          .from(dbSchema.taskAssignees)
+          .where(eq(dbSchema.taskAssignees.userId, assigneeId))
+        const taskIds = taskIdsForUser.map((t: any) => t.taskId)
+        where = and(inArray(dbSchema.tasks.id, taskIds), eq(dbSchema.tasks.projectId, projectId))
+      } else if (projectId && createdById) {
+        where = and(eq(dbSchema.tasks.projectId, projectId), eq(dbSchema.tasks.createdById, createdById))
+      } else if (assigneeId) {
+        const taskIdsForUser = await db.select({ taskId: dbSchema.taskAssignees.taskId })
+          .from(dbSchema.taskAssignees)
+          .where(eq(dbSchema.taskAssignees.userId, assigneeId))
+        const taskIds = taskIdsForUser.map((t: any) => t.taskId)
+        where = inArray(dbSchema.tasks.id, taskIds)
+      } else if (projectId) {
+        where = eq(dbSchema.tasks.projectId, projectId)
+      } else if (createdById) {
+        where = eq(dbSchema.tasks.createdById, createdById)
+      }
+      // If no filters for admin, return all tasks (where remains undefined)
     }
 
     // Add approvalStatus filter if provided

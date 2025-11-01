@@ -35,30 +35,38 @@ export async function GET(req: NextRequest) {
     if (!payload?.sub) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     
     const currentUserId = payload.sub
+    const isAdmin = payload.role === 'admin'
 
-    // Get all projects where user is owner or team member
+    // Get all projects and team members
     const allProjects = await db.select().from(dbSchema.projects)
     const allTeamRows = await db.select().from(dbSchema.projectTeam)
     
-    // Filter projects: user is owner OR user is in project team
-    const userProjectIds = new Set<string>()
+    let rows: typeof allProjects
     
-    // Add projects where user is owner
-    allProjects.forEach((p) => {
-      if (p.ownerId === currentUserId) {
-        userProjectIds.add(p.id)
-      }
-    })
-    
-    // Add projects where user is team member
-    allTeamRows.forEach((t) => {
-      if (t.userId === currentUserId) {
-        userProjectIds.add(t.projectId)
-      }
-    })
-    
-    // Filter to only user's projects
-    const rows = allProjects.filter((p) => userProjectIds.has(p.id))
+    if (isAdmin) {
+      // Admins can see all projects
+      rows = allProjects
+    } else {
+      // Filter projects: user is owner OR user is in project team
+      const userProjectIds = new Set<string>()
+      
+      // Add projects where user is owner
+      allProjects.forEach((p) => {
+        if (p.ownerId === currentUserId) {
+          userProjectIds.add(p.id)
+        }
+      })
+      
+      // Add projects where user is team member
+      allTeamRows.forEach((t) => {
+        if (t.userId === currentUserId) {
+          userProjectIds.add(t.projectId)
+        }
+      })
+      
+      // Filter to only user's projects
+      rows = allProjects.filter((p) => userProjectIds.has(p.id))
+    }
     
     if (rows.length === 0) {
       return NextResponse.json({ success: true, data: [] }, { status: 200 })
