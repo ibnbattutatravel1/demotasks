@@ -1,0 +1,28 @@
+
+
+
+
+MYSQL_HOST=mysql
+MYSQL_PORT=3306
+MYSQL_USER=demotasks_user
+MYSQL_PASSWORD=frehifiuerfer#joifo
+MYSQL_DATABASE=demotasks
+
+
+NEXT_PUBLIC_APP_URL=https://taskara.compumacy.com
+AUTH_SECRET=43ca965949e618536ec12118b61731269fec86aae9fffb7295f100b8905c0cca
+
+
+# SMTP Configuration for Email Notifications
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=compumacy28@gmail.com
+SMTP_PASS=jqcwlabqlpnacmwb
+SMTP_FROM=compumacy28@gmail.com
+
+# Remote Database (Production) - for schema comparison
+REMOTE_DB_HOST=srv557.hstgr.io
+REMOTE_DB_PORT=3306
+REMOTE_DB_USER=u744630877_tasks
+REMOTE_DB_PASSWORD=###Taskstasks123
+REMOTE_DB_NAME=u744630877_tasks
