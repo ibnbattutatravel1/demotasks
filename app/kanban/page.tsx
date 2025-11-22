@@ -300,7 +300,7 @@ export default function KanbanPage() {
 
                         {/* Tags */}
                         <div className="flex flex-wrap gap-1">
-                          {task.tags.map((tag: string) => (
+                          {(task.tags || []).map((tag: string) => (
                             <Badge key={tag} variant="outline" className="text-xs bg-gray-50">
                               {tag}
                             </Badge>
@@ -318,7 +318,7 @@ export default function KanbanPage() {
                         {/* Assignees */}
                         <div className="flex items-center gap-2">
                           <div className="flex -space-x-1">
-                            {task.assignees.map((assignee: any, index: number) => (
+                            {(task.assignees || []).map((assignee: any, index: number) => (
                               <Avatar key={index} className="w-6 h-6 border-2 border-white">
                                 <AvatarImage
                                   src={assignee?.avatar || `/abstract-geometric-shapes.png?height=24&width=24&query=${encodeURIComponent(assignee?.name || assignee?.id || 'user')}`}
@@ -330,7 +330,11 @@ export default function KanbanPage() {
                               </Avatar>
                             ))}
                           </div>
-                          <span className="text-xs text-gray-700">{task.assignees.map((a: any) => a?.name || a?.id).join(", ")}</span>
+                          <span className="text-xs text-gray-700">
+                            {(task.assignees || [])
+                              .map((a: any) => a?.name || a?.id)
+                              .join(", ")}
+                          </span>
                         </div>
                       </CardContent>
                     </Card>
