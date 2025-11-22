@@ -59,8 +59,13 @@ const isOverdue = (dueDate: string, completed: boolean) => {
   return checkOverdue(dueDate)
 }
 
-const formatDueDate = (dueDate: string) => {
+const formatDueDate = (dueDate: string, completed?: boolean) => {
   const diffDays = getDaysUntil(dueDate)
+
+  // For completed items, show a neutral label and avoid "X days overdue" text
+  if (completed) {
+    return "Completed"
+  }
 
   if (diffDays === 0) return "Due today"
   if (diffDays === 1) return "Due tomorrow"
@@ -144,7 +149,7 @@ export default function TaskDetailPage() {
   const [taskMentionOpen, setTaskMentionOpen] = useState(false)
   const [taskMentionIds, setTaskMentionIds] = useState<string[]>([])
 
-  // Load available users for assignment
+  // Fallback: load all users (only used if project data is unavailable)
   const loadUsers = useCallback(async () => {
     try {
       const res = await fetch('/api/users')
@@ -156,6 +161,33 @@ export default function TaskDetailPage() {
       console.error('Failed to load users', e)
     }
   }, [])
+
+  // Restrict available users to project owner + project team
+  const buildAvailableUsersFromProject = (proj: Project | null) => {
+    if (!proj) return
+
+    const map = new Map<string, AppUser>()
+
+    const addMember = (member: any) => {
+      if (!member || !member.id) return
+      if (map.has(member.id)) return
+      map.set(member.id, {
+        id: member.id,
+        name: member.name,
+        email: member.email || `${member.id}@example.com`,
+        avatar: member.avatar || undefined,
+        initials: member.initials,
+        role: (member.role as AppUser["role"]) || "user",
+      })
+    }
+
+    addMember(proj.owner)
+    if (Array.isArray(proj.team)) {
+      proj.team.forEach(addMember)
+    }
+
+    setAvailableUsers(Array.from(map.values()))
+  }
 
   // Load task and project
   useEffect(() => {
@@ -183,8 +215,18 @@ export default function TaskDetailPage() {
             if (pres.ok && pjson.success) {
               const proj = (pjson.data as Project[]).find((p) => p.id === t.projectId) || null
               setProject(proj)
+              if (proj) {
+                buildAvailableUsersFromProject(proj)
+              } else {
+                // Fallback to all users if project is not found
+                await loadUsers()
+              }
+            } else {
+              await loadUsers()
             }
-          } catch {}
+          } catch {
+            await loadUsers()
+          }
           // Load task comments
           try {
             const cres = await fetch(`/api/comments?entityType=task&entityId=${encodeURIComponent(taskId)}`)
@@ -203,7 +245,6 @@ export default function TaskDetailPage() {
       }
     }
     load()
-    loadUsers()
     return () => { ignore = true }
   }, [taskId, loadUsers])
 
@@ -1622,14 +1663,12 @@ export default function TaskDetailPage() {
                               <Calendar className="h-3 w-3 text-slate-400" />
                               <span
                                 className={`text-xs ${
-                                  subtask.dueDate && isOverdue(subtask.dueDate, subtask.completed)
+                                  subtask.dueDate && !subtask.completed && isOverdue(subtask.dueDate)
                                     ? "text-red-600 font-medium"
-                                    : subtask.completed
-                                      ? "text-slate-400"
-                                      : "text-slate-500"
+                                    : "text-slate-500"
                                 }`}
                               >
-                                {subtask.dueDate ? formatDueDate(subtask.dueDate) : "No due date"}
+                                {subtask.dueDate ? (subtask.completed ? "Completed" : formatDueDate(subtask.dueDate)) : "No due date"}
                               </span>
                               <div className="flex items-center gap-1 ml-2">
                                 <span className="text-[10px] text-slate-500">Status</span>
@@ -1645,7 +1684,7 @@ export default function TaskDetailPage() {
                                   <option value="done">Done</option>
                                 </select>
                               </div>
-                              {subtask.dueDate && isOverdue(subtask.dueDate, subtask.completed) && (
+                              {subtask.dueDate && !subtask.completed && isOverdue(subtask.dueDate) && (
                                 <Badge
                                   variant="outline"
                                   className="bg-red-50 text-red-700 border-red-200 text-xs px-1 py-0"
