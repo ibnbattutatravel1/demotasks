@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, dbSchema } from '@/lib/db/client'
-import { eq, and, or, gte, lte } from 'drizzle-orm'
+import { eq, and, or, gte, lte, inArray } from 'drizzle-orm'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 import { notifyMeetingCreated, notifyAttendeeAdded } from '@/lib/meeting-notifications'
 import { toMySQLDatetime, toMySQLDatetimeOrNull } from '@/lib/date-utils'
@@ -31,29 +31,43 @@ export async function GET(req: NextRequest) {
     const projectId = searchParams.get('projectId')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const scope = searchParams.get('scope') // when scope=self, always show only meetings related to this user
 
-    // Get all meetings where user is an attendee or organizer
+    // Get all meetings where user is an attendee
     const attendeeRecords = await db
       .select()
       .from(dbSchema.meetingAttendees)
       .where(eq(dbSchema.meetingAttendees.userId, userId))
 
     const meetingIds = attendeeRecords.map(a => a.meetingId)
+    const selfOnly = scope === 'self'
 
-    // Get meetings
-    let meetingsQuery = db.select().from(dbSchema.meetings)
+    let meetings: any[]
 
-    // For non-admin users, only show meetings they're part of
-    if (!isAdmin && meetingIds.length === 0) {
-      return NextResponse.json({ success: true, data: [] })
+    if (selfOnly) {
+      // For self scope (e.g. calendar), always restrict to meetings the user organizes or attends
+      let whereClause: any = eq(dbSchema.meetings.createdById, userId)
+      if (meetingIds.length > 0) {
+        const attendeeCond = inArray(dbSchema.meetings.id, meetingIds)
+        whereClause = or(whereClause, attendeeCond)
+      }
+
+      meetings = await db.select().from(dbSchema.meetings).where(whereClause)
+    } else {
+      // Original behavior: admins can see all, others only see meetings they attend
+      let meetingsQuery = db.select().from(dbSchema.meetings)
+
+      // For non-admin users, only show meetings they're part of
+      if (!isAdmin && meetingIds.length === 0) {
+        return NextResponse.json({ success: true, data: [] })
+      }
+
+      const allMeetings = await meetingsQuery
+
+      meetings = allMeetings.filter(m => 
+        isAdmin || meetingIds.includes(m.id)
+      )
     }
-
-    const allMeetings = await meetingsQuery
-
-    // Filter meetings
-    let meetings = allMeetings.filter(m => 
-      isAdmin || meetingIds.includes(m.id)
-    )
 
     // Apply filters
     if (status) {

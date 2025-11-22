@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
 import { db, dbSchema } from '@/lib/db/client'
 import { notifyUser } from '@/lib/notifications'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, or } from 'drizzle-orm'
 import { toISOString, toISOStringOrUndefined } from '@/lib/date-utils'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 
@@ -148,8 +148,40 @@ export async function GET(req: NextRequest) {
     const createdById = searchParams.get('createdById')
     const approvalStatus = searchParams.get('approvalStatus')
     const includeRejected = searchParams.get('includeRejected') === 'true' // For admin views
+    const scope = searchParams.get('scope') // when scope=self, only return tasks related to current user
 
     let where = undefined as any
+
+    // Special case: personal view (e.g. calendar) should only see tasks directly related to current user
+    if (scope === 'self') {
+      // Tasks where user is assignee or creator
+      const taskIdsForUser = await db
+        .select({ taskId: dbSchema.taskAssignees.taskId })
+        .from(dbSchema.taskAssignees)
+        .where(eq(dbSchema.taskAssignees.userId, currentUserId))
+
+      const taskIds = taskIdsForUser.map((t: any) => t.taskId)
+
+      let selfWhere: any = eq(dbSchema.tasks.createdById, currentUserId)
+      if (taskIds.length > 0) {
+        const assigneeCond = inArray(dbSchema.tasks.id, taskIds)
+        selfWhere = or(selfWhere, assigneeCond)
+      }
+
+      let rows = await db.select().from(dbSchema.tasks).where(selfWhere)
+
+      // Optional filters still apply
+      if (approvalStatus) {
+        rows = rows.filter((task: any) => task.approvalStatus === approvalStatus)
+      }
+
+      const filteredRows = includeRejected
+        ? rows
+        : rows.filter((task: any) => task.approvalStatus !== 'rejected')
+
+      const data = await composeTasksBatch(filteredRows)
+      return NextResponse.json({ success: true, data })
+    }
     
     // If not admin, enforce user-specific filtering
     if (!isAdmin) {

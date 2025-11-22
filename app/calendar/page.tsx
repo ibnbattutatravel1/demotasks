@@ -83,9 +83,9 @@ export default function CalendarPage() {
         setLoading(true)
         setError(null)
         const [tasksRes, projectsRes, meetingsRes] = await Promise.all([
-          fetch('/api/tasks'),
+          fetch('/api/tasks?scope=self'),
           fetch('/api/projects'),
-          fetch('/api/meetings'),
+          fetch('/api/meetings?scope=self'),
         ])
         const tasksJson = await tasksRes.json()
         const projectsJson = await projectsRes.json()
