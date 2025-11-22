@@ -191,20 +191,27 @@ export default function CalendarPage() {
     return weekDays
   }
 
+  const isSameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+
+  const asDate = (value: string | Date | undefined | null) => {
+    if (!value) return null
+    return value instanceof Date ? value : new Date(value)
+  }
+
   const getEventsForDate = (date: Date) => {
-    const dateString = date.toISOString().split("T")[0]
     const allItems: any[] = []
 
     events.forEach((evt: CalendarEvent) => {
-      // تحويل التاريخ إلى YYYY-MM-DD للمقارنة
-      const evtDate = evt.date ? evt.date.split("T")[0] : null
-      if (evtDate === dateString) {
+      const evtDateObj = asDate(evt.date as any)
+      if (evtDateObj && isSameDay(evtDateObj, date)) {
         allItems.push({ ...evt, isSubtask: false })
       }
+
       if (evt.subtasks && evt.subtasks.length) {
         evt.subtasks.forEach((sub: { id: string; title: string; date: string; time?: string; completed?: boolean }) => {
-          const subDate = sub.date ? sub.date.split("T")[0] : null
-          if (subDate === dateString) {
+          const subDateObj = asDate(sub.date as any)
+          if (subDateObj && isSameDay(subDateObj, date)) {
             allItems.push({
               ...sub,
               parentTitle: evt.title,
