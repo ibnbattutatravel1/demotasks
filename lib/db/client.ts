@@ -1,4 +1,4 @@
-import * as schema from './schema-mysql'
+import * as schema from '../../drizzle/mysql/schema'
 import { drizzle } from 'drizzle-orm/mysql2'
 import mysql from 'mysql2/promise'
 
@@ -28,4 +28,4 @@ function makeDb() {
 
 export const db = makeDb() as any
 export type DB = typeof db
-export * as dbSchema from './schema-mysql'
+export * as dbSchema from '../../drizzle/mysql/schema'
