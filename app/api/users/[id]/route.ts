@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, dbSchema } from '@/lib/db/client'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -100,8 +100,11 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       return NextResponse.json({ success: false, error: 'Cannot delete the last remaining admin' }, { status: 400 })
     }
 
+    // Fallback admin for reassignment when a project lead is not suitable
+    const adminFallback = admins.find(a => a.id !== id) || admins[0]
+
     // Reassign or clean up references to avoid orphan records.
-    // We'll use a special ghost user as the sink for historical references.
+    // We'll use a special ghost user only for historical references (comments, attachments, etc.).
     const GHOST_USER_ID = 'system-deleted-user'
 
     // Ensure the ghost user exists (id is deterministic)
@@ -123,19 +126,128 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       })
     }
 
+    const FALLBACK_ADMIN_ID = adminFallback?.id || GHOST_USER_ID
+
     // Perform all changes atomically
     await db.transaction(async (tx) => {
-      // Reassign ownership/creator references
-      await tx.update(dbSchema.projects).set({ ownerId: GHOST_USER_ID }).where(eq(dbSchema.projects.ownerId, id))
-      await tx.update(dbSchema.tasks).set({ createdById: GHOST_USER_ID }).where(eq(dbSchema.tasks.createdById, id))
-      await tx.update(dbSchema.tasks).set({ approvedById: null as unknown as string | null }).where(eq(dbSchema.tasks.approvedById, id))
+      // --- Reassign tasks and subtasks ownership/assignees ---
 
-      // Memberships (remove)
+      // Tasks created by this user
+      const createdTasks = await tx
+        .select({ id: dbSchema.tasks.id, projectId: dbSchema.tasks.projectId })
+        .from(dbSchema.tasks)
+        .where(eq(dbSchema.tasks.createdById, id))
+
+      // Tasks where this user is an assignee
+      const userTaskAssignees = await tx
+        .select({ taskId: dbSchema.taskAssignees.taskId })
+        .from(dbSchema.taskAssignees)
+        .where(eq(dbSchema.taskAssignees.userId, id))
+
+      const taskIdsForAssignee = Array.from(new Set(userTaskAssignees.map(t => t.taskId)))
+
+      let tasksWithAssignee: { id: string; projectId: string }[] = []
+      if (taskIdsForAssignee.length) {
+        tasksWithAssignee = await tx
+          .select({ id: dbSchema.tasks.id, projectId: dbSchema.tasks.projectId })
+          .from(dbSchema.tasks)
+          .where(inArray(dbSchema.tasks.id, taskIdsForAssignee))
+      }
+
+      // Build task -> project map and collect affected project IDs
+      const taskToProject = new Map<string, string>()
+      for (const t of createdTasks) {
+        taskToProject.set(t.id, t.projectId)
+      }
+      for (const t of tasksWithAssignee) {
+        taskToProject.set(t.id, t.projectId)
+      }
+
+      const projectIds = Array.from(new Set(Array.from(taskToProject.values())))
+
+      const projectLeadMap = new Map<string, string>()
+      if (projectIds.length) {
+        const projects = await tx
+          .select({ id: dbSchema.projects.id, ownerId: dbSchema.projects.ownerId })
+          .from(dbSchema.projects)
+          .where(inArray(dbSchema.projects.id, projectIds))
+
+        for (const p of projects) {
+          // Prefer project lead (owner) if it is not the deleted user, otherwise fall back to admin
+          const replacement = p.ownerId && p.ownerId !== id ? p.ownerId : FALLBACK_ADMIN_ID
+          projectLeadMap.set(p.id, replacement)
+        }
+      }
+
+      // Reassign createdById for tasks created by this user
+      for (const t of createdTasks) {
+        const replacementId = projectLeadMap.get(t.projectId) || FALLBACK_ADMIN_ID
+        await tx
+          .update(dbSchema.tasks)
+          .set({ createdById: replacementId })
+          .where(eq(dbSchema.tasks.id, t.id))
+      }
+
+      // Reassign task assignees for this user to the project lead/admin
+      if (tasksWithAssignee.length) {
+        const uniqueTaskIds = Array.from(new Set(tasksWithAssignee.map(t => t.id)))
+
+        // Remove old assignee records for this user
+        await tx.delete(dbSchema.taskAssignees).where(eq(dbSchema.taskAssignees.userId, id))
+
+        const candidateAssignments: { taskId: string; userId: string }[] = []
+        for (const taskId of uniqueTaskIds) {
+          const projectId = taskToProject.get(taskId)
+          const replacementId = (projectId && projectLeadMap.get(projectId)) || FALLBACK_ADMIN_ID
+          candidateAssignments.push({ taskId, userId: replacementId })
+        }
+
+        // De-duplicate (taskId, userId) pairs to avoid duplicate assignments
+        const seen = new Set<string>()
+        const assignments = candidateAssignments.filter((row) => {
+          const key = `${row.taskId}:${row.userId}`
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+
+        if (assignments.length) {
+          await tx.insert(dbSchema.taskAssignees).values(assignments)
+        }
+      } else {
+        // Ensure any lingering assignee records for this user are removed
+        await tx.delete(dbSchema.taskAssignees).where(eq(dbSchema.taskAssignees.userId, id))
+      }
+
+      // Reassign subtasks where this user was the assignee
+      const userSubtasks = await tx
+        .select({ id: dbSchema.subtasks.id, taskId: dbSchema.subtasks.taskId })
+        .from(dbSchema.subtasks)
+        .where(eq(dbSchema.subtasks.assigneeId, id))
+
+      for (const st of userSubtasks) {
+        const projectId = taskToProject.get(st.taskId)
+        const replacementId = (projectId && projectLeadMap.get(projectId)) || FALLBACK_ADMIN_ID
+        await tx
+          .update(dbSchema.subtasks)
+          .set({ assigneeId: replacementId })
+          .where(eq(dbSchema.subtasks.id, st.id))
+      }
+
+      // Tasks approved by this user should lose the approver reference
+      await tx
+        .update(dbSchema.tasks)
+        .set({ approvedById: null as unknown as string | null })
+        .where(eq(dbSchema.tasks.approvedById, id))
+
+      // Project ownership moves to the ghost user to keep the project itself intact
+      await tx
+        .update(dbSchema.projects)
+        .set({ ownerId: GHOST_USER_ID })
+        .where(eq(dbSchema.projects.ownerId, id))
+
+      // Memberships (remove the deleted user from teams)
       await tx.delete(dbSchema.projectTeam).where(eq(dbSchema.projectTeam.userId, id))
-      await tx.delete(dbSchema.taskAssignees).where(eq(dbSchema.taskAssignees.userId, id))
-
-      // Subtasks: assignee is optional
-      await tx.update(dbSchema.subtasks).set({ assigneeId: null as unknown as string | null }).where(eq(dbSchema.subtasks.assigneeId, id))
 
       // Attachments and comments keep history but should not point to a deleted user
       await tx
@@ -147,10 +259,21 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         .set({ userId: GHOST_USER_ID, userName: 'Deleted User', avatar: null as unknown as string | null })
         .where(eq(dbSchema.comments.userId, id))
 
-      // Notifications and timesheets
-      await tx.update(dbSchema.notifications).set({ userId: GHOST_USER_ID }).where(eq(dbSchema.notifications.userId, id))
-      await tx.update(dbSchema.timesheets).set({ userId: GHOST_USER_ID }).where(eq(dbSchema.timesheets.userId, id))
-      await tx.update(dbSchema.timesheets).set({ approvedById: null as unknown as string | null }).where(eq(dbSchema.timesheets.approvedById, id))
+      // Notifications and timesheets are moved to the ghost user
+      await tx
+        .update(dbSchema.notifications)
+        .set({ userId: GHOST_USER_ID })
+        .where(eq(dbSchema.notifications.userId, id))
+
+      await tx
+        .update(dbSchema.timesheets)
+        .set({ userId: GHOST_USER_ID })
+        .where(eq(dbSchema.timesheets.userId, id))
+
+      await tx
+        .update(dbSchema.timesheets)
+        .set({ approvedById: null as unknown as string | null })
+        .where(eq(dbSchema.timesheets.approvedById, id))
 
       // Per-user configs/subscriptions
       await tx.delete(dbSchema.pushSubscriptions).where(eq(dbSchema.pushSubscriptions.userId, id))
