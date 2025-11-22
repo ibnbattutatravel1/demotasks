@@ -49,21 +49,23 @@ export async function createPasswordResetToken(userId: string, ttlMinutes = 60):
 export async function verifyAndConsumeResetToken(token: string): Promise<{ ok: boolean; userId?: string; error?: string }> {
   await ensureResetTable()
   const tokenHash = hashToken(token)
-  const rows = await db.execute(sql`
+  const raw = await db.execute(sql`
     SELECT id, user_id, expires_at, used_at
     FROM password_reset_tokens
     WHERE token_hash = ${tokenHash}
     LIMIT 1
   `) as any
 
-  const rec = rows?.rows?.[0] || rows?.[0]
+  // mysql2 + drizzle execute returns { rows, fields } for raw queries
+  const rows = raw?.rows ?? raw
+  const rec = rows?.[0]
   if (!rec) return { ok: false, error: 'Invalid token' }
   if (rec.used_at) return { ok: false, error: 'Token already used' }
   if (new Date(rec.expires_at).getTime() <= Date.now()) return { ok: false, error: 'Token expired' }
 
   // consume token
   await db.execute(sql`
-    UPDATE password_reset_tokens SET used_at = NOW() WHERE id = ${rec.id}
+    UPDATE password_reset_tokens SET used_at = NOW() WHERE token_hash = ${tokenHash}
   `)
 
   return { ok: true, userId: rec.user_id as string }
