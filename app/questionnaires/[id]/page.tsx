@@ -105,14 +105,16 @@ export default function FillQuestionnairePage() {
 
   // Update answer
   const updateAnswer = (questionId: string, updates: Partial<Answer>) => {
-    setAnswers(prev => ({
-      ...prev,
-      [questionId]: {
-        questionId,
-        ...prev[questionId],
-        ...updates,
+    setAnswers(prev => {
+      const base: Answer = prev[questionId] || { questionId }
+      return {
+        ...prev,
+        [questionId]: {
+          ...base,
+          ...updates,
+        },
       }
-    }))
+    })
   }
 
   // Handle file upload
@@ -166,11 +168,12 @@ export default function FillQuestionnairePage() {
     }
   }
 
-  // Validate answers
+  // Validate answers (ignore non-answerable section headers)
   const validateAnswers = () => {
     const errors: string[] = []
     
     questions.forEach(q => {
+      if (q.questionType === 'section') return
       if (q.isRequired) {
         const answer = answers[q.id]
         if (!answer) {
@@ -260,9 +263,20 @@ export default function FillQuestionnairePage() {
     }
   }
 
-  // Progress calculation
-  const answeredCount = Object.keys(answers).length
-  const totalCount = questions.length
+  // Progress calculation: only count answerable (non-section) questions
+  const answerableQuestions = questions.filter(q => q.questionType !== 'section')
+  const answeredCount = answerableQuestions.filter(q => {
+    const a = answers[q.id]
+    if (!a) return false
+    if (q.questionType === 'text') return !!a.answerText?.trim()
+    if (q.questionType === 'mcq' || q.questionType === 'yes_no') return !!a.answerValue
+    if (q.questionType === 'multiple_choice' || q.questionType === 'checkbox') return !!(a.answerOptions && a.answerOptions.length)
+    if (q.questionType === 'rating') return typeof a.answerNumber === 'number'
+    if (q.questionType === 'file') return !!a.answerFile
+    if (q.questionType === 'date') return !!a.answerDate
+    return true
+  }).length
+  const totalCount = answerableQuestions.length
   const progress = totalCount > 0 ? Math.round((answeredCount / totalCount) * 100) : 0
 
   // Check if overdue
@@ -365,22 +379,40 @@ export default function FillQuestionnairePage() {
       {/* Questions */}
       <div className="max-w-4xl mx-auto px-6 py-6">
         <div className="space-y-6">
-          {questions.map((q, index) => (
-            <Card key={q.id}>
-              <CardHeader>
-                <CardTitle className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <span className="text-slate-500 text-sm mr-2">Q{index + 1}.</span>
-                    <span>{q.questionText}</span>
-                    {q.isRequired && <span className="text-red-500 ml-1">*</span>}
-                  </div>
-                  <Badge variant="outline" className="ml-2">{q.questionType}</Badge>
-                </CardTitle>
-                {q.helpText && (
-                  <p className="text-sm text-slate-600 mt-1">{q.helpText}</p>
-                )}
-              </CardHeader>
-              <CardContent>
+          {questions.map((q) => {
+            // Render section/topic headers as non-answerable blocks
+            if (q.questionType === 'section') {
+              return (
+                <Card key={q.id} className="bg-slate-50 border-slate-200">
+                  <CardHeader className="pb-4">
+                    <div className="text-xs font-semibold tracking-wide text-slate-500 uppercase mb-1">Section</div>
+                    <h2 className="text-lg font-semibold text-slate-900">{q.questionText}</h2>
+                    {q.helpText && (
+                      <p className="text-sm text-slate-600 mt-1">{q.helpText}</p>
+                    )}
+                  </CardHeader>
+                </Card>
+              )
+            }
+
+            const number = answerableQuestions.findIndex(aq => aq.id === q.id) + 1
+
+            return (
+              <Card key={q.id}>
+                <CardHeader>
+                  <CardTitle className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <span className="text-slate-500 text-sm mr-2">Q{number}.</span>
+                      <span>{q.questionText}</span>
+                      {q.isRequired && <span className="text-red-500 ml-1">*</span>}
+                    </div>
+                    <Badge variant="outline" className="ml-2">{q.questionType}</Badge>
+                  </CardTitle>
+                  {q.helpText && (
+                    <p className="text-sm text-slate-600 mt-1">{q.helpText}</p>
+                  )}
+                </CardHeader>
+                <CardContent>
                 {/* MCQ (Single Choice) */}
                 {q.questionType === 'mcq' && (
                   <RadioGroup
@@ -507,7 +539,8 @@ export default function FillQuestionnairePage() {
                 )}
               </CardContent>
             </Card>
-          ))}
+            )
+          })}
         </div>
 
         {/* Actions */}

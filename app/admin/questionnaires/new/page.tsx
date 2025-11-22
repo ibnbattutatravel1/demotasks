@@ -30,7 +30,7 @@ import { Switch } from "@/components/ui/switch"
 interface Question {
   id: string
   questionText: string
-  questionType: 'mcq' | 'text' | 'rating' | 'yes_no' | 'file' | 'date' | 'multiple_choice' | 'checkbox'
+  questionType: 'mcq' | 'text' | 'rating' | 'yes_no' | 'file' | 'date' | 'multiple_choice' | 'checkbox' | 'section'
   isRequired: boolean
   options?: string[]
   minValue?: number
@@ -91,7 +91,7 @@ export default function CreateQuestionnairePage() {
       id: `q_${Date.now()}`,
       questionText: '',
       questionType: type,
-      isRequired: true,
+      isRequired: type === 'section' ? false : true,
     }
 
     if (type === 'mcq' || type === 'multiple_choice' || type === 'checkbox') {
@@ -417,11 +417,17 @@ export default function CreateQuestionnairePage() {
               <CardTitle>Questions ({questions.length})</CardTitle>
               <div className="flex items-center gap-2">
                 <Label className="text-sm text-slate-600">Add Question:</Label>
-                <Select onValueChange={(v) => addQuestion(v as any)}>
-                  <SelectTrigger className="w-[180px]">
+                <Select
+                  key={questions.length}
+                  onValueChange={(v) => {
+                    addQuestion(v as any)
+                  }}
+                >
+                  <SelectTrigger className="w-[220px]">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="section">Section / Topic Header</SelectItem>
                     <SelectItem value="text">Text</SelectItem>
                     <SelectItem value="mcq">MCQ (Single)</SelectItem>
                     <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
@@ -450,7 +456,9 @@ export default function CreateQuestionnairePage() {
                         <GripVertical className="h-5 w-5 text-slate-400 mt-2 cursor-move" />
                         <div className="flex-1 space-y-3">
                           <div className="flex items-center justify-between">
-                            <Badge variant="outline">{q.questionType}</Badge>
+                            <Badge variant="outline">
+                              {q.questionType === 'section' ? 'Section' : q.questionType}
+                            </Badge>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -459,99 +467,120 @@ export default function CreateQuestionnairePage() {
                               <Trash2 className="h-4 w-4 text-red-600" />
                             </Button>
                           </div>
-                          
-                          <div>
-                            <Input
-                              placeholder="Question text"
-                              value={q.questionText}
-                              onChange={(e) => updateQuestion(q.id, { questionText: e.target.value })}
-                            />
-                          </div>
+                          {q.questionType === 'section' ? (
+                            <>
+                              <div>
+                                <Input
+                                  placeholder="Section title (e.g., Teamwork)"
+                                  value={q.questionText}
+                                  onChange={(e) => updateQuestion(q.id, { questionText: e.target.value })}
+                                />
+                              </div>
+                              <div>
+                                <Textarea
+                                  placeholder="Optional description for this section"
+                                  value={q.helpText || ''}
+                                  onChange={(e) => updateQuestion(q.id, { helpText: e.target.value })}
+                                  rows={2}
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div>
+                                <Input
+                                  placeholder="Question text"
+                                  value={q.questionText}
+                                  onChange={(e) => updateQuestion(q.id, { questionText: e.target.value })}
+                                />
+                              </div>
 
-                          {/* MCQ/Multiple Choice Options */}
-                          {(q.questionType === 'mcq' || q.questionType === 'multiple_choice' || q.questionType === 'checkbox') && (
-                            <div className="space-y-2">
-                              <Label className="text-xs">Options:</Label>
-                              {q.options?.map((opt, idx) => (
-                                <div key={idx} className="flex items-center gap-2">
-                                  <Input
-                                    placeholder={`Option ${idx + 1}`}
-                                    value={opt}
-                                    onChange={(e) => updateOption(q.id, idx, e.target.value)}
-                                  />
-                                  {q.options!.length > 2 && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => removeOption(q.id, idx)}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  )}
+                              {/* MCQ/Multiple Choice Options */}
+                              {(q.questionType === 'mcq' || q.questionType === 'multiple_choice' || q.questionType === 'checkbox') && (
+                                <div className="space-y-2">
+                                  <Label className="text-xs">Options:</Label>
+                                  {q.options?.map((opt, idx) => (
+                                    <div key={idx} className="flex items-center gap-2">
+                                      <Input
+                                        placeholder={`Option ${idx + 1}`}
+                                        value={opt}
+                                        onChange={(e) => updateOption(q.id, idx, e.target.value)}
+                                      />
+                                      {q.options!.length > 2 && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => removeOption(q.id, idx)}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ))}
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => addOption(q.id)}
+                                  >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Option
+                                  </Button>
                                 </div>
-                              ))}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => addOption(q.id)}
-                              >
-                                <Plus className="h-4 w-4 mr-2" />
-                                Add Option
-                              </Button>
-                            </div>
-                          )}
+                              )}
 
-                          {/* Rating */}
-                          {q.questionType === 'rating' && (
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <Label className="text-xs">Min Value</Label>
-                                <Input
-                                  type="number"
-                                  value={q.minValue}
-                                  onChange={(e) => updateQuestion(q.id, { minValue: Number(e.target.value) })}
-                                />
-                              </div>
-                              <div>
-                                <Label className="text-xs">Max Value</Label>
-                                <Input
-                                  type="number"
-                                  value={q.maxValue}
-                                  onChange={(e) => updateQuestion(q.id, { maxValue: Number(e.target.value) })}
-                                />
-                              </div>
-                            </div>
-                          )}
+                              {/* Rating */}
+                              {q.questionType === 'rating' && (
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <Label className="text-xs">Min Value</Label>
+                                    <Input
+                                      type="number"
+                                      value={q.minValue}
+                                      onChange={(e) => updateQuestion(q.id, { minValue: Number(e.target.value) })}
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs">Max Value</Label>
+                                    <Input
+                                      type="number"
+                                      value={q.maxValue}
+                                      onChange={(e) => updateQuestion(q.id, { maxValue: Number(e.target.value) })}
+                                    />
+                                  </div>
+                                </div>
+                              )}
 
-                          {/* File Upload */}
-                          {q.questionType === 'file' && (
-                            <div className="space-y-2">
-                              <div>
-                                <Label className="text-xs">Max File Size (MB)</Label>
-                                <Input
-                                  type="number"
-                                  value={q.maxFileSize}
-                                  onChange={(e) => updateQuestion(q.id, { maxFileSize: Number(e.target.value) })}
-                                />
-                              </div>
-                              <div>
-                                <Label className="text-xs">Allowed Types (comma-separated)</Label>
-                                <Input
-                                  placeholder="pdf,doc,docx,jpg,png"
-                                  value={q.allowedFileTypes}
-                                  onChange={(e) => updateQuestion(q.id, { allowedFileTypes: e.target.value })}
-                                />
-                              </div>
-                            </div>
-                          )}
+                              {/* File Upload */}
+                              {q.questionType === 'file' && (
+                                <div className="space-y-2">
+                                  <div>
+                                    <Label className="text-xs">Max File Size (MB)</Label>
+                                    <Input
+                                      type="number"
+                                      value={q.maxFileSize}
+                                      onChange={(e) => updateQuestion(q.id, { maxFileSize: Number(e.target.value) })}
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs">Allowed Types (comma-separated)</Label>
+                                    <Input
+                                      placeholder="pdf,doc,docx,jpg,png"
+                                      value={q.allowedFileTypes}
+                                      onChange={(e) => updateQuestion(q.id, { allowedFileTypes: e.target.value })}
+                                    />
+                                  </div>
+                                </div>
+                              )}
 
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              checked={q.isRequired}
-                              onCheckedChange={(checked) => updateQuestion(q.id, { isRequired: checked })}
-                            />
-                            <Label className="text-sm">Required</Label>
-                          </div>
+                              <div className="flex items-center gap-2">
+                                <Switch
+                                  checked={q.isRequired}
+                                  onCheckedChange={(checked) => updateQuestion(q.id, { isRequired: checked })}
+                                />
+                                <Label className="text-sm">Required</Label>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </CardContent>
