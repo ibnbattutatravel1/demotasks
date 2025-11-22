@@ -3,7 +3,8 @@ import { db, dbSchema } from '@/lib/db/client'
 import { randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { AUTH_COOKIE, verifyAuthToken } from '@/lib/auth'
-import { sendUserWelcomeEmail } from '@/lib/email/user-welcome-email'
+import { createPasswordResetToken } from '@/lib/auth-password'
+import { sendPasswordResetEmail } from '@/lib/email/password-reset-email'
 
 export async function GET() {
   try {
@@ -18,7 +19,7 @@ export async function GET() {
     }).from(dbSchema.users)
 
     // Hide the internal ghost user used for safe deletions
-    const filtered = users.filter((u) => u.id !== 'system-deleted-user')
+    const filtered = users.filter((u: any) => u.id !== 'system-deleted-user')
 
     return NextResponse.json({ success: true, data: filtered })
   } catch (error) {
@@ -74,30 +75,8 @@ export async function POST(req: NextRequest) {
     const id = (globalThis.crypto?.randomUUID?.() ?? randomUUID()) as string
     const initials = name.split(/\s+/).map(p => p[0]?.toUpperCase() ?? '').slice(0, 2).join('') || name[0]?.toUpperCase() || 'U'
 
-    // Generate a strong temporary password if none provided
-    const createTempPassword = () => {
-      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+';
-      let out = ''
-      // 12-16 chars
-      const len = 12
-      const arr = new Uint32Array(len)
-      (globalThis.crypto || require('node:crypto').webcrypto).getRandomValues(arr)
-      for (let i = 0; i < len; i++) out += chars[arr[i] % chars.length]
-      return out
-    }
-
-    let plainPassword: string | null = null
-    if (typeof body.password === 'string' && body.password.trim()) {
-      plainPassword = body.password.trim()
-      if (plainPassword.length < 8) {
-        return NextResponse.json({ success: false, error: 'Password must be at least 8 characters' }, { status: 400 })
-      }
-    } else {
-      plainPassword = createTempPassword()
-    }
-
-    const { hashSync } = await import('bcryptjs')
-    const passwordHash: string | null = plainPassword ? hashSync(plainPassword, 10) : null
+    // Always require user to set password via secure email link
+    const passwordHash: string | null = null
 
     await db.insert(dbSchema.users).values({
       id,
@@ -120,18 +99,14 @@ export async function POST(req: NextRequest) {
       status: dbSchema.users.status,
     }).from(dbSchema.users).where(eq(dbSchema.users.id, id))
 
-    // Send welcome email with temporary password (first-time only)
-    if (plainPassword) {
-      try {
-        await sendUserWelcomeEmail({
-          to: email,
-          name,
-          tempPassword: plainPassword,
-          appUrl: process.env.NEXT_PUBLIC_APP_URL,
-        })
-      } catch (e) {
-        console.warn('Failed to send welcome email:', e)
-      }
+    // Send password set/reset email with secure token
+    try {
+      const { token } = await createPasswordResetToken(id, 60)
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      const resetLink = `${appUrl}/reset-password?token=${encodeURIComponent(token)}`
+      await sendPasswordResetEmail({ to: email, name, resetLink })
+    } catch (e) {
+      console.warn('Failed to send password reset email:', e)
     }
 
     return NextResponse.json({ success: true, data: created[0] }, { status: 201 })
