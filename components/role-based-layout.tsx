@@ -15,9 +15,11 @@ export function RoleBasedLayout({ children }: RoleBasedLayoutProps) {
   const pathname = usePathname()
   const router = useRouter()
 
+  const publicPaths = ["/login", "/reset-password"]
+
   useEffect(() => {
     if (!isLoading) {
-      if (!user && pathname !== "/login") {
+      if (!user && !publicPaths.includes(pathname)) {
         router.push("/login")
       } else if (user && pathname === "/login") {
         router.push("/")
@@ -38,7 +40,7 @@ export function RoleBasedLayout({ children }: RoleBasedLayoutProps) {
     )
   }
 
-  if (!user && pathname === "/login") {
+  if (!user && publicPaths.includes(pathname)) {
     return <>{children}</>
   }
 
