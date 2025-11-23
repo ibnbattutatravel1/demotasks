@@ -123,21 +123,21 @@ export default function ReportsPage() {
         // Derive sets
         const tasksCreatedInRange = tasks.filter(t => inRange(parseDate(t.createdAt)))
         const tasksCompletedInRange = tasks.filter(t => inRange(parseDate(t.completedAt)))
-        const tasksDueInRange = tasks.filter(t => inRange(parseDate(t.dueDate)))
         // Any task relevant to period (created/completed/due inside)
         const tasksInPeriod = tasks.filter(t =>
           inRange(parseDate(t.createdAt)) || inRange(parseDate(t.completedAt)) || inRange(parseDate(t.dueDate))
         )
 
-        // Overview
-        // Use tasksInPeriod so periods with zero creations still show meaningful totals
-        const totalTasks = tasksInPeriod.length || tasks.length
-        const completedTasks = tasksCompletedInRange.length
-        const overdueTasks = tasksDueInRange.filter(t => parseDate(t.dueDate)! < today && !isDone(t)).length
+        // Overview - use global workspace totals so numbers match other dashboards
+        const totalTasks = tasks.length
+        const completedTasks = tasks.filter(isDone).length
+        const overdueTasks = tasks.filter(t => {
+          const due = parseDate(t.dueDate)
+          return !!due && due < today && !isDone(t)
+        }).length
         const assigneeIds = new Set<string>()
         tasksInPeriod.forEach(t => (t.assignees || []).forEach((u: any) => u?.id && assigneeIds.add(u.id)))
         const activeUsers = assigneeIds.size
-        // Denominator: tasksInPeriod (fallback to all tasks) for more stable rates
         const denom = totalTasks
         const completionRate = denom ? Math.round((completedTasks / denom) * 100) : 0
 

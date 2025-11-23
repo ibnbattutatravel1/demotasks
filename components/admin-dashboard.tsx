@@ -50,7 +50,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog"
 import { useAuth } from "@/contexts/auth-context"
 import { CreateProjectDialog } from "@/components/create-project-dialog"
-import { formatDateOnly } from "@/lib/format-date"
+import { formatDateOnly, isOverdue } from "@/lib/format-date"
 
 type TeamStat = { name: string; tasksCreated: number; tasksCompleted: number; avatar?: string }
 
@@ -358,6 +358,16 @@ export function AdminDashboard() {
     return priorityOk && queryOk
   })
 
+  const allTasks = projects.flatMap((project) => project.tasks || [])
+  const overdueTasks = allTasks.filter(
+    (t: any) => t.dueDate && isOverdue(t.dueDate) && t.status !== "done",
+  )
+  const overdueHighPriority = overdueTasks.filter((t: any) => t.priority === "high").length
+
+  const totalTasks = allTasks.length
+  const totalCompletedTasks = allTasks.filter((t: any) => t.status === "done").length
+  const activeCompletionRate = totalTasks ? Math.round((totalCompletedTasks / totalTasks) * 100) : 0
+
   const toggleProjectExpansion = (projectId: string) => {
     setExpandedProjects((prev) => ({
       ...prev,
@@ -616,64 +626,60 @@ export function AdminDashboard() {
               </CardContent>
             </Card>
 
-              <Card>
-                <CardContent className="py-2 px-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-600">Pending Approval</p>
-                      <p className="text-2xl font-bold text-orange-600">{filteredPendingTasks.length}</p>
-                    </div>
-                    <AlertTriangle className="h-8 w-8 text-orange-500" />
+            <Card>
+              <CardContent className="py-2 px-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">Active Tasks</p>
+                    <p className="text-2xl font-bold text-blue-600">{getApprovedTasks().length}</p>
                   </div>
-                  <div className="mt-2 flex items-center text-xs text-slate-500">
-                    <span className="text-red-600">
-                      {filteredPendingTasks.filter((t) => t.priority === "high").length} high priority
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
+                  <CheckCircle2 className="h-8 w-8 text-blue-500" />
+                </div>
+                <div className="mt-2 flex items-center text-xs text-slate-500">
+                  <span className="text-green-600">
+                    {projects.flatMap((p) => p.tasks).filter((t) => t.status === "done").length} completed
+                  </span>
+                  <span className="mx-1">•</span>
+                  <span className="text-slate-600">{activeCompletionRate}% completion rate</span>
+                </div>
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardContent className="py-2 px-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-600">Active Tasks</p>
-                      <p className="text-2xl font-bold text-blue-600">{getApprovedTasks().length}</p>
-                    </div>
-                    <CheckCircle2 className="h-8 w-8 text-blue-500" />
+            <Card>
+              <CardContent className="py-2 px-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">Overdue Tasks</p>
+                    <p className="text-2xl font-bold text-red-600">{overdueTasks.length}</p>
                   </div>
-                  <div className="mt-2 flex items-center text-xs text-slate-500">
-                    <span className="text-green-600">
-                      {projects.flatMap((p) => p.tasks).filter((t) => t.status === "done").length} completed
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
+                  <AlertTriangle className="h-8 w-8 text-red-500" />
+                </div>
+                <div className="mt-2 flex items-center text-xs text-slate-500">
+                  <span className="text-red-600">
+                    {overdueHighPriority} high priority
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardContent className="py-2 px-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-600">Team Members</p>
-                      <p className="text-2xl font-bold text-purple-600">{teamStats.length}</p>
-                    </div>
-                    <Users className="h-8 w-8 text-purple-500" />
+            <Card>
+              <CardContent className="py-2 px-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">Team Members</p>
+                    <p className="text-2xl font-bold text-purple-600">{teamStats.length}</p>
                   </div>
-                  <div className="mt-2 flex items-center text-xs text-slate-500">
-                    <span className="text-green-600">
-                      {(() => {
-                        const created = teamStats.reduce((acc, m) => acc + m.tasksCreated, 0)
-                        const completed = teamStats.reduce((acc, m) => acc + m.tasksCompleted, 0)
-                        if (!created) return 0
-                        return Math.round((completed / created) * 100)
-                      })()}
-                      % completion rate
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                  <Users className="h-8 w-8 text-purple-500" />
+                </div>
+                <div className="mt-2 flex items-center text-xs text-slate-500">
+                  <span>
+                    {teamStats.reduce((acc, m) => acc + m.tasksCompleted, 0)} tasks completed
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
           </div>
+        </div>
 
             {/* Quick Actions */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 px-6">
