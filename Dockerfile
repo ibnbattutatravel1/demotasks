@@ -18,7 +18,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/scripts/init-upload-dirs.js ./scripts/init-upload-dirs.js
+# Pre-create upload directories inside the image
+RUN mkdir -p ./public/uploads/avatars \
+    && mkdir -p ./public/uploads/attachments \
+    && mkdir -p ./public/uploads/projects \
+    && mkdir -p ./public/uploads/communities \
+    && mkdir -p ./public/uploads/questionnaires
 COPY --from=deps /app/node_modules ./node_modules
 EXPOSE 3000
-CMD node scripts/init-upload-dirs.js && npm run start
+CMD npm run start
