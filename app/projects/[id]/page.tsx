@@ -290,6 +290,8 @@ export default function ProjectDetailPage() {
                 <DropdownMenuItem onClick={() => setStatusFilter("all")}>All Status</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setStatusFilter("todo")}>To Do</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setStatusFilter("in-progress")}>In Progress</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setStatusFilter("blocked")}>Blocked</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setStatusFilter("postponed")}>Postponed</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setStatusFilter("done")}>Completed</DropdownMenuItem>
                 <div className="border-t border-slate-200 my-1" />
                 <div className="px-2 py-1 text-sm font-medium text-slate-700">Priority</div>

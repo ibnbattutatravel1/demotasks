@@ -34,7 +34,7 @@ export interface Subtask {
   taskId: string // Foreign key to parent task
   title: string
   description?: string
-  status?: "planning" | "todo" | "in-progress" | "review" | "done"
+  status?: "planning" | "todo" | "in-progress" | "review" | "done" | "blocked" | "postponed"
   completed: boolean
   startDate?: string
   dueDate?: string
@@ -53,7 +53,7 @@ export interface Task {
   projectId: string // Foreign key to parent project
   title: string
   description: string
-  status: "planning" | "todo" | "in-progress" | "review" | "done"
+  status: "planning" | "todo" | "in-progress" | "review" | "done" | "blocked" | "postponed"
   priority: "low" | "medium" | "high"
   startDate: string
   dueDate: string

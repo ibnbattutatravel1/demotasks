@@ -72,7 +72,13 @@ export default function UpcomingPage() {
     return (task?.subtasks || []) as any[]
   }
 
-  const patchTask = async (id: string, payload: Partial<{ status: 'todo' | 'in-progress' | 'review' | 'done'; priority: 'low' | 'medium' | 'high' }>) => {
+  const patchTask = async (
+    id: string,
+    payload: Partial<{
+      status: 'todo' | 'in-progress' | 'review' | 'done' | 'blocked' | 'postponed'
+      priority: 'low' | 'medium' | 'high'
+    }>,
+  ) => {
     const res = await fetch(`/api/tasks/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -105,7 +111,10 @@ export default function UpcomingPage() {
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...changes } : t)))
   }
 
-  const handleChangeStatus = async (taskId: string, status: 'todo' | 'in-progress' | 'review' | 'done') => {
+  const handleChangeStatus = async (
+    taskId: string,
+    status: 'todo' | 'in-progress' | 'review' | 'done' | 'blocked' | 'postponed',
+  ) => {
     const prev = tasks.find((t) => t.id === taskId)
     if (!prev) return
     updateTaskLocal(taskId, { status })
@@ -438,6 +447,8 @@ export default function UpcomingPage() {
                                     <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'in-progress')}>In Progress</DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'review')}>Review</DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'done')}>Done</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'blocked')}>Blocked</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'postponed')}>Postponed</DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuLabel>Priority</DropdownMenuLabel>
                                     <DropdownMenuItem onClick={() => handleChangePriority(task.id, 'low')}>Low</DropdownMenuItem>

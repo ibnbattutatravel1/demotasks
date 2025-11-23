@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       startDate?: string
       dueDate?: string
       priority?: 'low' | 'medium' | 'high'
-      status?: 'todo' | 'in-progress' | 'review' | 'done'
+      status?: 'todo' | 'in-progress' | 'review' | 'done' | 'blocked' | 'postponed'
     }
 
     const { taskId, title, description = '', assigneeIds = [], startDate = null, dueDate = null, priority = null, status = 'todo' } = body as any

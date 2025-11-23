@@ -177,11 +177,11 @@ export async function POST(req: NextRequest) {
     const userId = payload.sub
     const body = await req.json()
 
-    // Validate required fields
-    if (!body.title || !body.description || !body.meetingLink || !body.startTime || !body.endTime) {
+    // Validate required base fields
+    if (!body.title || !body.description || !body.meetingLink) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Missing required fields: title, description, meetingLink, startTime, endTime' 
+        error: 'Missing required fields: title, description, meetingLink' 
       }, { status: 400 })
     }
 
@@ -192,9 +192,56 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
+    // Determine start/end from either date + startTime + durationMinutes (new) or startTime + endTime (legacy)
+    const hasDateInputs = !!(body.date && body.startTime && (body.durationMinutes || body.durationMinutes === 0))
+    const hasDirectTimes = !!(body.startTime && body.endTime)
+
+    if (!hasDateInputs && !hasDirectTimes) {
+      return NextResponse.json({
+        success: false,
+        error: 'Missing time fields: provide either date, startTime, durationMinutes or startTime and endTime',
+      }, { status: 400 })
+    }
+
+    let startISO: string
+    let endISO: string
+
+    if (hasDateInputs) {
+      const duration = Number(body.durationMinutes)
+      if (!Number.isFinite(duration) || duration <= 0) {
+        return NextResponse.json({
+          success: false,
+          error: 'durationMinutes must be a positive number',
+        }, { status: 400 })
+      }
+
+      const combinedStart = new Date(`${body.date}T${body.startTime}`)
+      if (Number.isNaN(combinedStart.getTime())) {
+        return NextResponse.json({
+          success: false,
+          error: 'Invalid date or startTime',
+        }, { status: 400 })
+      }
+
+      const combinedEnd = new Date(combinedStart.getTime() + duration * 60_000)
+      startISO = combinedStart.toISOString()
+      endISO = combinedEnd.toISOString()
+    } else {
+      const start = new Date(body.startTime)
+      const end = new Date(body.endTime)
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        return NextResponse.json({
+          success: false,
+          error: 'Invalid startTime or endTime',
+        }, { status: 400 })
+      }
+      startISO = start.toISOString()
+      endISO = end.toISOString()
+    }
+
     // Validate date range
-    const startTime = new Date(body.startTime)
-    const endTime = new Date(body.endTime)
+    const startTime = new Date(startISO)
+    const endTime = new Date(endISO)
     if (endTime <= startTime) {
       return NextResponse.json({ 
         success: false, 
@@ -207,8 +254,8 @@ export async function POST(req: NextRequest) {
     const now = new Date()
 
     // Convert to MySQL datetime format (YYYY-MM-DD HH:MM:SS)
-    const startTimeFormatted = toMySQLDatetime(body.startTime)
-    const endTimeFormatted = toMySQLDatetime(body.endTime)
+    const startTimeFormatted = toMySQLDatetime(startISO)
+    const endTimeFormatted = toMySQLDatetime(endISO)
     const recurrenceEndDateFormatted = toMySQLDatetimeOrNull(body.recurrenceEndDate)
 
     await db.insert(dbSchema.meetings).values({
@@ -282,8 +329,8 @@ export async function POST(req: NextRequest) {
         description: body.description,
         meetingLink: body.meetingLink,
         meetingType: body.meetingType || 'zoom',
-        startTime: body.startTime,
-        endTime: body.endTime,
+        startTime: startISO,
+        endTime: endISO,
         timezone: body.timezone || 'UTC',
         createdById: userId,
         projectId: body.projectId,

@@ -196,7 +196,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const body = (await req.json()) as Partial<{
       title: string
       description: string
-      status: 'planning' | 'todo' | 'in-progress' | 'review' | 'done'
+      status: 'planning' | 'todo' | 'in-progress' | 'review' | 'done' | 'blocked' | 'postponed'
       priority: 'low' | 'medium' | 'high'
       startDate: string
       dueDate: string

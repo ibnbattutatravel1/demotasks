@@ -54,8 +54,9 @@ export function MeetingForm({ isOpen, onClose, onSuccess, meeting, mode = 'creat
     description: '',
     meetingLink: '',
     meetingType: 'zoom',
+    date: '',
     startTime: '',
-    endTime: '',
+    durationMinutes: 30,
     timezone: 'UTC',
     projectId: '',
     agenda: '',
@@ -67,13 +68,27 @@ export function MeetingForm({ isOpen, onClose, onSuccess, meeting, mode = 'creat
     if (isOpen) {
       loadData()
       if (meeting && mode === 'edit') {
+        const start = meeting.startTime ? new Date(meeting.startTime) : null
+        const end = meeting.endTime ? new Date(meeting.endTime) : null
+        const date = start ? start.toISOString().slice(0, 10) : ''
+        const startTime = start ? start.toISOString().slice(11, 16) : ''
+        let durationMinutes = 30
+        if (start && end) {
+          const diffMs = end.getTime() - start.getTime()
+          const diffMin = Math.round(diffMs / 60000)
+          if (!Number.isNaN(diffMin) && diffMin > 0) {
+            durationMinutes = diffMin
+          }
+        }
+
         setFormData({
           title: meeting.title || '',
           description: meeting.description || '',
           meetingLink: meeting.meetingLink || '',
           meetingType: meeting.meetingType || 'zoom',
-          startTime: meeting.startTime ? new Date(meeting.startTime).toISOString().slice(0, 16) : '',
-          endTime: meeting.endTime ? new Date(meeting.endTime).toISOString().slice(0, 16) : '',
+          date,
+          startTime,
+          durationMinutes,
           timezone: meeting.timezone || 'UTC',
           projectId: meeting.projectId || '',
           agenda: meeting.agenda || '',
@@ -87,8 +102,9 @@ export function MeetingForm({ isOpen, onClose, onSuccess, meeting, mode = 'creat
           description: '',
           meetingLink: '',
           meetingType: 'zoom',
+          date: '',
           startTime: '',
-          endTime: '',
+          durationMinutes: 30,
           timezone: 'UTC',
           projectId: '',
           agenda: '',
@@ -121,14 +137,8 @@ export function MeetingForm({ isOpen, onClose, onSuccess, meeting, mode = 'creat
     setLoading(true)
 
     try {
-      // Convert datetime-local to ISO timestamps
-      const startTime = new Date(formData.startTime).toISOString()
-      const endTime = new Date(formData.endTime).toISOString()
-
       const payload = {
         ...formData,
-        startTime,
-        endTime,
         projectId: formData.projectId || null,
         agenda: formData.agenda || null,
       }
@@ -236,31 +246,46 @@ export function MeetingForm({ isOpen, onClose, onSuccess, meeting, mode = 'creat
             </Select>
           </div>
 
-          {/* Date & Time */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Date, Start Time & Duration */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="date" className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Date *
+              </Label>
+              <Input
+                id="date"
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                required
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="startTime" className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
+                <Clock className="h-4 w-4" />
                 Start Time *
               </Label>
               <Input
                 id="startTime"
-                type="datetime-local"
+                type="time"
                 value={formData.startTime}
                 onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="endTime" className="flex items-center gap-2">
+              <Label htmlFor="durationMinutes" className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                End Time *
+                Duration (minutes) *
               </Label>
               <Input
-                id="endTime"
-                type="datetime-local"
-                value={formData.endTime}
-                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                id="durationMinutes"
+                type="number"
+                min={5}
+                step={5}
+                value={formData.durationMinutes}
+                onChange={(e) => setFormData({ ...formData, durationMinutes: Number(e.target.value) || 0 })}
                 required
               />
             </div>

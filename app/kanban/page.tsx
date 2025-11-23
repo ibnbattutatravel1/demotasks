@@ -25,6 +25,8 @@ const columns = [
   { id: "todo", title: "To Do", color: "bg-slate-100" },
   { id: "in-progress", title: "In Progress", color: "bg-blue-50" },
   { id: "review", title: "Review", color: "bg-amber-50" },
+  { id: "blocked", title: "Blocked", color: "bg-red-50" },
+  { id: "postponed", title: "Postponed", color: "bg-purple-50" },
   { id: "done", title: "Done", color: "bg-emerald-50" },
 ]
 
@@ -121,7 +123,10 @@ export default function KanbanPage() {
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...changes } : t)))
   }
 
-  const handleChangeStatus = async (taskId: string, status: 'todo' | 'in-progress' | 'review' | 'done') => {
+  const handleChangeStatus = async (
+    taskId: string,
+    status: 'todo' | 'in-progress' | 'review' | 'done' | 'blocked' | 'postponed',
+  ) => {
     const prev = tasks.find((t) => t.id === taskId)
     if (!prev) return
     updateTaskLocal(taskId, { status })
@@ -275,6 +280,8 @@ export default function KanbanPage() {
                               <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'todo')}>To Do</DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'in-progress')}>In Progress</DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'review')}>Review</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'blocked')}>Blocked</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'postponed')}>Postponed</DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleChangeStatus(task.id, 'done')}>Done</DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuLabel>Priority</DropdownMenuLabel>

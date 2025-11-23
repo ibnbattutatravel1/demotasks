@@ -44,7 +44,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       startDate: string | null
       dueDate: string | null
       priority: 'low' | 'medium' | 'high' | null
-      status: 'todo' | 'in-progress' | 'review' | 'done'
+      status: 'todo' | 'in-progress' | 'review' | 'done' | 'blocked' | 'postponed'
     }>
 
     const existing = await db.select().from(dbSchema.subtasks).where(eq(dbSchema.subtasks.id, id))

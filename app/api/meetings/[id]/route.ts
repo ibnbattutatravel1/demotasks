@@ -170,9 +170,55 @@ export async function PUT(
       return NextResponse.json({ success: false, error: 'Only the organizer can update this meeting' }, { status: 403 })
     }
 
-    // Validate date range if provided
-    const startTime = body.startTime ? new Date(body.startTime) : new Date(meeting.startTime)
-    const endTime = body.endTime ? new Date(body.endTime) : new Date(meeting.endTime)
+    // Determine updated start/end time
+    const hasDateInputs = !!(body.date || body.startTime || body.durationMinutes !== undefined)
+
+    let startISO: string | null = null
+    let endISO: string | null = null
+
+    if (hasDateInputs) {
+      const currentStart = new Date(meeting.startTime)
+      const currentEnd = new Date(meeting.endTime)
+      const fallbackDuration = Math.max(5, Math.round((currentEnd.getTime() - currentStart.getTime()) / 60_000) || 30)
+
+      const dateStr = body.date || currentStart.toISOString().slice(0, 10)
+      const timeStr = body.startTime || currentStart.toISOString().slice(11, 16)
+      const duration = body.durationMinutes !== undefined ? Number(body.durationMinutes) : fallbackDuration
+
+      if (!Number.isFinite(duration) || duration <= 0) {
+        return NextResponse.json({
+          success: false,
+          error: 'durationMinutes must be a positive number',
+        }, { status: 400 })
+      }
+
+      const combinedStart = new Date(`${dateStr}T${timeStr}`)
+      if (Number.isNaN(combinedStart.getTime())) {
+        return NextResponse.json({
+          success: false,
+          error: 'Invalid date or startTime',
+        }, { status: 400 })
+      }
+
+      const combinedEnd = new Date(combinedStart.getTime() + duration * 60_000)
+      startISO = combinedStart.toISOString()
+      endISO = combinedEnd.toISOString()
+    } else if (body.startTime || body.endTime) {
+      const start = body.startTime ? new Date(body.startTime) : new Date(meeting.startTime)
+      const end = body.endTime ? new Date(body.endTime) : new Date(meeting.endTime)
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        return NextResponse.json({
+          success: false,
+          error: 'Invalid startTime or endTime',
+        }, { status: 400 })
+      }
+      startISO = start.toISOString()
+      endISO = end.toISOString()
+    }
+
+    // Validate date range (always using final values)
+    const startTime = startISO ? new Date(startISO) : new Date(meeting.startTime)
+    const endTime = endISO ? new Date(endISO) : new Date(meeting.endTime)
     if (endTime <= startTime) {
       return NextResponse.json({ 
         success: false, 
@@ -189,8 +235,8 @@ export async function PUT(
     if (body.description !== undefined) updateData.description = body.description
     if (body.meetingLink) updateData.meetingLink = body.meetingLink
     if (body.meetingType) updateData.meetingType = body.meetingType
-    if (body.startTime) updateData.startTime = toMySQLDatetime(body.startTime)
-    if (body.endTime) updateData.endTime = toMySQLDatetime(body.endTime)
+    if (startISO) updateData.startTime = toMySQLDatetime(startISO)
+    if (endISO) updateData.endTime = toMySQLDatetime(endISO)
     if (body.timezone) updateData.timezone = body.timezone
     if (body.status) updateData.status = body.status
     if (body.projectId !== undefined) updateData.projectId = body.projectId

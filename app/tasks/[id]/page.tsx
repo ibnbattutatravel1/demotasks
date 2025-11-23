@@ -120,7 +120,9 @@ export default function TaskDetailPage() {
   const [showAddSubtask, setShowAddSubtask] = useState(false)
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("")
   const [newSubtaskDueDate, setNewSubtaskDueDate] = useState("")
-  const [newSubtaskStatus, setNewSubtaskStatus] = useState<"todo" | "in-progress" | "review" | "done">("todo")
+  const [newSubtaskStatus, setNewSubtaskStatus] = useState<
+    "todo" | "in-progress" | "review" | "done" | "blocked" | "postponed"
+  >("todo")
   const [newSubtaskAssigneeIds, setNewSubtaskAssigneeIds] = useState<string[]>([])
   const [expandedSubtasks, setExpandedSubtasks] = useState<Record<string, boolean>>({})
   const [subtaskComments, setSubtaskComments] = useState<Record<string, string>>({})
@@ -250,7 +252,7 @@ export default function TaskDetailPage() {
 
   // Handlers moved to component scope (outside of loadUsers)
   const handleChangeTaskStatus = async (
-    status: "planning" | "todo" | "in-progress" | "review" | "done"
+    status: "planning" | "todo" | "in-progress" | "review" | "done" | "blocked" | "postponed"
   ) => {
     if (!task) return
     try {
@@ -270,7 +272,7 @@ export default function TaskDetailPage() {
 
   const handleChangeSubtaskStatus = async (
     subtaskId: string,
-    status: "planning" | "todo" | "in-progress" | "review" | "done"
+    status: "planning" | "todo" | "in-progress" | "review" | "done" | "blocked" | "postponed"
   ) => {
     try {
       // Sync completed checkbox: true if status is 'done', false otherwise
@@ -1075,6 +1077,8 @@ export default function TaskDetailPage() {
                           <option value="in-progress">In Progress</option>
                           <option value="review">Review</option>
                           <option value="done">Done</option>
+                          <option value="blocked">Blocked</option>
+                          <option value="postponed">Postponed</option>
                         </select>
                       </div>
                       {task?.createdBy && (
@@ -1504,6 +1508,8 @@ export default function TaskDetailPage() {
                         <option value="in-progress">In Progress</option>
                         <option value="review">Review</option>
                         <option value="done">Done</option>
+                        <option value="blocked">Blocked</option>
+                        <option value="postponed">Postponed</option>
                       </select>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1640,6 +1646,22 @@ export default function TaskDetailPage() {
                               />
                             </div>
                             <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-600">Status</span>
+                              <select
+                                className="h-6 text-[10px] border border-slate-300 rounded px-1 bg-white"
+                                value={subtask.status || 'todo'}
+                                onChange={(e) => handleChangeSubtaskStatus(subtask.id, e.target.value as any)}
+                              >
+                                <option value="planning">Planning</option>
+                                <option value="todo">To Do</option>
+                                <option value="in-progress">In Progress</option>
+                                <option value="review">Review</option>
+                                <option value="done">Done</option>
+                                <option value="blocked">Blocked</option>
+                                <option value="postponed">Postponed</option>
+                              </select>
+                            </div>
+                            <div className="flex items-center gap-2">
                               <Button
                                 size="sm"
                                 onClick={() => handleSaveSubtaskEdit(subtask.id)}
@@ -1682,6 +1704,8 @@ export default function TaskDetailPage() {
                                   <option value="in-progress">In Progress</option>
                                   <option value="review">Review</option>
                                   <option value="done">Done</option>
+                                  <option value="blocked">Blocked</option>
+                                  <option value="postponed">Postponed</option>
                                 </select>
                               </div>
                               {subtask.dueDate && !subtask.completed && isOverdue(subtask.dueDate) && (
