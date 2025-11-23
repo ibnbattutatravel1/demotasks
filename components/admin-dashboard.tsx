@@ -51,6 +51,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { useAuth } from "@/contexts/auth-context"
 import { CreateProjectDialog } from "@/components/create-project-dialog"
 import { formatDateOnly, isOverdue } from "@/lib/format-date"
+import { GanttChart } from "@/components/gantt-chart"
 
 type TeamStat = { name: string; tasksCreated: number; tasksCompleted: number; avatar?: string }
 
@@ -357,6 +358,20 @@ export function AdminDashboard() {
       project.tasks.some((task: any) => String(task.title || "").toLowerCase().includes(q))
     return priorityOk && queryOk
   })
+
+  const projectTimelineItems = filteredProjects.map((project) => ({
+    id: project.id,
+    label: project.name,
+    startDate: project.startDate,
+    endDate: project.dueDate || project.completedAt || project.startDate,
+    color: project.color || "#6366f1",
+    members: (project.team || []).map((member) => ({
+      id: member.id,
+      name: member.name,
+      avatar: (member as any).avatar,
+      initials: (member as any).initials,
+    })),
+  }))
 
   const allTasks = projects.flatMap((project) => project.tasks || [])
   const overdueTasks = allTasks.filter(
@@ -811,6 +826,17 @@ export function AdminDashboard() {
               </DropdownMenu>
             </div>
           </div>
+
+          <Card className="mb-6">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-slate-800">
+                Project Timeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <GanttChart items={projectTimelineItems} />
+            </CardContent>
+          </Card>
 
           <div className="space-y-4 px-6">
             {filteredProjects.length > 0 ? (

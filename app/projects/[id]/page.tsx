@@ -32,6 +32,7 @@ import {
 } from "lucide-react"
 import type { Project, Task, TeamMember } from "@/lib/types"
 import { formatDate } from "@/lib/format-date"
+import { GanttChart } from "@/components/gantt-chart"
 
 export default function ProjectDetailPage() {
   const router = useRouter()
@@ -166,6 +167,20 @@ export default function ProjectDetailPage() {
     const priorityMatch = priorityFilter === "all" || task.priority === priorityFilter
     return statusMatch && priorityMatch
   })
+
+  const taskTimelineItems = filteredTasks.map((task) => ({
+    id: task.id,
+    label: task.title,
+    startDate: task.startDate,
+    endDate: task.dueDate || task.completedAt || task.startDate,
+    color: project.color || "#6366f1",
+    members: (task.assignees || []).map((member) => ({
+      id: member.id,
+      name: member.name,
+      avatar: (member as any).avatar,
+      initials: (member as any).initials,
+    })),
+  }))
 
   const completedTasks = projectTasks.filter((task) => task.status === "done")
   const inProgressTasks = projectTasks.filter((task) => task.status === "in-progress")
@@ -480,6 +495,15 @@ export default function ProjectDetailPage() {
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Project Timeline</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <GanttChart items={taskTimelineItems} compact />
+            </CardContent>
+          </Card>
 
           {/* Tasks Section */}
           <div className="space-y-4">
