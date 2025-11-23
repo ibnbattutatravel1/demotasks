@@ -287,6 +287,18 @@ export function UserDashboard() {
     })
   }
 
+  const getTimeLabelForTask = (t: Task) => {
+    const due = new Date(t.dueDate)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    due.setHours(0, 0, 0, 0)
+    const diffDays = Math.floor((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    if (diffDays === 0) return "Due Today"
+    if (diffDays === 1) return "Due Tomorrow"
+    if (diffDays < 0) return "Overdue"
+    return `Due in ${diffDays} days`
+  }
+
   const getUpcomingEvents = () => {
     const today = new Date()
     const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
@@ -302,7 +314,7 @@ export function UserDashboard() {
         title: t.title,
         type: 'task' as const,
         date: t.dueDate,
-        time: 'Due',
+        time: getTimeLabelForTask(t),
         priority: t.priority,
         project: projects.find((p) => p.id === t.projectId)?.name || 'Project',
         progress: t.progress,
@@ -319,7 +331,7 @@ export function UserDashboard() {
         title: t.title,
         type: 'task' as const,
         date: t.dueDate,
-        time: 'Due',
+        time: getTimeLabelForTask(t),
         priority: t.priority,
         project: projects.find((p) => p.id === t.projectId)?.name || 'Project',
         progress: t.progress,

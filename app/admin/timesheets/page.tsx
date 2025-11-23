@@ -18,15 +18,17 @@ interface AdminRow {
   user?: { id: string; name: string; email: string }
 }
 
+type AdminStatusFilter = 'all' | AdminRow["status"]
+
 export default function AdminTimesheetsPage() {
   const { toast } = useToast()
   const router = useRouter()
-  const [status, setStatus] = useState<AdminRow["status"]>("submitted")
+  const [status, setStatus] = useState<AdminStatusFilter>("all")
   const [rows, setRows] = useState<AdminRow[]>([])
   const [loading, setLoading] = useState(false)
   const [actingId, setActingId] = useState<string | null>(null)
 
-  const load = async (s: AdminRow["status"]) => {
+  const load = async (s: AdminStatusFilter) => {
     try {
       setLoading(true)
       const res = await fetch(`/api/admin/timesheets?status=${encodeURIComponent(s)}`, { cache: "no-store" })
@@ -137,6 +139,7 @@ export default function AdminTimesheetsPage() {
                 value={status}
                 onChange={(e) => setStatus(e.target.value as any)}
               >
+                <option value="all">All</option>
                 <option value="submitted">Submitted</option>
                 <option value="returned">Returned</option>
                 <option value="approved">Approved</option>

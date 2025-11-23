@@ -68,11 +68,36 @@ export async function sendMeetingEmail(
     const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER
     const fromName = 'Taskara Meetings'
 
+    const ics = generateICS({
+      title: data.meetingTitle,
+      description: data.meetingDescription || '',
+      start: data.startTime,
+      end: data.endTime,
+      organizerName: data.organizerName,
+      organizerEmail: fromEmail || '',
+      attendeeName: data.toName,
+      attendeeEmail: data.to,
+      location: data.meetingLink || 'Online'
+    })
+
     const result = await transporter.sendMail({
       from: `${fromName} <${fromEmail}>`,
       to: data.to,
       subject,
       html,
+      alternatives: [
+        {
+          content: ics,
+          contentType: 'text/calendar; charset=UTF-8; method=REQUEST'
+        }
+      ],
+      attachments: [
+        {
+          filename: 'invite.ics',
+          content: ics,
+          contentType: 'text/calendar'
+        }
+      ]
     })
 
     console.log('✅ Email sent successfully:', { to: data.to, subject, messageId: result.messageId })
@@ -482,5 +507,48 @@ function getMeetingEmailTemplate(type: string, data: MeetingEmailData) {
         subject: 'Meeting Notification',
         html: '<p>Meeting notification</p>'
       }
-  }
+}
+
+function formatICSDate(isoString: string): string {
+  const d = new Date(isoString)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`
+}
+
+function generateICS(opts: {
+  title: string
+  description: string
+  start: string
+  end: string
+  organizerName: string
+  organizerEmail: string
+  attendeeName: string
+  attendeeEmail: string
+  location: string
+}): string {
+  const uid = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const dtstamp = formatICSDate(new Date().toISOString())
+  const dtstart = formatICSDate(opts.start)
+  const dtend = formatICSDate(opts.end)
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Taskara//Meeting//EN',
+    'METHOD:REQUEST',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTAMP:${dtstamp}`,
+    `DTSTART:${dtstart}`,
+    `DTEND:${dtend}`,
+    `SUMMARY:${opts.title}`,
+    `DESCRIPTION:${opts.description}`,
+    `LOCATION:${opts.location}`,
+    `ORGANIZER;CN=${opts.organizerName}:MAILTO:${opts.organizerEmail}`,
+    `ATTENDEE;CN=${opts.attendeeName};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION:MAILTO:${opts.attendeeEmail}`,
+    'STATUS:CONFIRMED',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ]
+  return lines.join('\r\n')
+}
 }

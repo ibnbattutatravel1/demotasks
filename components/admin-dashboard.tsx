@@ -62,6 +62,7 @@ export function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeFilter, setActiveFilter] = useState("all")
+  const [statusFilter, setStatusFilter] = useState<'all' | Project["status"]>("all")
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({})
   const [query, setQuery] = useState("")
   const [submittedTimesheetsCount, setSubmittedTimesheetsCount] = useState(0)
@@ -352,11 +353,12 @@ export function AdminDashboard() {
   const filteredProjects = projects.filter((project) => {
     const q = query.trim().toLowerCase()
     const priorityOk = activeFilter === "all" || project.tasks.some((task: any) => task.priority === activeFilter)
+    const statusOk = statusFilter === 'all' || project.status === statusFilter
     const queryOk =
       !q ||
       project.name.toLowerCase().includes(q) ||
       project.tasks.some((task: any) => String(task.title || "").toLowerCase().includes(q))
-    return priorityOk && queryOk
+    return priorityOk && statusOk && queryOk
   })
 
   const projectTimelineItems = filteredProjects.map((project) => ({
@@ -774,13 +776,7 @@ export function AdminDashboard() {
                 variant="outline"
                 className={`bg-${filteredProjects.length > 0 ? filteredProjects[0].color : "indigo"}-50 text-${filteredProjects.length > 0 ? filteredProjects[0].color : "indigo"}-700 border-${filteredProjects.length > 0 ? filteredProjects[0].color : "indigo"}-200`}
               >
-                {filteredProjects.length} {activeFilter !== "all" ? `${activeFilter} priority` : "active"} projects
-              </Badge>
-              <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-                {filteredPendingTasks.length} pending approval
-              </Badge>
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                {getApprovedTasks().length} in progress
+                {filteredProjects.length} projects
               </Badge>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -822,6 +818,30 @@ export function AdminDashboard() {
                       <span className={activeFilter !== "low" ? "ml-6" : ""}>Low Priority</span>
                     </div>
                   </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Badge
+                    variant={statusFilter !== "all" ? "default" : "outline"}
+                    className="flex items-center gap-1 cursor-pointer hover:bg-slate-100"
+                  >
+                    <Filter className="h-3 w-3" />
+                    {statusFilter === "all" ? "All Statuses" : `${statusFilter.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase())}`}
+                    <ChevronDown className="h-3 w-3" />
+                  </Badge>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {['all','planning','in-progress','review','completed','on-hold'].map((s) => (
+                    <DropdownMenuItem key={s} onClick={() => setStatusFilter(s as any)}>
+                      <div className="flex items-center gap-2">
+                        {statusFilter === s && <Check className="h-4 w-4" />}
+                        <span className={statusFilter !== s ? "ml-6" : ""}>{s === 'all' ? 'All Statuses' : s.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

@@ -25,3 +25,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ success: false, error: 'Failed to update notification' }, { status: 500 })
   }
 }
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params
+    const token = req.cookies.get(AUTH_COOKIE)?.value
+    if (!token) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const payload = await verifyAuthToken(token).catch(() => null)
+    if (!payload?.sub) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+
+    const rows = await db.select().from(dbSchema.notifications).where(eq(dbSchema.notifications.id, id))
+    if (!rows.length) return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 })
+    const notif = rows[0]
+    if (notif.userId !== payload.sub) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+
+    await db.delete(dbSchema.notifications).where(eq(dbSchema.notifications.id, id))
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('DELETE /api/notifications/[id] error', error)
+    return NextResponse.json({ success: false, error: 'Failed to delete notification' }, { status: 500 })
+  }
+}

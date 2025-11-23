@@ -16,9 +16,9 @@ export async function GET(req: NextRequest) {
     if (!me || me.role !== 'admin') return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
 
     const { searchParams } = new URL(req.url)
-    const status = (searchParams.get('status') || 'submitted') as 'submitted' | 'returned' | 'approved' | 'rejected'
+    const statusParam = (searchParams.get('status') || 'all') as 'all' | 'submitted' | 'returned' | 'approved' | 'rejected'
 
-    const rows = await db
+    let rowsQuery = db
       .select({
         id: dbSchema.timesheets.id,
         month: dbSchema.timesheets.month,
@@ -27,7 +27,12 @@ export async function GET(req: NextRequest) {
         submittedAt: dbSchema.timesheets.submittedAt,
       })
       .from(dbSchema.timesheets)
-      .where(eq(dbSchema.timesheets.status, status))
+
+    if (statusParam !== 'all') {
+      rowsQuery = rowsQuery.where(eq(dbSchema.timesheets.status, statusParam)) as any
+    }
+
+    const rows = await rowsQuery
 
     // Attach user name
     const userIds = Array.from(new Set(rows.map(r => r.userId)))

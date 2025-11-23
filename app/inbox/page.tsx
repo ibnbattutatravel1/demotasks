@@ -197,6 +197,32 @@ export default function InboxPage() {
               <AvatarImage src={user?.role === "admin" ? "/diverse-woman-portrait.png" : "/thoughtful-man.png"} />
               <AvatarFallback>{user?.name?.[0] || "U"}</AvatarFallback>
             </Avatar>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                const unread = items.filter((i) => !i.isRead)
+                setItems((prev) => prev.map((i) => ({ ...i, isRead: true })))
+                try {
+                  await Promise.all(unread.map((i) => fetch(`/api/notifications/${encodeURIComponent(i.id)}`, { method: 'PATCH' })))
+                } catch {}
+              }}
+            >
+              Mark All as Read
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                const readIds = items.filter((i) => i.isRead).map((i) => i.id)
+                setItems((prev) => prev.filter((i) => !i.isRead))
+                try {
+                  await fetch('/api/notifications', { method: 'DELETE' })
+                } catch {}
+              }}
+            >
+              Clear Read
+            </Button>
           </div>
         </div>
       </div>

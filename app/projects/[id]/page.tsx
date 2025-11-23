@@ -133,6 +133,9 @@ export default function ProjectDetailPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("list")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [priorityFilter, setPriorityFilter] = useState<string>("all")
+  const [notes, setNotes] = useState<any[]>([])
+  const [documents, setDocuments] = useState<any[]>([])
+  const [loadingWorkspace, setLoadingWorkspace] = useState(false)
 
   // Handler for inline status change
   const handleChangeProjectStatus = async (status: "planning" | "active" | "on-hold" | "completed" | "archived") => {
@@ -153,6 +156,28 @@ export default function ProjectDetailPage() {
       toast({ title: 'Update failed', description: e?.message || 'Could not update status', variant: 'destructive' })
     }
   }
+
+  useEffect(() => {
+    const loadWorkspace = async () => {
+      if (!projectId) return
+      try {
+        setLoadingWorkspace(true)
+        const [notesRes, docsRes] = await Promise.all([
+          fetch(`/api/projects/${projectId}/notes`),
+          fetch(`/api/projects/${projectId}/documents`),
+        ])
+        const notesJson = await notesRes.json()
+        const docsJson = await docsRes.json()
+        if (notesRes.ok && notesJson.success) setNotes(notesJson.data || [])
+        if (docsRes.ok && docsJson.success) setDocuments(docsJson.data || [])
+      } catch (e) {
+        console.error('Failed to load workspace preview', e)
+      } finally {
+        setLoadingWorkspace(false)
+      }
+    }
+    loadWorkspace()
+  }, [projectId])
 
   if (loading) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center">Loading...</div>
@@ -507,180 +532,205 @@ export default function ProjectDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Tasks Section */}
-          <div className="space-y-4">
-            {/* View Toggle */}
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Project Tasks ({filteredTasks.length})</h2>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant={viewMode === "grid" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setViewMode("grid")}
-                >
-                  <Grid3X3 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={viewMode === "list" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setViewMode("list")}
-                >
-                  <List className="h-4 w-4" />
-                </Button>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-slate-900">Project Tasks ({filteredTasks.length})</h2>
+                <div className="flex items-center gap-2">
+                  <Button variant={viewMode === "grid" ? "default" : "outline"} size="sm" onClick={() => setViewMode("grid")}>
+                    <Grid3X3 className="h-4 w-4" />
+                  </Button>
+                  <Button variant={viewMode === "list" ? "default" : "outline"} size="sm" onClick={() => setViewMode("list")}>
+                    <List className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-            </div>
-
-            {/* Tasks Display */}
-            {viewMode === "grid" ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredTasks.map((task) => (
-                  <Card
-                    key={task.id}
-                    className="hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => router.push(`/tasks/${task.id}`)}
-                  >
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(task.status)}
-                          <CardTitle className="text-base">{task.title}</CardTitle>
-                        </div>
-                        <Badge variant={task.priority === "high" ? "destructive" : "secondary"} className="text-xs">
-                          {task.priority}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="text-sm text-slate-600">
-                        <Dialog>
-                          {(() => {
-                            const { display, truncated } = getTruncatedDescription(task.description || "")
-                            return (
-                              <>
-                                <p className="whitespace-pre-wrap break-words">
-                                  {display}
-                                  {truncated && (
-                                    <>
-                                      {" "}
-                                      <DialogTrigger asChild>
-                                        <Button
-                                          variant="link"
-                                          className="px-0 h-auto align-baseline text-indigo-600"
-                                          onClick={(e) => e.stopPropagation()}
-                                        >
-                                          Read more
-                                        </Button>
-                                      </DialogTrigger>
-                                    </>
-                                  )}
-                                </p>
-                                <DialogContent className="sm:max-w-2xl">
-                                  <DialogHeader>
-                                    <DialogTitle>Description</DialogTitle>
-                                    <DialogDescription>Full task description</DialogDescription>
-                                  </DialogHeader>
-                                  <div className="max-h-[70vh] overflow-y-auto whitespace-pre-wrap break-words text-slate-700">
-                                    {task.description || "No description"}
-                                  </div>
-                                </DialogContent>
-                              </>
-                            )
-                          })()}
-                        </Dialog>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex -space-x-2">
-                          {task.assignees.slice(0, 2).map((member) => (
-                            <Avatar key={member.id} className="h-6 w-6 border-2 border-white">
-                              <AvatarImage src={member.avatar || "/placeholder-user.jpg"} />
-                              <AvatarFallback className="text-xs">{member.initials || (member.name?.[0] || 'U')}</AvatarFallback>
-                            </Avatar>
-                          ))}
-                        </div>
-                        <span className="text-xs text-slate-500">{formatDate(task.dueDate, 'short')}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="p-0">
-                  <div className="divide-y divide-slate-200">
-                    {filteredTasks.map((task) => (
-                      <div
-                        key={task.id}
-                        className="p-4 hover:bg-slate-50 transition-colors cursor-pointer"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          router.push(`/tasks/${task.id}`)
-                        }}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3 flex-1">
+              {viewMode === "grid" ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+                  {filteredTasks.map((task) => (
+                    <Card key={task.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push(`/tasks/${task.id}`)}>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2">
                             {getStatusIcon(task.status)}
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-medium text-slate-900">{task.title}</h3>
-                              <div className="text-sm text-slate-600 mt-1">
-                                <Dialog>
-                                  {(() => {
-                                    const { display, truncated } = getTruncatedDescription(task.description || "")
-                                    return (
+                            <CardTitle className="text-base">{task.title}</CardTitle>
+                          </div>
+                          <Badge variant={task.priority === "high" ? "destructive" : "secondary"} className="text-xs">
+                            {task.priority}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="text-sm text-slate-600">
+                          <Dialog>
+                            {(() => {
+                              const { display, truncated } = getTruncatedDescription(task.description || "")
+                              return (
+                                <>
+                                  <p className="whitespace-pre-wrap break-words">
+                                    {display}
+                                    {truncated && (
                                       <>
-                                        <p className="whitespace-pre-wrap break-words">
-                                          {display}
-                                          {truncated && (
-                                            <>
-                                              {" "}
-                                              <DialogTrigger asChild>
-                                                <Button
-                                                  variant="link"
-                                                  className="px-0 h-auto align-baseline text-indigo-600"
-                                                  onClick={(e) => e.stopPropagation()}
-                                                >
-                                                  Read more
-                                                </Button>
-                                              </DialogTrigger>
-                                            </>
-                                          )}
-                                        </p>
-                                        <DialogContent className="sm:max-w-2xl">
-                                          <DialogHeader>
-                                            <DialogTitle>Description</DialogTitle>
-                                            <DialogDescription>Full task description</DialogDescription>
-                                          </DialogHeader>
-                                          <div className="max-h-[70vh] overflow-y-auto whitespace-pre-wrap break-words text-slate-700">
-                                            {task.description || "No description"}
-                                          </div>
-                                        </DialogContent>
+                                        {" "}
+                                        <DialogTrigger asChild>
+                                          <Button variant="link" className="px-0 h-auto align-baseline text-indigo-600" onClick={(e) => e.stopPropagation()}>
+                                            Read more
+                                          </Button>
+                                        </DialogTrigger>
                                       </>
-                                    )
-                                  })()}
-                                </Dialog>
+                                    )}
+                                  </p>
+                                  <DialogContent className="sm:max-w-2xl">
+                                    <DialogHeader>
+                                      <DialogTitle>Description</DialogTitle>
+                                      <DialogDescription>Full task description</DialogDescription>
+                                    </DialogHeader>
+                                    <div className="max-h-[70vh] overflow-y-auto whitespace-pre-wrap break-words text-slate-700">
+                                      {task.description || "No description"}
+                                    </div>
+                                  </DialogContent>
+                                </>
+                              )
+                            })()}
+                          </Dialog>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex -space-x-2">
+                            {task.assignees.slice(0, 2).map((member) => (
+                              <Avatar key={member.id} className="h-6 w-6 border-2 border-white">
+                                <AvatarImage src={member.avatar || "/placeholder-user.jpg"} />
+                                <AvatarFallback className="text-xs">{member.initials || (member.name?.[0] || 'U')}</AvatarFallback>
+                              </Avatar>
+                            ))}
+                          </div>
+                          <span className="text-xs text-slate-500">{formatDate(task.dueDate, 'short')}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="p-0">
+                    <div className="divide-y divide-slate-200">
+                      {filteredTasks.map((task) => (
+                        <div key={task.id} className="p-4 hover:bg-slate-50 transition-colors cursor-pointer" onClick={(e) => { e.stopPropagation(); router.push(`/tasks/${task.id}`) }}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 flex-1">
+                              {getStatusIcon(task.status)}
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-medium text-slate-900">{task.title}</h3>
+                                <div className="text-sm text-slate-600 mt-1">
+                                  <Dialog>
+                                    {(() => {
+                                      const { display, truncated } = getTruncatedDescription(task.description || "")
+                                      return (
+                                        <>
+                                          <p className="whitespace-pre-wrap break-words">
+                                            {display}
+                                            {truncated && (
+                                              <>
+                                                {" "}
+                                                <DialogTrigger asChild>
+                                                  <Button variant="link" className="px-0 h-auto align-baseline text-indigo-600" onClick={(e) => e.stopPropagation()}>
+                                                    Read more
+                                                  </Button>
+                                                </DialogTrigger>
+                                              </>
+                                            )}
+                                          </p>
+                                          <DialogContent className="sm:max-w-2xl">
+                                            <DialogHeader>
+                                              <DialogTitle>Description</DialogTitle>
+                                              <DialogDescription>Full task description</DialogDescription>
+                                            </DialogHeader>
+                                            <div className="max-h-[70vh] overflow-y-auto whitespace-pre-wrap break-words text-slate-700">
+                                              {task.description || "No description"}
+                                            </div>
+                                          </DialogContent>
+                                        </>
+                                      )
+                                    })()}
+                                  </Dialog>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="flex -space-x-2">
-                              {task.assignees.slice(0, 2).map((member) => (
-                                <Avatar key={member.id} className="h-6 w-6 border-2 border-white">
-                                  <AvatarImage src={member.avatar || "/placeholder-user.jpg"} />
-                                  <AvatarFallback className="text-xs">{member.initials || (member.name?.[0] || 'U')}</AvatarFallback>
-                                </Avatar>
-                              ))}
+                            <div className="flex items-center gap-4">
+                              <div className="flex -space-x-2">
+                                {task.assignees.slice(0, 2).map((member) => (
+                                  <Avatar key={member.id} className="h-6 w-6 border-2 border-white">
+                                    <AvatarImage src={member.avatar || "/placeholder-user.jpg"} />
+                                    <AvatarFallback className="text-xs">{member.initials || (member.name?.[0] || 'U')}</AvatarFallback>
+                                  </Avatar>
+                                ))}
+                              </div>
+                              <Badge variant={task.priority === "high" ? "destructive" : "secondary"} className="text-xs">{task.priority}</Badge>
+                              <span className="text-xs text-slate-500 min-w-0">{formatDate(task.dueDate, 'short')}</span>
                             </div>
-                            <Badge variant={task.priority === "high" ? "destructive" : "secondary"} className="text-xs">
-                              {task.priority}
-                            </Badge>
-                            <span className="text-xs text-slate-500 min-w-0">{formatDate(task.dueDate, 'short')}</span>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-indigo-500" />
+                      <CardTitle className="text-base">Workspace</CardTitle>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => router.push(`/projects/${projectId}/workspace`)}>
+                      Open Workspace
+                    </Button>
                   </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {loadingWorkspace ? (
+                    <div className="text-sm text-slate-600">Loading...</div>
+                  ) : (
+                    <>
+                      <div>
+                        <h4 className="font-medium text-slate-900 mb-2">Pinned Notes</h4>
+                        {notes.filter((n) => n.isPinned).length === 0 ? (
+                          <p className="text-sm text-slate-500">No pinned notes</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {notes.filter((n) => n.isPinned).slice(0, 3).map((note: any) => (
+                              <div key={note.id} className="p-3 bg-slate-50 rounded-lg">
+                                <p className="text-sm font-medium text-slate-900">{note.title}</p>
+                                <p className="text-xs text-slate-600 line-clamp-2">{note.content}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-slate-900 mb-2">Recent Documents</h4>
+                        {documents.length === 0 ? (
+                          <p className="text-sm text-slate-500">No documents uploaded</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {documents.slice(0, 5).map((doc: any) => (
+                              <div key={doc.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-slate-500" />
+                                  <span className="text-sm text-slate-700 truncate max-w-[160px]">{doc.name}</span>
+                                </div>
+                                <span className="text-xs text-slate-500">{formatDate(doc.uploadedAt, 'short')}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
-            )}
+            </div>
           </div>
 
           {/* Team Members Section */}
