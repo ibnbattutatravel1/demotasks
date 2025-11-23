@@ -3,6 +3,18 @@
     {
       "path": "/api/cron/questionnaire-reminders",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/due-reminders",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-summary",
+      "schedule": "0 20 * * SUN"
+    },
+    {
+      "path": "/api/cron/weekly-planning",
+      "schedule": "0 7 * * MON"
     }
   ]
 }
