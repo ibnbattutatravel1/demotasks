@@ -109,6 +109,71 @@ export async function sendMeetingEmail(
   }
 }
 
+function toICSDate(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const y = d.getUTCFullYear()
+  const m = pad(d.getUTCMonth() + 1)
+  const day = pad(d.getUTCDate())
+  const h = pad(d.getUTCHours())
+  const min = pad(d.getUTCMinutes())
+  const s = pad(d.getUTCSeconds())
+  return `${y}${m}${day}T${h}${min}${s}Z`
+}
+
+function escapeICS(text: string): string {
+  return (text || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '')
+    .replace(/,/g, '\\,')
+    .replace(/;/g, '\\;')
+}
+
+function generateICS(opts: {
+  title: string
+  description: string
+  start: string
+  end: string
+  organizerName?: string
+  organizerEmail: string
+  attendeeName?: string
+  attendeeEmail?: string
+  location?: string
+}): string {
+  const uid = `taskara-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const dtstamp = toICSDate(new Date().toISOString())
+  const dtstart = toICSDate(opts.start)
+  const dtend = toICSDate(opts.end)
+  const organizerCN = escapeICS(opts.organizerName || 'Organizer')
+  const attendeeCN = escapeICS(opts.attendeeName || 'Attendee')
+  const summary = escapeICS(opts.title)
+  const description = escapeICS(opts.description)
+  const location = escapeICS(opts.location || '')
+
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'PRODID:-//Taskara//Meetings//EN',
+    'VERSION:2.0',
+    'CALSCALE:GREGORIAN',
+    'METHOD:REQUEST',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTAMP:${dtstamp}`,
+    `DTSTART:${dtstart}`,
+    `DTEND:${dtend}`,
+    `SUMMARY:${summary}`,
+    `DESCRIPTION:${description}`,
+    `ORGANIZER;CN=${organizerCN}:MAILTO:${opts.organizerEmail}`,
+    opts.attendeeEmail ? `ATTENDEE;CN=${attendeeCN};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:MAILTO:${opts.attendeeEmail}` : '',
+    location ? `LOCATION:${location}` : '',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].filter(Boolean)
+
+  return lines.join('\r\n')
+}
+
 function formatDateTime(isoString: string, timezone: string = 'UTC'): string {
   const date = new Date(isoString)
   const options: Intl.DateTimeFormatOptions = {

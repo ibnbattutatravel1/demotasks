@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { Search, Menu, LogOut, Settings, User, Plus, Inbox, Calendar, BarChart3 } from "lucide-react"
+import { Menu, LogOut, Settings, User, Plus, Inbox, Calendar, BarChart3, FolderPlus } from "lucide-react"
 import { useState } from "react"
 
 export function AppHeader() {
@@ -48,13 +48,13 @@ export function AppHeader() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="relative hidden sm:block">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input placeholder="Search…" className="pl-10 w-40 md:w-64 lg:w-80" />
-          </div>
           <Button size="sm" className="hidden sm:inline-flex bg-indigo-500 hover:bg-indigo-600" onClick={() => go("/tasks/new")}> 
             <Plus className="h-4 w-4 mr-2" />
-            New
+            New Task
+          </Button>
+          <Button size="sm" variant="outline" className="hidden sm:inline-flex" onClick={() => go("/projects/new")}>
+            <FolderPlus className="h-4 w-4 mr-2" />
+            New Project
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -109,6 +109,7 @@ export function AppHeader() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Button size="sm" className="flex-1" onClick={() => go("/tasks/new")}>New Task</Button>
+                  <Button size="sm" variant="outline" className="flex-1" onClick={() => go("/projects/new")}>New Project</Button>
                   <Button variant="outline" size="sm" className="flex-1" onClick={() => go("/reports")}>Reports</Button>
                 </div>
               </div>

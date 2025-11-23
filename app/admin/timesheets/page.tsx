@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Filter, SortDesc, SortAsc, Search } from "lucide-react"
 // Using a native <select> for status filter
 import { useToast } from "@/hooks/use-toast"
 
@@ -27,6 +27,11 @@ export default function AdminTimesheetsPage() {
   const [rows, setRows] = useState<AdminRow[]>([])
   const [loading, setLoading] = useState(false)
   const [actingId, setActingId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [monthFilter, setMonthFilter] = useState<"all"|"this_month"|"last_month"|"custom">("all")
+  const [customMonth, setCustomMonth] = useState("")
+  const [needsApprovalOnly, setNeedsApprovalOnly] = useState(false)
+  const [sortOrder, setSortOrder] = useState<"priority"|"newest"|"oldest">("priority")
 
   const load = async (s: AdminStatusFilter) => {
     try {
@@ -46,6 +51,55 @@ export default function AdminTimesheetsPage() {
     load(status)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status])
+
+  const filteredSorted = useMemo(() => {
+    const now = new Date()
+    const ym = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+    const currentMonth = ym(now)
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth()-1, 1)
+    const lastMonth = ym(lastMonthDate)
+
+    const matchesMonth = (m?: string) => {
+      if (!m) return monthFilter === "all"
+      if (monthFilter === "all") return true
+      if (monthFilter === "this_month") return m === currentMonth
+      if (monthFilter === "last_month") return m === lastMonth
+      if (monthFilter === "custom") return !!customMonth && m === customMonth
+      return true
+    }
+
+    const matchesApproval = (s: AdminRow["status"]) => {
+      if (!needsApprovalOnly) return true
+      return s === "submitted" || s === "returned"
+    }
+
+    const matchesSearch = (r: AdminRow) => {
+      if (!searchQuery.trim()) return true
+      const q = searchQuery.toLowerCase()
+      return (
+        (r.user?.name || "").toLowerCase().includes(q) ||
+        (r.user?.email || "").toLowerCase().includes(q) ||
+        (r.month || "").toLowerCase().includes(q)
+      )
+    }
+
+    const filtered = rows.filter(r => matchesMonth(r.month) && matchesApproval(r.status) && matchesSearch(r))
+
+    const getPriority = (s: AdminRow["status"]) => (s === "submitted" || s === "returned") ? 0 : 1
+    const getTime = (t?: string) => t ? new Date(t).getTime() : 0
+
+    const sorted = [...filtered].sort((a,b) => {
+      if (sortOrder === "priority") {
+        const pa = getPriority(a.status), pb = getPriority(b.status)
+        if (pa !== pb) return pa - pb
+        return getTime(b.submittedAt) - getTime(a.submittedAt)
+      }
+      if (sortOrder === "newest") return getTime(b.submittedAt) - getTime(a.submittedAt)
+      return getTime(a.submittedAt) - getTime(b.submittedAt)
+    })
+
+    return sorted
+  }, [rows, searchQuery, monthFilter, customMonth, needsApprovalOnly, sortOrder])
 
   const handleApprove = async (id: string) => {
     try {
@@ -111,7 +165,7 @@ export default function AdminTimesheetsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="border-b bg-white border-slate-200 px-6 py-4">
+      <div className="border-b bg-white border-slate-200 px-4 sm:px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button
@@ -125,7 +179,7 @@ export default function AdminTimesheetsPage() {
             </Button>
             <h1 className="text-xl font-semibold text-slate-900">Timesheets Review</h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap justify-end">
             <Button
               variant="outline"
               size="sm"
@@ -146,6 +200,54 @@ export default function AdminTimesheetsPage() {
                 <option value="rejected">Rejected</option>
               </select>
             </div>
+            <div className="w-48">
+              <select
+                className="w-full h-10 border border-slate-300 rounded-md px-3 bg-white text-sm"
+                value={monthFilter}
+                onChange={(e) => setMonthFilter(e.target.value as any)}
+              >
+                <option value="all">All Months</option>
+                <option value="this_month">This Month</option>
+                <option value="last_month">Last Month</option>
+                <option value="custom">Custom Month</option>
+              </select>
+            </div>
+            {monthFilter === "custom" && (
+              <input
+                type="month"
+                className="h-10 border border-slate-300 rounded-md px-3 bg-white text-sm"
+                value={customMonth}
+                onChange={(e) => setCustomMonth(e.target.value)}
+              />
+            )}
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={needsApprovalOnly}
+                onChange={(e) => setNeedsApprovalOnly(e.target.checked)}
+              />
+              Needs Approval Only
+            </label>
+            <div className="w-40">
+              <select
+                className="w-full h-10 border border-slate-300 rounded-md px-3 bg-white text-sm"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as any)}
+              >
+                <option value="priority">Priority (Pending first, newest)</option>
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+              </select>
+            </div>
+            <div className="relative w-full max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                className="pl-9 h-10 border border-slate-300 rounded-md px-3 bg-white text-sm w-full"
+                placeholder="Search by name, email or month..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -157,7 +259,7 @@ export default function AdminTimesheetsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {rows.map((r) => (
+              {filteredSorted.map((r) => (
                 <div key={r.id} className="p-3 bg-white border rounded-md flex items-center justify-between">
                   <div>
                     <div className="text-sm font-medium text-slate-900">{r.user?.name || r.userId}</div>
