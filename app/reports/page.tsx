@@ -23,31 +23,16 @@ import {
 
 const reportData = {
   overview: {
-    totalTasks: 156,
-    completedTasks: 89,
-    overdueTasks: 12,
-    activeUsers: 24,
-    completionRate: 57,
-    avgCompletionTime: 3.2,
+    totalTasks: 0,
+    completedTasks: 0,
+    overdueTasks: 0,
+    activeUsers: 0,
+    completionRate: 0,
+    avgCompletionTime: 0,
   },
-  weeklyProgress: [
-    { week: "Week 1", completed: 18, created: 25 },
-    { week: "Week 2", completed: 22, created: 20 },
-    { week: "Week 3", completed: 15, created: 28 },
-    { week: "Week 4", completed: 34, created: 30 },
-  ],
-  topPerformers: [
-    { name: "Alice Johnson", completed: 24, avatar: "/diverse-woman-portrait.png" },
-    { name: "Bob Smith", completed: 19, avatar: "/thoughtful-man.png" },
-    { name: "Charlie Brown", completed: 16, avatar: "/developer-working.png" },
-  ],
-  tasksByCategory: [
-    { category: "Design", count: 45, percentage: 29 },
-    { category: "Development", count: 38, percentage: 24 },
-    { category: "Testing", count: 32, percentage: 21 },
-    { category: "Planning", count: 25, percentage: 16 },
-    { category: "Other", count: 16, percentage: 10 },
-  ],
+  weeklyProgress: [] as { week: string; completed: number; created: number }[],
+  topPerformers: [] as { name: string; completed: number; avatar?: string }[],
+  tasksByCategory: [] as { category: string; count: number; percentage: number }[],
 }
 
 export default function ReportsPage() {
@@ -371,7 +356,7 @@ export default function ReportsPage() {
                 <span className="text-2xl font-bold text-slate-900">{report.overview.totalTasks}</span>
                 <CheckCircle2 className="h-5 w-5 text-indigo-500" />
               </div>
-              <p className="text-xs text-slate-500 mt-1">+12% from last month</p>
+              <p className="text-xs text-slate-500 mt-1">Workspace-wide total tasks</p>
             </CardContent>
           </Card>
 
@@ -384,7 +369,7 @@ export default function ReportsPage() {
                 <span className="text-2xl font-bold text-green-600">{report.overview.completedTasks}</span>
                 <TrendingUp className="h-5 w-5 text-green-500" />
               </div>
-              <p className="text-xs text-slate-500 mt-1">+8% from last month</p>
+              <p className="text-xs text-slate-500 mt-1">Total completed tasks (all time)</p>
             </CardContent>
           </Card>
 
@@ -397,7 +382,7 @@ export default function ReportsPage() {
                 <span className="text-2xl font-bold text-red-600">{report.overview.overdueTasks}</span>
                 <AlertTriangle className="h-5 w-5 text-red-500" />
               </div>
-              <p className="text-xs text-slate-500 mt-1">-3% from last month</p>
+              <p className="text-xs text-slate-500 mt-1">Tasks past their due date</p>
             </CardContent>
           </Card>
 
@@ -410,7 +395,7 @@ export default function ReportsPage() {
                 <span className="text-2xl font-bold text-blue-600">{report.overview.activeUsers}</span>
                 <Users className="h-5 w-5 text-blue-500" />
               </div>
-              <p className="text-xs text-slate-500 mt-1">+5% from last month</p>
+              <p className="text-xs text-slate-500 mt-1">Unique assignees in the selected period</p>
             </CardContent>
           </Card>
         </div>
@@ -497,7 +482,7 @@ export default function ReportsPage() {
                 <Progress value={report.overview.completionRate} className="h-3" />
                 <div className="flex items-center justify-center gap-2 text-sm">
                   <TrendingUp className="h-4 w-4 text-green-500" />
-                  <span className="text-green-600">+5% from last month</span>
+                  <span className="text-slate-600">Based on all workspace tasks</span>
                 </div>
               </div>
             </CardContent>
