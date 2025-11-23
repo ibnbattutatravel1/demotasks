@@ -169,7 +169,7 @@ export default function InboxPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4">
+      <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" onClick={handleBackToDashboard}>
@@ -184,11 +184,11 @@ export default function InboxPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="relative">
+            <div className="relative w-full max-w-xs sm:max-w-none">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
                 placeholder="Search notifications..."
-                className="pl-10 w-80"
+                className="pl-10 w-full sm:w-64 lg:w-80"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />

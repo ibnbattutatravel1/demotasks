@@ -340,9 +340,9 @@ export function UserDashboard() {
   }
 
   return (
-    <div className="h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row">
       {/* Left Navigation Rail */}
-      <div className="w-[280px] bg-white border-r border-slate-200 flex flex-col">
+      <div className="w-full lg:w-[280px] bg-white border-b lg:border-b-0 lg:border-r border-slate-200 flex flex-col">
         {/* Workspace Switcher */}
         <div className="p-4 border-b border-slate-200">
           <Button variant="ghost" className="w-full justify-between h-10 px-3" onClick={handleDashboardNavigation}>
@@ -527,7 +527,7 @@ export function UserDashboard() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   placeholder="Search my projects and tasks..."
-                  className="pl-10 w-80"
+                  className="pl-10 w-full sm:w-64 lg:w-80"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />

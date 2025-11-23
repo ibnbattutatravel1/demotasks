@@ -141,9 +141,9 @@ export function TaskDashboard() {
   }
 
   return (
-    <div className="h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row">
       {/* Left Navigation Rail */}
-      <div className="w-[280px] bg-white border-r border-slate-200 flex flex-col">
+      <div className="w-full lg:w-[280px] bg-white border-b lg:border-b-0 lg:border-r border-slate-200 flex flex-col">
         {/* Workspace Switcher */}
         <div className="p-4 border-b border-slate-200">
           <Button variant="ghost" className="w-full justify-between h-10 px-3">
@@ -269,7 +269,7 @@ export function TaskDashboard() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
         {/* Top Bar */}
-        <div className="bg-white border-b border-slate-200 px-6 py-4">
+        <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
@@ -286,11 +286,11 @@ export function TaskDashboard() {
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="relative">
+              <div className="relative w-full max-w-xs sm:max-w-none">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   placeholder="Search tasks..."
-                  className="pl-10 w-80"
+                  className="pl-10 w-full sm:w-64 lg:w-80"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />

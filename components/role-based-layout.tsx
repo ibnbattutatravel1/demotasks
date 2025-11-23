@@ -5,6 +5,8 @@ import { useAuth } from "@/contexts/auth-context"
 import { TaskApprovalNotifications } from "@/components/task-approval-notifications"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
+import { AppHeader } from "@/components/app-header"
+import { AppFooter } from "@/components/app-footer"
 
 interface RoleBasedLayoutProps {
   children: React.ReactNode
@@ -50,14 +52,17 @@ export function RoleBasedLayout({ children }: RoleBasedLayoutProps) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Role-specific notifications */}
       {(user?.role === "user" || user?.role === "admin") && (
-        <div className="fixed top-4 right-4 z-50 w-80">
+        <div className="fixed top-4 right-4 z-50 w-full max-w-xs sm:w-80">
           <TaskApprovalNotifications />
         </div>
       )}
 
+      <AppHeader />
+
       {children}
+
+      <AppFooter />
     </div>
   )
 }
