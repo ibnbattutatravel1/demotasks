@@ -7,7 +7,7 @@
     "build:analyze": "ANALYZE=true next build",
     "dev": "next dev",
     "dev:turbo": "next dev --turbo",
-    "lint": "next lint",
+    "lint": "eslint . --ext .ts,.tsx",
     "start": "next start",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",

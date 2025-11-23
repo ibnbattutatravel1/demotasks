@@ -554,7 +554,7 @@ export function UserDashboard() {
                   <div>
                     <h4 className="font-medium text-slate-900 mb-3 flex items-center gap-2">
                       <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
-                      Today's Schedule
+                      Today&apos;s Schedule
                     </h4>
                     <div className="space-y-2">
                       {getTodaysEvents().length > 0 ? (
