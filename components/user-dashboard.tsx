@@ -510,71 +510,8 @@ export function UserDashboard() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
-        {/* Top Bar */}
-        <div className="bg-white border-b border-slate-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1 text-sm text-slate-500">
-                <span>Taskara</span>
-                <ChevronRight className="h-3 w-3" />
-                <span>My Tasks</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <RoleSwitcher />
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="Search my projects and tasks..."
-                  className="pl-10 w-full sm:w-64 lg:w-80"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              </div>
-              <Button onClick={handleCreateTask} className="bg-indigo-500 hover:bg-indigo-600">
-                <Plus className="h-4 w-4 mr-2" />
-                New Task
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user?.avatar || "/placeholder-user.jpg"} />
-                      <AvatarFallback>{user?.name?.charAt(0) || "U"}</AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{user?.name}</p>
-                      <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
-                      <p className="text-xs leading-none text-muted-foreground capitalize">{user?.role} Account</p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleNavigation("/profile")}>
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleNavigation("/settings")}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </div>
-
         {/* Center Pane */}
-        <div className="flex-1 p-6 overflow-auto">
+        <div className="flex-1 p-4 sm:p-6 overflow-auto max-w-7xl mx-auto w-full">
           {(loadingProjects || loadingTasks) && (
             <div className="mb-4 rounded-md bg-slate-50 border border-slate-200 p-3 text-sm text-slate-700">
               Loading your projects and tasks...
@@ -587,24 +524,30 @@ export function UserDashboard() {
           )}
           <div className="mb-8">
             <Card className="mb-6">
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5 text-indigo-500" />
-                    <CardTitle className="text-lg font-semibold text-slate-900">My Calendar</CardTitle>
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-indigo-500" />
+                      <CardTitle className="text-lg font-semibold text-slate-900">My Calendar</CardTitle>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleNavigation("/calendar")}
+                        className="text-indigo-600 hover:text-indigo-700"
+                      >
+                        View Full Calendar
+                        <ChevronRight className="h-3 w-3 ml-1" />
+                      </Button>
+                      <Button size="sm" className="bg-indigo-500 hover:bg-indigo-600" onClick={handleCreateTask}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        New Task
+                      </Button>
+                    </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleNavigation("/calendar")}
-                    className="text-indigo-600 hover:text-indigo-700"
-                  >
-                    View Full Calendar
-                    <ChevronRight className="h-3 w-3 ml-1" />
-                  </Button>
-                </div>
-                <p className="text-sm text-slate-600">{formatDate(currentDate)}</p>
-              </CardHeader>
+                  <p className="text-sm text-slate-600">{formatDate(currentDate)}</p>
+                </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Today's Events */}
@@ -698,6 +641,22 @@ export function UserDashboard() {
                 </div>
               </CardContent>
             </Card>
+            <div className="flex items-center justify-between gap-3 mt-2">
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <span>My Tasks</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative w-full max-w-xs sm:max-w-none">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search my projects and tasks..."
+                    className="pl-10 w-full sm:w-64 lg:w-80"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="mb-6">

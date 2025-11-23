@@ -554,73 +554,8 @@ export function AdminDashboard() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
-        {/* Top Bar */}
-        <div className="bg-white border-b border-slate-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1 text-sm text-slate-500">
-                <span>Taskara</span>
-                <ChevronRight className="h-3 w-3" />
-                <span>Admin Panel</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <RoleSwitcher />
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="Search projects and tasks..."
-                  className="pl-10 w-full sm:w-64 lg:w-80"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              </div>
-              <CreateProjectDialog onProjectCreated={handleProjectCreated}>
-                <Button className="bg-indigo-500 hover:bg-indigo-600">
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Project
-                </Button>
-              </CreateProjectDialog>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user?.avatar || "/placeholder-user.jpg"} />
-                      <AvatarFallback>{user?.name?.charAt(0) || "A"}</AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{user?.name}</p>
-                      <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
-                      <p className="text-xs leading-none text-muted-foreground capitalize">{user?.role} Account</p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleNavigation("/profile")}>
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleNavigation("/settings")}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </div>
-
         {/* Dashboard Metrics */}
-        <div className="p-6 space-y-6">
+        <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto w-full">
           {loading && <div className="text-sm text-slate-500">Loading data…</div>}
           {error && !loading && <div className="text-sm text-red-600">{error}</div>}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -769,9 +704,28 @@ export function AdminDashboard() {
               </Card>
             </div>
 
-          <div className="mb-6 px-6">
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">Project Overview</h2>
-            <div className="flex items-center gap-3 mb-4">
+          <div className="mb-6 px-2 sm:px-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
+              <h2 className="text-2xl font-bold text-slate-900">Project Overview</h2>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="relative w-full max-w-xs sm:max-w-none">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search projects and tasks..."
+                    className="pl-10 w-full sm:w-64 lg:w-80"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </div>
+                <CreateProjectDialog onProjectCreated={handleProjectCreated}>
+                  <Button size="sm" className="bg-indigo-500 hover:bg-indigo-600">
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Project
+                  </Button>
+                </CreateProjectDialog>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 mb-4 flex-wrap">
               <Badge
                 variant="outline"
                 className={`bg-${filteredProjects.length > 0 ? filteredProjects[0].color : "indigo"}-50 text-${filteredProjects.length > 0 ? filteredProjects[0].color : "indigo"}-700 border-${filteredProjects.length > 0 ? filteredProjects[0].color : "indigo"}-200`}
